@@ -213,17 +213,42 @@ public partial class CategoryFilePanel : UserControl
     private void ShowErrorSafe(string message) =>
         MessageBox.Show(message, "错误", MessageBoxButton.OK, MessageBoxImage.Warning);
 
-    /// <summary>
-    /// 解析右键菜单目标分类:取 ContextMenu 弹出位置对应的 TreeViewItem
-    /// (右键不改变选中,必须从 PlacementTarget 取,否则未先左击时无反应),
-    /// 取不到回退到当前选中项(键盘菜单等场景)。
-    /// </summary>
-    private static Category? CategoryFromMenuItem(RoutedEventArgs e) =>
-        e.OriginalSource is MenuItem { Parent: ContextMenu menu }
-        && menu.PlacementTarget is TreeViewItem item
-        && item.Header is Category category
-            ? category
-            : null;
+    // 右键命中的分类节点:ContextMenu 挂在 TreeView 整体上,
+    // PlacementTarget 是 TreeView(不是节点),必须在右键时记下命中的 TreeViewItem
+    private Category? _contextMenuCategory;
+
+    /// <summary>右键打开菜单前记录命中的分类(菜单命令的真正目标)。</summary>
+    private void OnCategoryTreeContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        _contextMenuCategory = null;
+        if (e.OriginalSource is DependencyObject source)
+        {
+            var item = FindAncestor<TreeViewItem>(source);
+            if (item?.Header is Category category)
+                _contextMenuCategory = category;
+        }
+        e.Handled = false; // 仍让菜单正常弹出
+    }
+
+    private static T? FindAncestor<T>(DependencyObject node) where T : DependencyObject
+    {
+        while (node is not null)
+        {
+            if (node is T typed) return typed;
+            node = System.Windows.Media.VisualTreeHelper.GetParent(node);
+        }
+        return null;
+    }
+
+    /// <summary>菜单命令目标:优先右键命中的分类,回退当前选中项。</summary>
+    private Category? CategoryFromMenuItem(RoutedEventArgs e) =>
+        _contextMenuCategory ?? CategoryTree.SelectedItem as Category;
+
+    internal Category? GetContextMenuCategory() => _contextMenuCategory;
+
+    /// <summary>测试桥:以指定节点为源记录右键目标(与事件路径同一逻辑)。</summary>
+    internal void RecordContextMenuTarget(TreeViewItem item) =>
+        _contextMenuCategory = item.Header as Category;
 
     private async void OnCreateChild(object sender, RoutedEventArgs e)
     {

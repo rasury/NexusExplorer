@@ -78,6 +78,7 @@
                   VirtualizingPanel.IsVirtualizing="True"
                   AllowDrop="True"
                   SelectedItemChanged="OnCategorySelected"
+                  ContextMenuOpening="OnCategoryTreeContextMenuOpening"
                   Drop="OnTreeDrop"
                   DragOver="OnTreeDragOver">
             <TreeView.ContextMenu>
