@@ -15,16 +15,20 @@
                MouseLeftButtonUp="OnVideoAreaClick" />
 
         <!-- 图片层 -->
+        <!-- 图片层:默认 Fit 窗口,滚轮以鼠标位置为中心缩放,可拖拽平移 -->
         <ScrollViewer x:Name="ImageScroll"
                       Visibility="Collapsed"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto"
-                      Background="Black"
-                      MouseWheel="OnImageWheel">
+                      Background="Black">
             <Image x:Name="ImageDisplay"
                    RenderOptions.BitmapScalingMode="HighQuality"
                    Stretch="Uniform"
-                   StretchDirection="DownOnly" />
+                   MouseWheel="OnImageWheel"
+                   MouseLeftButtonDown="OnImageMouseDown"
+                   MouseLeftButtonUp="OnImageMouseUp"
+                   MouseMove="OnImageMouseMove"
+                   Cursor="SizeAll" />
         </ScrollViewer>
 
         <!-- 音频层:点击切换播放/暂停 -->
@@ -60,8 +64,8 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!-- 进度 -->
-                <Grid Grid.Row="0" Margin="0,0,0,8">
+                <!-- 进度(视频/音频) -->
+                <Grid x:Name="ProgressRow" Grid.Row="0" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -93,8 +97,8 @@
                                Margin="10,0,0,0" />
                 </Grid>
 
-                <!-- 按钮行 -->
-                <StackPanel Grid.Row="1"
+                <!-- 按钮行(视频/音频) -->
+                <StackPanel x:Name="MediaButtonsRow" Grid.Row="1"
                             Orientation="Horizontal"
                             HorizontalAlignment="Center">
                     <Button Style="{StaticResource ButtonOnPlayer}"
@@ -112,24 +116,39 @@
                             Content="⏭ 下一项" MinWidth="72"
                             Click="OnNext" />
 
+                    <!-- 图片专用控件行 -->
+                    <StackPanel x:Name="ImageButtonsRow" Grid.Row="0" Grid.RowSpan="2"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed">
+                        <Button Style="{StaticResource ButtonOnPlayer}"
+                                Content="⏮ 上一张" MinWidth="84"
+                                Click="OnPrevious" />
+                        <Button Style="{StaticResource ButtonOnPlayer}"
+                                Content="＋" MinWidth="40" FontSize="17"
+                                Click="OnZoomIn" Margin="16,0,0,0" />
+                        <Button x:Name="ZoomResetButton"
+                                Style="{StaticResource ButtonOnPlayer}"
+                                Content="适合窗口" MinWidth="72"
+                                Click="OnZoomReset" Margin="6,0,0,0" />
+                        <Button Style="{StaticResource ButtonOnPlayer}"
+                                Content="－" MinWidth="40" FontSize="17"
+                                Click="OnZoomOut" Margin="6,0,0,0" />
+                        <Button Style="{StaticResource ButtonOnPlayer}"
+                                Content="1:1" MinWidth="52"
+                                Click="OnZoomOriginal" Margin="6,0,0,0" />
+                        <Button Style="{StaticResource ButtonOnPlayer}"
+                                Content="⏭ 下一张" MinWidth="84"
+                                Click="OnNext" Margin="16,0,0,0" />
+                    </StackPanel>
+
                     <!-- 播放模式(音频) -->
                     <Button x:Name="ModeButton"
                             Style="{StaticResource ButtonOnPlayer}"
                             Content="➡ 顺序" MinWidth="88"
                             Click="OnCycleMode"
                             Visibility="Collapsed" />
-
-                    <!-- 图片缩放 -->
-                    <StackPanel x:Name="ZoomButtons"
-                                Orientation="Horizontal"
-                                Visibility="Collapsed">
-                        <Button Style="{StaticResource ButtonOnPlayer}" Content="－"
-                                Click="OnZoomOut" MinWidth="36" />
-                        <Button Style="{StaticResource ButtonOnPlayer}" Content="＋"
-                                Click="OnZoomIn" MinWidth="36" />
-                        <Button Style="{StaticResource ButtonOnPlayer}" Content="1:1"
-                                Click="OnZoomReset" MinWidth="46" />
-                    </StackPanel>
 
                     <!-- 音量 -->
                     <StackPanel x:Name="VolumePanel"

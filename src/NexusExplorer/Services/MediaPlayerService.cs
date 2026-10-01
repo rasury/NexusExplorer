@@ -75,6 +75,16 @@ public class MediaPlayerService : IDisposable
     /// <summary>当前媒体播放完毕(VLC 线程触发)。前进策略由 UI 层决定。</summary>
     public event Action? MediaEnded;
 
+    /// <summary>
+    /// 设置输出角色:纯音频播 Music(系统对 Video 角色会套视频流音效链,
+    /// 如动态范围处理,音乐听感发闷/有损)。视频文件的音轨保持 Video。
+    /// </summary>
+    public void SetMusicRole(bool music)
+    {
+        if (!IsVlcReady) return;
+        Player.SetRole(music ? MediaPlayerRole.Music : MediaPlayerRole.Video);
+    }
+
     public event Action<string, string>? PlaybackError;
 
     // VLC 回调委托必须保活,否则被 GC 后原生回调崩溃
@@ -103,7 +113,9 @@ public class MediaPlayerService : IDisposable
         _libVlcLazy = new Lazy<LibVLC>(() =>
         {
             Log.Information("初始化 LibVLC…");
-            var libVlc = new LibVLC("--no-osd");
+            // --audio-resampler=soxr:高质量重采样(默认 float 精度较低);
+// 无需 --norm-broadcast 等,LibVLC 默认不做响度规格化
+            var libVlc = new LibVLC("--no-osd", "--audio-resampler=soxr");
             Log.Information("LibVLC 初始化完成");
             return libVlc;
         }, LazyThreadSafetyMode.ExecutionAndPublication);

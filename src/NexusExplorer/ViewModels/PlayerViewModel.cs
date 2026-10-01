@@ -268,6 +268,8 @@ public partial class PlayerViewModel : ObservableObject
         // VLC 冷启动初始化可能未完成(Lazy 触发会阻塞),放后台线程执行
         _ = Task.Run(() =>
         {
+            // 纯音频按 Music 角色输出(避免视频流音效处理);视频含音轨保持 Video
+            _mediaPlayer.SetMusicRole(Kind == MediaKind.Audio);
             _mediaPlayer.Play(playlist, index);
             // 用户没动过音量 → 保持 VLC 默认 100(零损耗);
             // VLC 的音量是软件衰减,主动写 <100 会造成量化损失
@@ -360,16 +362,19 @@ public partial class PlayerViewModel : ObservableObject
         StateChanged?.Invoke();
     }
 
-    /// <summary>图片缩放(滚轮)。</summary>
+    /// <summary>
+    /// 图片缩放系数:0 = Fit 窗口(默认);&gt;0 = 缩放系数(1.0 = 原始像素)。
+    /// </summary>
     public void Zoom(double delta)
     {
-        ImageScale = Math.Clamp(ImageScale * delta, 0.1, 10.0);
+        var current = ImageScale < 0.001 ? 1.0 : ImageScale;
+        ImageScale = Math.Clamp(current * delta, 0.05, 20.0);
         StateChanged?.Invoke();
     }
 
     public void ResetZoom()
     {
-        ImageScale = 1.0;
+        ImageScale = 0; // 回到 Fit 窗口
         StateChanged?.Invoke();
     }
 }

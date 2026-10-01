@@ -247,8 +247,10 @@ public partial class PlayerPanel : UserControl
                 ImageScroll.Visibility = Visibility.Collapsed;
                 AudioLayer.Visibility = Visibility.Collapsed;
                 ControlsBar.Visibility = Visibility.Visible;
+                ProgressRow.Visibility = Visibility.Visible;
+                MediaButtonsRow.Visibility = Visibility.Visible;
+                ImageButtonsRow.Visibility = Visibility.Collapsed;
                 ModeButton.Visibility = Visibility.Collapsed;
-                ZoomButtons.Visibility = Visibility.Collapsed;
                 VolumePanel.Visibility = Visibility.Visible;
                 ShowControls(); // 开始播放即计时,2 秒后隐藏进入沉浸
                 break;
@@ -259,21 +261,27 @@ public partial class PlayerPanel : UserControl
                 AudioLayer.Visibility = Visibility.Visible;
                 AudioTitle.Text = Vm.MediaTitle ?? string.Empty;
                 ControlsBar.Visibility = Visibility.Visible;
+                ProgressRow.Visibility = Visibility.Visible;
+                MediaButtonsRow.Visibility = Visibility.Visible;
+                ImageButtonsRow.Visibility = Visibility.Collapsed;
                 ModeButton.Visibility = Visibility.Visible;
-                ZoomButtons.Visibility = Visibility.Collapsed;
                 VolumePanel.Visibility = Visibility.Visible;
                 ShowControls();
                 break;
 
             case MediaKind.Image:
+                // 图片模式:专用控件(上一张/下一张/缩放),隐藏进度与媒体控件
                 VideoImage.Visibility = Visibility.Collapsed;
                 ImageScroll.Visibility = Visibility.Visible;
                 AudioLayer.Visibility = Visibility.Collapsed;
                 ControlsBar.Visibility = Visibility.Visible;
+                ProgressRow.Visibility = Visibility.Collapsed;
+                MediaButtonsRow.Visibility = Visibility.Collapsed;
+                ImageButtonsRow.Visibility = Visibility.Visible;
                 ModeButton.Visibility = Visibility.Collapsed;
-                ZoomButtons.Visibility = Visibility.Visible;
                 VolumePanel.Visibility = Visibility.Collapsed;
                 ImageDisplay.Source = Vm.ImageSource;
+                ApplyImageZoom();
                 break;
 
             case MediaKind.Unsupported:
@@ -374,38 +382,125 @@ public partial class PlayerPanel : UserControl
 
     private bool _volumeInitialized;
 
-    // ---------- 图片 ----------
+    // ---------- 图片:缩放与平移 ----------
 
+    // 拖拽平移状态
+    private bool _isPanning;
+    private Point _panStartPoint;
+    private const double MinImageScale = 0.05;
+    private const double MaxImageScale = 20.0;
+
+    /// <summary>滚轮缩放:以鼠标位置为不动点(缩放中心跟随光标)。</summary>
     private void OnImageWheel(object sender, MouseWheelEventArgs e)
     {
         if (Vm.Kind != MediaKind.Image) return;
-        Vm.Zoom(e.Delta > 0 ? 1.15 : 1 / 1.15);
+
+        var position = e.GetPosition(ImageScroll);
+        var factor = e.Delta > 0 ? 1.2 : 1 / 1.2;
+        ZoomAt(position, factor);
+        e.Handled = true;
+    }
+
+    /// <summary>缩放并保持 scroll 视口内锚点位置。</summary>
+    private void ZoomAt(Point viewportAnchor, double factor)
+    {
+        var oldScale = Vm.ImageScale;
+        var newScale = Math.Clamp(oldScale * factor, MinImageScale, MaxImageScale);
+        if (Math.Abs(newScale - oldScale) < 0.0001) return;
+        var actualFactor = newScale / oldScale;
+
+        // 记录锚点处的偏移(缩放前)
+        var offsetX = ImageScroll.HorizontalOffset;
+        var offsetY = ImageScroll.VerticalOffset;
+        var anchorX = offsetX + viewportAnchor.X;
+        var anchorY = offsetY + viewportAnchor.Y;
+
+        Vm.ImageScale = newScale;
         ApplyImageZoom();
+        ImageScroll.UpdateLayout();
+
+        // 锚点保持:新的偏移 = 锚点内容坐标 × 实际缩放比 − 视口锚点
+        ImageScroll.ScrollToHorizontalOffset(anchorX * actualFactor - viewportAnchor.X);
+        ImageScroll.ScrollToVerticalOffset(anchorY * actualFactor - viewportAnchor.Y);
     }
 
     private void OnZoomIn(object sender, RoutedEventArgs e)
     {
-        Vm.Zoom(1.25);
-        ApplyImageZoom();
+        var center = new Point(ImageScroll.ViewportWidth / 2, ImageScroll.ViewportHeight / 2);
+        ZoomAt(center, 1.4);
     }
 
     private void OnZoomOut(object sender, RoutedEventArgs e)
     {
-        Vm.Zoom(1 / 1.25);
-        ApplyImageZoom();
+        var center = new Point(ImageScroll.ViewportWidth / 2, ImageScroll.ViewportHeight / 2);
+        ZoomAt(center, 1 / 1.4);
     }
 
+    /// <summary>适合窗口(默认态)。</summary>
     private void OnZoomReset(object sender, RoutedEventArgs e)
     {
         Vm.ResetZoom();
         ApplyImageZoom();
+        ImageScroll.ScrollToHome();
     }
 
+    /// <summary>1:1 原始像素尺寸。</summary>
+    private void OnZoomOriginal(object sender, RoutedEventArgs e)
+    {
+        Vm.ResetZoom();
+        Vm.ImageScale = 1.0; // 1.0 = 原始尺寸(见 ApplyImageZoom)
+        ApplyImageZoom();
+        // 居中
+        ImageScroll.UpdateLayout();
+        ImageScroll.ScrollToHorizontalOffset(Math.Max(0, (ImageScroll.ScrollableWidth) / 2));
+        ImageScroll.ScrollToVerticalOffset(Math.Max(0, (ImageScroll.ScrollableHeight) / 2));
+    }
+
+    // 拖拽平移
+    private void OnImageMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (Vm.Kind != MediaKind.Image) return;
+        _isPanning = true;
+        _panStartPoint = e.GetPosition(ImageScroll);
+        ImageDisplay.CaptureMouse();
+    }
+
+    private void OnImageMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_isPanning) return;
+        var position = e.GetPosition(ImageScroll);
+        var dx = position.X - _panStartPoint.X;
+        var dy = position.Y - _panStartPoint.Y;
+        ImageScroll.ScrollToHorizontalOffset(ImageScroll.HorizontalOffset - dx);
+        ImageScroll.ScrollToVerticalOffset(ImageScroll.VerticalOffset - dy);
+        _panStartPoint = position;
+    }
+
+    private void OnImageMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        _isPanning = false;
+        ImageDisplay.ReleaseMouseCapture();
+    }
+
+    /// <summary>
+    /// 应用缩放:0 = Fit 窗口(Uniform);其余值 = 缩放系数(1.0 = 原始像素)。
+    /// </summary>
     private void ApplyImageZoom()
     {
-        ImageDisplay.Stretch = Vm.ImageScale > 1.0 ? Stretch.None : Stretch.Uniform;
-        ImageDisplay.LayoutTransform = Vm.ImageScale > 1.0
-            ? new ScaleTransform(Vm.ImageScale, Vm.ImageScale)
-            : null;
+        if (Vm.ImageScale is < 0.001)
+        {
+            // Fit 模式
+            ImageDisplay.Stretch = Stretch.Uniform;
+            ImageDisplay.LayoutTransform = null;
+            ZoomResetButton.Content = "适合窗口";
+        }
+        else
+        {
+            // 实际尺寸 = Fit 尺寸 × scale 不直观;直接用原始像素:
+            // Stretch=None + ScaleTransform(scale)
+            ImageDisplay.Stretch = Stretch.None;
+            ImageDisplay.LayoutTransform = new ScaleTransform(Vm.ImageScale, Vm.ImageScale);
+            ZoomResetButton.Content = Vm.ImageScale == 1.0 ? "1:1" : $"{Vm.ImageScale:0.0}×";
+        }
     }
 }
