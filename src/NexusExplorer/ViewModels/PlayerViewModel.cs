@@ -196,11 +196,16 @@ public partial class PlayerViewModel : ObservableObject
     {
         try
         {
-            // 解码+Freeze 都在后台线程完成(BitmapCacheOption.OnLoad 已同步读入内存,
-            // 后台线程拥有位图可安全 Freeze;冻结后 UI 线程才能直接使用)
-            var source = await Task.Run(() => LoadBitmap(file.AbsolutePath));
-            if (source is not null && !source.IsFrozen)
-                source.Freeze();
+            // 解码+Freeze 都在后台线程内完成——WPF Freezable 的属性读取
+            // (含 IsFrozen)同样受线程亲和保护,任何访问都不得跨线程;
+            // 冻结后的位图才能安全交给 UI 线程
+            var source = await Task.Run(() =>
+            {
+                var bitmap = LoadBitmap(file.AbsolutePath);
+                if (bitmap is not null && !bitmap.IsFrozen)
+                    bitmap.Freeze();
+                return bitmap;
+            });
             ImageSource = source;
         }
         catch (Exception ex)
