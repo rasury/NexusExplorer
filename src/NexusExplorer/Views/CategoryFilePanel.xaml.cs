@@ -213,37 +213,54 @@ public partial class CategoryFilePanel : UserControl
     private void ShowErrorSafe(string message) =>
         MessageBox.Show(message, "错误", MessageBoxButton.OK, MessageBoxImage.Warning);
 
+    /// <summary>
+    /// 解析右键菜单目标分类:取 ContextMenu 弹出位置对应的 TreeViewItem
+    /// (右键不改变选中,必须从 PlacementTarget 取,否则未先左击时无反应),
+    /// 取不到回退到当前选中项(键盘菜单等场景)。
+    /// </summary>
+    private static Category? CategoryFromMenuItem(RoutedEventArgs e) =>
+        e.OriginalSource is MenuItem { Parent: ContextMenu menu }
+        && menu.PlacementTarget is TreeViewItem item
+        && item.Header is Category category
+            ? category
+            : null;
+
     private async void OnCreateChild(object sender, RoutedEventArgs e)
     {
-        if (CategoryTree.SelectedItem is not Category category) return;
+        var category = CategoryFromMenuItem(e) ?? CategoryTree.SelectedItem as Category;
+        if (category is null) return;
         try { await CategoryVm.CreateChildAsync(category); }
         catch (Exception ex) { Serilog.Log.Error(ex, "新建子分类失败"); ShowErrorSafe(ex.Message); }
     }
 
     private async void OnRenameCategory(object sender, RoutedEventArgs e)
     {
-        if (CategoryTree.SelectedItem is not Category category) return;
+        var category = CategoryFromMenuItem(e) ?? CategoryTree.SelectedItem as Category;
+        if (category is null) return;
         try { await CategoryVm.RenameAsync(category); }
         catch (Exception ex) { Serilog.Log.Error(ex, "重命名分类失败"); ShowErrorSafe(ex.Message); }
     }
 
     private async void OnDeleteCategory(object sender, RoutedEventArgs e)
     {
-        if (CategoryTree.SelectedItem is not Category category) return;
+        var category = CategoryFromMenuItem(e) ?? CategoryTree.SelectedItem as Category;
+        if (category is null) return;
         try { await CategoryVm.DeleteAsync(category); }
         catch (Exception ex) { Serilog.Log.Error(ex, "删除分类失败"); ShowErrorSafe(ex.Message); }
     }
 
     private async void OnMoveCategoryUp(object sender, RoutedEventArgs e)
     {
-        if (CategoryTree.SelectedItem is not Category category) return;
+        var category = CategoryFromMenuItem(e) ?? CategoryTree.SelectedItem as Category;
+        if (category is null) return;
         try { await CategoryVm.MoveUpAsync(category); }
         catch (Exception ex) { Serilog.Log.Error(ex, "分类上移失败"); ShowErrorSafe(ex.Message); }
     }
 
     private async void OnMoveCategoryDown(object sender, RoutedEventArgs e)
     {
-        if (CategoryTree.SelectedItem is not Category category) return;
+        var category = CategoryFromMenuItem(e) ?? CategoryTree.SelectedItem as Category;
+        if (category is null) return;
         try { await CategoryVm.MoveDownAsync(category); }
         catch (Exception ex) { Serilog.Log.Error(ex, "分类下移失败"); ShowErrorSafe(ex.Message); }
     }
@@ -265,7 +282,8 @@ public partial class CategoryFilePanel : UserControl
     /// <summary>钉到底栏快捷分类层。</summary>
     private async void OnPinCategory(object sender, RoutedEventArgs e)
     {
-        if (CategoryTree.SelectedItem is not Category category) return;
+        var category = CategoryFromMenuItem(e) ?? CategoryTree.SelectedItem as Category;
+        if (category is null) return;
         try
         {
             var categoryService = AppServices.Categories;
@@ -284,7 +302,8 @@ public partial class CategoryFilePanel : UserControl
     /// <summary>在资源管理器中打开分类对应的物理目录。</summary>
     private void OnOpenCategoryInExplorer(object sender, RoutedEventArgs e)
     {
-        if (CategoryTree.SelectedItem is not Category category) return;
+        var category = CategoryFromMenuItem(e) ?? CategoryTree.SelectedItem as Category;
+        if (category is null) return;
         if (!Services.ExplorerService.OpenDirectory(category.PhysicalPath))
             MessageBox.Show($"目录不存在:\n{category.PhysicalPath}", "提示",
                 MessageBoxButton.OK, MessageBoxImage.Information);
