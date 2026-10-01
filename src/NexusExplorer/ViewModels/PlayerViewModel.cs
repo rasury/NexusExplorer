@@ -63,7 +63,10 @@ public partial class PlayerViewModel : ObservableObject
     private TimeSpan _duration;
 
     [ObservableProperty]
-    private int _volume = 80;
+    private int _volume = 100; // 默认 100=VLC 原样输出(软件音量<100 有量化损耗)
+
+    /// <summary>用户是否调整过音量(未调整时绝不写 VLC,保持 0 损耗直出)。</summary>
+    private bool _userAdjustedVolume;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRepeatOne), nameof(IsRepeatAll), nameof(IsShuffle), nameof(IsSequential))]
@@ -193,8 +196,12 @@ public partial class PlayerViewModel : ObservableObject
     {
         try
         {
-            ImageSource = await Task.Run(() => LoadBitmap(file.AbsolutePath));
-            ImageSource?.Freeze();
+            // 解码+Freeze 都在后台线程完成(BitmapCacheOption.OnLoad 已同步读入内存,
+            // 后台线程拥有位图可安全 Freeze;冻结后 UI 线程才能直接使用)
+            var source = await Task.Run(() => LoadBitmap(file.AbsolutePath));
+            if (source is not null && !source.IsFrozen)
+                source.Freeze();
+            ImageSource = source;
         }
         catch (Exception ex)
         {
@@ -257,7 +264,9 @@ public partial class PlayerViewModel : ObservableObject
         _ = Task.Run(() =>
         {
             _mediaPlayer.Play(playlist, index);
-            if (_mediaPlayer.IsVlcReady)
+            // 用户没动过音量 → 保持 VLC 默认 100(零损耗);
+            // VLC 的音量是软件衰减,主动写 <100 会造成量化损失
+            if (_userAdjustedVolume && _mediaPlayer.IsVlcReady)
                 _mediaPlayer.Player.Volume = Volume;
         });
     }
@@ -319,6 +328,7 @@ public partial class PlayerViewModel : ObservableObject
     public void SetVolume(int volume)
     {
         Volume = Math.Clamp(volume, 0, 100);
+        _userAdjustedVolume = true;
         if (_mediaPlayer.IsVlcReady)
             _mediaPlayer.Player.Volume = Volume;
     }

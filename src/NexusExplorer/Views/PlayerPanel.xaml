@@ -144,7 +144,7 @@
                                 IsMoveToPointEnabled="True"
                                 VerticalAlignment="Center"
                                 ValueChanged="OnVolumeChanged"
-                                Value="80" />
+                                Value="100" />
                     </StackPanel>
                 </StackPanel>
             </Grid>
