@@ -167,14 +167,7 @@
                                 <Button Content="{Binding Name}"
                                         Style="{StaticResource NavCategoryButton}"
                                         Click="OnCategoryClick"
-                                        Tag="{Binding}"
-                                        ContextMenuService.Placement="Top">
-                                    <Button.ContextMenu>
-                                        <ContextMenu>
-                                            <MenuItem Header="📌 钉到底栏快捷分类" Click="OnPinCategory" />
-                                        </ContextMenu>
-                                    </Button.ContextMenu>
-                                </Button>
+                                        Tag="{Binding}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -237,7 +230,7 @@
             <!-- 空提示 -->
             <TextBlock x:Name="PinnedEmptyHint"
                        Grid.Column="1"
-                       Text="在上方分类上右键可钉到这里"
+                       Text="在左侧分类树上右键可钉到这里"
                        Style="{StaticResource TextCaption}"
                        VerticalAlignment="Center"
                        Visibility="Collapsed" />

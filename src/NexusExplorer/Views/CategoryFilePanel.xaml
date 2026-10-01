@@ -83,6 +83,7 @@
             <TreeView.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="在资源管理器中打开" Click="OnOpenCategoryInExplorer" />
+                    <MenuItem Header="📌 钉到底栏快捷分类" Click="OnPinCategory" />
                     <MenuItem Header="新建子分类" Click="OnCreateChild" />
                     <Separator />
                     <MenuItem Header="重命名" Click="OnRenameCategory" />

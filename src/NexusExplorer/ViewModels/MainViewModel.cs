@@ -79,6 +79,7 @@ public partial class MainViewModel : ObservableObject
     public async Task RefreshTreeAsync()
     {
         await Category.LoadTreeAsync();
+        await Navigation.RefreshPinnedAsync(); // 删除/移动分类后钉层同步
         // 当前分类可能已被删除/改名,重新取最新数据
         if (CurrentCategory is not null)
         {

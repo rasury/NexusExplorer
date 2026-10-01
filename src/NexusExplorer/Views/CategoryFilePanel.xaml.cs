@@ -262,6 +262,25 @@ public partial class CategoryFilePanel : UserControl
         // 单击仅预览标题,不自动播放;双击播放
     }
 
+    /// <summary>钉到底栏快捷分类层。</summary>
+    private async void OnPinCategory(object sender, RoutedEventArgs e)
+    {
+        if (CategoryTree.SelectedItem is not Category category) return;
+        try
+        {
+            var categoryService = AppServices.Categories;
+            if (categoryService is null) return;
+            await categoryService.PinAsync(category.Id);
+            // 刷新底栏快捷层
+            await _main.Navigation.OnPinsChangedAsync();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "钉住分类失败");
+            ShowErrorSafe($"钉住失败: {ex.Message}");
+        }
+    }
+
     /// <summary>在资源管理器中打开分类对应的物理目录。</summary>
     private void OnOpenCategoryInExplorer(object sender, RoutedEventArgs e)
     {

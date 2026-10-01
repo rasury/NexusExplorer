@@ -156,26 +156,7 @@ public partial class NavigationBar : UserControl
         }
     }
 
-    /// <summary>右键钉到底栏快捷层。</summary>
-    private async void OnPinCategory(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            if (sender is MenuItem { Parent: ContextMenu menu } && menu.PlacementTarget is Button { Tag: Category category })
-            {
-                await _main.Category.PinAsync(category.Id);
-                await Vm.OnPinsChangedAsync();
-            }
-        }
-        catch (Exception ex)
-        {
-            Serilog.Log.Error(ex, "钉住分类失败");
-            MessageBox.Show($"钉住失败: {ex.Message}", "分类导航",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
-    }
-
-    /// <summary>右键取消钉住。</summary>
+    /// <summary>右键取消钉住(入口在快捷分类按钮上)。</summary>
     private async void OnUnpinCategory(object sender, RoutedEventArgs e)
     {
         try
