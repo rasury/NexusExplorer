@@ -1,0 +1,171 @@
+<UserControl x:Class="NexusExplorer.Views.NavigationBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:NexusExplorer.Models"
+             Background="{StaticResource BrushPanelBg}"
+             BorderBrush="{StaticResource BrushDivider}"
+             BorderThickness="0,1,0,0">
+
+    <UserControl.Resources>
+        <!-- 导航分类按钮:点击=导航下钻 -->
+        <Style x:Key="NavCategoryButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource BrushAccentBlueLight}" />
+            <Setter Property="Foreground" Value="{StaticResource BrushAccentBlue}" />
+            <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="14"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource BrushAccentBlue}" />
+                                <Setter Property="Foreground" Value="White" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource BrushSecondaryBg}" />
+                                <Setter Property="Foreground" Value="{StaticResource BrushDisabledText}" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 绿色打勾确认按钮 -->
+        <Style x:Key="ConfirmButton" TargetType="Button">
+            <Setter Property="Background" Value="#4CAF7D" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Padding" Value="0,5" />
+            <Setter Property="Width" Value="46" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="ToolTip" Value="把当前文件归入此分类" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="18"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.7" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Background" Value="{StaticResource BrushDisabledText}" />
+                                <Setter TargetName="border" Property="Opacity" Value="0.5" />
+                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter Property="ToolTip" Value="文件已在此分类中" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16,10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- 左侧:当前分类路径 -->
+        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
+            <TextBlock Text="当前分类:"
+                       Style="{StaticResource TextCaption}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,6,0" />
+            <TextBlock Text="{Binding CurrentPathText}"
+                       Style="{StaticResource TextPrimary}"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+        </StackPanel>
+
+        <!-- 中部:逐层分类导航(点击=导航,绿色勾=确认归类) -->
+        <ScrollViewer Grid.Column="1"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled"
+                      VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal">
+                <!-- 面包屑(导航路径) -->
+                <ItemsControl x:Name="BreadcrumbHost"
+                              ItemsSource="{Binding Breadcrumb}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:Category}">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="{Binding Name}"
+                                        Style="{StaticResource NavCategoryButton}"
+                                        Click="OnBreadcrumbClick"
+                                        Tag="{Binding}" />
+                                <TextBlock Text="›"
+                                           Style="{StaticResource TextSecondary}"
+                                           VerticalAlignment="Center"
+                                           Margin="2,0,8,0" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- 回到根层 -->
+                <Button x:Name="RootBackButton"
+                        Content="⌂ 顶层"
+                        Style="{StaticResource NavCategoryButton}"
+                        Click="OnBackToRoot"
+                        Visibility="Collapsed" />
+
+                <!-- 当前层子分类(点击=导航下钻并选中) -->
+                <ItemsControl x:Name="ChildrenHost"
+                              ItemsSource="{Binding Children}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:Category}">
+                            <Button Content="{Binding Name}"
+                                    Style="{StaticResource NavCategoryButton}"
+                                    Click="OnCategoryClick"
+                                    Tag="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 右侧:绿色打勾 = 确认把当前文件归入选中的分类 -->
+        <Button x:Name="ConfirmButton"
+                Grid.Column="2"
+                Style="{StaticResource ConfirmButton}"
+                Content="✔"
+                VerticalAlignment="Center"
+                Margin="16,0,0,0"
+                Click="OnConfirmClick" />
+    </Grid>
+</UserControl>

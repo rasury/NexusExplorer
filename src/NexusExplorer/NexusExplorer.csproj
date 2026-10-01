@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>NexusExplorer</AssemblyName>
+    <RootNamespace>NexusExplorer</RootNamespace>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!-- 便携版发布:托管 DLL 全部打包进单个 exe,保持发布目录整洁 -->
+  <PropertyGroup>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <!-- VLC 原生库不能进单文件(插件目录必须与 libvlc.dll 同级留在磁盘),
+       打包时排除,发布后从 NuGet 包完整复制 libvlc\win-x64 -->
+  <ItemGroup>
+    <None Include="libvlc\**\*.*" Exclude="libvlc\win-x86\**\*.*" Pack="false" />
+  </ItemGroup>
+
+  <Target Name="RestoreLibVlcNative" AfterTargets="Publish">
+    <PropertyGroup>
+      <LibVlcPackageDir>$(UserProfile)\.nuget\packages\videolan.libvlc.windows\3.0.21\build\x64</LibVlcPackageDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <LibVlcFiles Include="$(LibVlcPackageDir)\**\*.*" Exclude="$(LibVlcPackageDir)\include\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LibVlcFiles)"
+          DestinationFiles="@(LibVlcFiles->'$(PublishDir)libvlc\win-x64\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Message Text="已复制 VLC 原生库: @(LibVlcFiles->Count()) 个文件" Importance="high" />
+  </Target>
+
+  <!-- 发布后清理:VLC win-x86 目录(x64 目标用不到)与 createdump.exe -->
+  <Target Name="CleanPublishOutput" AfterTargets="Publish">
+    <RemoveDir Directories="$(PublishDir)libvlc\win-x86" Condition="Exists('$(PublishDir)libvlc\win-x86')" />
+    <Delete Files="$(PublishDir)createdump.exe" Condition="Exists('$(PublishDir)createdump.exe')" />
+    <Delete Files="$(PublishDir)NexusExplorer.pdb" Condition="Exists('$(PublishDir)NexusExplorer.pdb')" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="LibVLCSharp.WPF" Version="3.9.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.11.20" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

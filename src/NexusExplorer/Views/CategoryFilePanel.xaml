@@ -1,0 +1,126 @@
+<UserControl x:Class="NexusExplorer.Views.CategoryFilePanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:NexusExplorer.Models"
+             AllowDrop="True"
+             Background="{StaticResource BrushSecondaryBg}">
+
+    <UserControl.Resources>
+        <!-- 分类树节点模板 -->
+        <HierarchicalDataTemplate DataType="{x:Type models:Category}" ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="📁" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+            </StackPanel>
+        </HierarchicalDataTemplate>
+
+        <!-- 文件列表项模板 -->
+        <DataTemplate DataType="{x:Type models:FileItem}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Extension, Converter={StaticResource FileIconConverter}}"
+                           FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock x:Name="FileNameText"
+                           Text="{Binding FileName}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding ExistsOnDisk}" Value="False">
+                    <Setter TargetName="FileNameText" Property="Foreground" Value="{StaticResource BrushDisabledText}" />
+                    <Setter TargetName="FileNameText" Property="TextDecorations" Value="Strikethrough" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="120" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="120" />
+        </Grid.RowDefinitions>
+
+        <!-- 工具栏:WrapPanel 自动换行,窄面板下"整理"等按钮不再被裁剪 -->
+        <Border Grid.Row="0"
+                Background="{StaticResource BrushPanelBg}"
+                BorderBrush="{StaticResource BrushDivider}"
+                BorderThickness="0,0,0,1"
+                Padding="10,8">
+            <WrapPanel>
+                <Button Style="{StaticResource ButtonPrimary}"
+                        Content="＋ 新建分类"
+                        Padding="10,6"
+                        Command="{Binding CategoryVmBinding.CreateRootCommand}"
+                        Margin="0,0,6,0" />
+                <Button Style="{StaticResource ButtonGhost}"
+                        Content="添加文件"
+                        Padding="10,6"
+                        Command="{Binding FileListVmBinding.AddFilesCommand}"
+                        Margin="0,0,6,0" />
+                <Button Style="{StaticResource ButtonGhost}"
+                        Content="添加文件夹"
+                        Padding="10,6"
+                        Command="{Binding FileListVmBinding.AddFolderCommand}"
+                        Margin="0,0,6,0" />
+                <Button Style="{StaticResource ButtonSecondary}"
+                        Content="⚡ 整理"
+                        Padding="10,6"
+                        Command="{Binding OrganizeCommand}"
+                        ToolTip="将当前分类中的文件移动到分类对应的物理目录" />
+            </WrapPanel>
+        </Border>
+
+        <!-- 分类树 -->
+        <TreeView x:Name="CategoryTree"
+                  Grid.Row="1"
+                  Padding="6,8"
+                  VirtualizingPanel.IsVirtualizing="True"
+                  AllowDrop="True"
+                  SelectedItemChanged="OnCategorySelected"
+                  Drop="OnTreeDrop"
+                  DragOver="OnTreeDragOver">
+            <TreeView.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="新建子分类" Click="OnCreateChild" />
+                    <Separator />
+                    <MenuItem Header="重命名" Click="OnRenameCategory" />
+                    <MenuItem Header="上移" Click="OnMoveCategoryUp" />
+                    <MenuItem Header="下移" Click="OnMoveCategoryDown" />
+                    <Separator />
+                    <MenuItem Header="删除" Click="OnDeleteCategory" Foreground="{StaticResource BrushDanger}" />
+                </ContextMenu>
+            </TreeView.ContextMenu>
+        </TreeView>
+
+        <!-- 分割线 + 文件列表标题 -->
+        <Border Grid.Row="2"
+                Background="{StaticResource BrushPanelBg}"
+                BorderBrush="{StaticResource BrushDivider}"
+                BorderThickness="0,1,0,1"
+                Padding="10,6">
+            <TextBlock Text="{Binding FileListVmBinding.HeaderText, Mode=OneWay}"
+                       Style="{StaticResource TextCaption}" />
+        </Border>
+
+        <!-- 文件列表 -->
+        <ListBox x:Name="FileListBox"
+                 Grid.Row="3"
+                 Padding="6,4"
+                 AllowDrop="True"
+                 SelectionMode="Single"
+                 MouseDoubleClick="OnFileDoubleClick"
+                 Drop="OnFilesDrop"
+                 DragOver="OnFilesDragOver"
+                 SelectionChanged="OnFileSelected">
+            <ListBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="重新定位…" Click="OnRelocateFile" />
+                    <Separator />
+                    <MenuItem Header="从分类移除(保留源文件)" Click="OnRemoveFile" />
+                    <MenuItem Header="删除(源文件进回收站)" Click="OnDeleteFile" Foreground="{StaticResource BrushDanger}" />
+                </ContextMenu>
+            </ListBox.ContextMenu>
+        </ListBox>
+    </Grid>
+</UserControl>

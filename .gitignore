@@ -1,0 +1,13 @@
+bin/
+obj/
+publish/
+*.user
+.vs/
+data/
+logs/
+Storage/
+nexus.db*
+
+# 工具/临时文件
+.zcode/
+testmedia/
