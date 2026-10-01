@@ -262,6 +262,24 @@ public partial class CategoryFilePanel : UserControl
         // 单击仅预览标题,不自动播放;双击播放
     }
 
+    /// <summary>在资源管理器中打开分类对应的物理目录。</summary>
+    private void OnOpenCategoryInExplorer(object sender, RoutedEventArgs e)
+    {
+        if (CategoryTree.SelectedItem is not Category category) return;
+        if (!Services.ExplorerService.OpenDirectory(category.PhysicalPath))
+            MessageBox.Show($"目录不存在:\n{category.PhysicalPath}", "提示",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// <summary>在资源管理器中定位并选中文件。</summary>
+    private void OnOpenFileInExplorer(object sender, RoutedEventArgs e)
+    {
+        if (FileListBox.SelectedItem is not FileItem file) return;
+        if (!Services.ExplorerService.RevealFile(file.AbsolutePath))
+            MessageBox.Show($"文件不存在(可能已被外部移动或删除):\n{file.AbsolutePath}\n\n可右键选择「重新定位」。", "提示",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private async void OnRemoveFile(object sender, RoutedEventArgs e)
     {
         if (FileListBox.SelectedItem is not FileItem file) return;

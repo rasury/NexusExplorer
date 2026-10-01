@@ -82,6 +82,7 @@
                   DragOver="OnTreeDragOver">
             <TreeView.ContextMenu>
                 <ContextMenu>
+                    <MenuItem Header="在资源管理器中打开" Click="OnOpenCategoryInExplorer" />
                     <MenuItem Header="新建子分类" Click="OnCreateChild" />
                     <Separator />
                     <MenuItem Header="重命名" Click="OnRenameCategory" />
@@ -115,6 +116,7 @@
                  SelectionChanged="OnFileSelected">
             <ListBox.ContextMenu>
                 <ContextMenu>
+                    <MenuItem Header="在资源管理器中打开" Click="OnOpenFileInExplorer" />
                     <MenuItem Header="重新定位…" Click="OnRelocateFile" />
                     <Separator />
                     <MenuItem Header="从分类移除(保留源文件)" Click="OnRemoveFile" />
