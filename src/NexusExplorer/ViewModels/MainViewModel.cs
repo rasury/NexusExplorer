@@ -135,6 +135,24 @@ public partial class MainViewModel : ObservableObject
         await RefreshFilesAsync();
     }
 
+    /// <summary>
+    /// 整理前停止播放:正在播放的文件被 VLC 占用会导致 File.Move 失败
+    /// ("being used by another process")。清空当前文件引用但保留文件列表,
+    /// 整理完成后由 RefreshFilesAsync 重建。
+    /// </summary>
+    public async Task StopPlaybackForOrganizeAsync()
+    {
+        if (CurrentFile is null) return;
+
+        // 停止 VLC(释放文件句柄)并清空播放面板;
+        // 底部导航的路径显示回退到当前浏览分类
+        await Player.PlayFileAsync(null);
+        CurrentFile = null;
+        CurrentCategoryPath = CurrentCategory is null
+            ? string.Empty
+            : await _categoryService.GetCategoryPathAsync(CurrentCategory.Id);
+    }
+
     /// <summary>统计某分类子树内的文件总数(删除确认提示用)。</summary>
     public async Task<int> GetCurrentFileCountAsync(int categoryId)
     {

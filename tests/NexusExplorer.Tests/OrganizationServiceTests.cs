@@ -191,6 +191,22 @@ public class OrganizationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Organize_FileNotLocked_MovesSuccessfully()
+    {
+        // 回归:播放中的文件整理曾报"being used by another process"
+        // (UI 层已改为整理前停止播放;服务层验证正常移动路径)
+        var scifi = await _host.Categories.CreateAsync("科幻", null);
+        var a = _host.CreateTestFile("A.mp4");
+        await _host.Files.AddAsync(a, scifi.Id);
+
+        var results = await _host.Organization.OrganizeAsync(scifi.Id);
+
+        Assert.True(results[0].Success);
+        Assert.Equal(OrganizeOutcome.Moved, results[0].Outcome);
+        Assert.True(File.Exists(Path.Combine(scifi.PhysicalPath, "A.mp4")));
+    }
+
+    [Fact]
     public async Task Organize_NoConflictHandler_DefaultsToSkip()
     {
         var scifi = await _host.Categories.CreateAsync("科幻", null);

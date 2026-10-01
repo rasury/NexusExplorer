@@ -312,6 +312,15 @@ public partial class CategoryFilePanel : UserControl
         var organizationService = AppServices.Organization;
         if (organizationService is null) return;
 
+        // 正在播放的文件被 VLC 占用,File.Move 会报
+        // "being used by another process" — 整理前先停止播放;
+        // VLC 停止是异步的,稍等句柄释放
+        if (_main.CurrentFile is not null)
+        {
+            await _main.StopPlaybackForOrganizeAsync();
+            await Task.Delay(300);
+        }
+
         var result = await organizationService.OrganizeAsync(
             _main.CurrentCategory.Id,
             (fileName, targetPath) =>
