@@ -96,7 +96,7 @@ public partial class FileListViewModel : ObservableObject
 
         try
         {
-            var result = await _fileService.ImportDirectoryAsync(directory, _main.CurrentCategory.Id);
+            var result = await _fileService.ImportDirectoryAsync(directory, _main.CurrentCategory.Id, _categoryService);
             await _main.RefreshFilesAsync();
             ReportBatchResult(result);
         }
@@ -115,24 +115,52 @@ public partial class FileListViewModel : ObservableObject
             return;
         }
 
-        var files = new List<string>();
+        // 文件夹走镜像导入(目录结构 → 同名分类树);散文件平铺加入当前分类
+        var allResults = new List<BatchAddResult>();
+        var looseFiles = new List<string>();
+
         foreach (var path in paths)
         {
             if (Directory.Exists(path))
             {
-                files.AddRange(Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories));
+                try
+                {
+                    allResults.Add(await _fileService.ImportDirectoryAsync(
+                        path, _main.CurrentCategory.Id, _categoryService));
+                }
+                catch (Exception ex)
+                {
+                    ShowError?.Invoke($"导入文件夹失败: {ex.Message}");
+                }
             }
             else if (File.Exists(path))
             {
-                files.Add(path);
+                looseFiles.Add(path);
             }
         }
 
-        if (files.Count == 0) return;
+        if (looseFiles.Count > 0)
+            allResults.Add(await _fileService.AddRangeAsync(looseFiles, _main.CurrentCategory.Id));
 
-        var result = await _fileService.AddRangeAsync(files, _main.CurrentCategory.Id);
+        if (allResults.Count == 0) return;
+
+        // 镜像导入创建了新分类 → 刷新分类树
+        await _main.RefreshTreeAsync();
         await _main.RefreshFilesAsync();
-        ReportBatchResult(result);
+
+        var added = allResults.Sum(r => r.Added.Count);
+        var failed = allResults.SelectMany(r => r.Failed).ToList();
+        if (failed.Count == 0)
+        {
+            ShowInfo?.Invoke($"已导入 {added} 个文件(文件夹已按目录结构创建对应分类)。");
+        }
+        else
+        {
+            var errors = string.Join("\n", failed.Take(5).Select(f => $"• {f.FileName}: {f.Error}"));
+            if (failed.Count > 5)
+                errors += $"\n… 以及另外 {failed.Count - 5} 个失败";
+            ShowError?.Invoke($"成功导入 {added} 个,失败 {failed.Count} 个:\n{errors}");
+        }
     }
 
     private void ReportBatchResult(BatchAddResult result)

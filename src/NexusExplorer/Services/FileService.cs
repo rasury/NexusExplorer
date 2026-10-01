@@ -109,14 +109,55 @@ public class FileService
         return result;
     }
 
-    /// <summary>递归导入文件夹下所有文件(不移动,只登记)。</summary>
-    public async Task<BatchAddResult> ImportDirectoryAsync(string directory, int categoryId)
+    /// <summary>
+    /// 镜像导入文件夹:按磁盘目录结构创建同名分类树
+    /// (文件夹本身 → 同名子分类,子文件夹 → 再下一层,依此类推),
+    /// 每个文件登记到其所在目录对应的分类。不移动任何物理文件。
+    /// </summary>
+    public async Task<BatchAddResult> ImportDirectoryAsync(string directory, int categoryId, CategoryService categoryService)
     {
         if (!Directory.Exists(directory))
             throw new OperationException($"文件夹不存在: {directory}");
 
-        var files = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories);
-        return await AddRangeAsync(files, categoryId);
+        var result = new BatchAddResult();
+        var rootName = Path.GetFileName(directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+        // 根目录下直接的文件 → 加入目标分类本身
+        foreach (var file in Directory.EnumerateFiles(directory))
+        {
+            try
+            {
+                await AddAsync(file, categoryId);
+                result.Added.Add(Path.GetFileName(file));
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error(ex, "添加文件失败: {Path}", file);
+                result.Failed.Add((Path.GetFileName(file), ex.Message));
+            }
+        }
+
+        // 子目录递归:目录名 → 同名分类(不存在则创建),其下文件入该分类
+        foreach (var sub in Directory.EnumerateDirectories(directory))
+        {
+            try
+            {
+                var subName = Path.GetFileName(sub);
+                var subCategory = await categoryService.EnsurePathAsync(categoryId, new[] { subName });
+                var subResult = await ImportDirectoryAsync(sub, subCategory.Id, categoryService);
+                foreach (var added in subResult.Added) result.Added.Add(added);
+                foreach (var failed in subResult.Failed) result.Failed.Add(failed);
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error(ex, "镜像导入子目录失败: {Path}", sub);
+                result.Failed.Add((Path.GetFileName(sub), ex.Message));
+            }
+        }
+
+        Serilog.Log.Information("镜像导入完成: {Directory} -> 分类 {CategoryId}, 添加 {Added} 个文件, 失败 {Failed} 个",
+            directory, categoryId, result.Added.Count, result.Failed.Count);
+        return result;
     }
 
     // ---------- 重新分类 ----------

@@ -104,6 +104,41 @@ public class CategoryService
 
     // ---------- 创建 ----------
 
+    /// <summary>
+    /// 按目录相对结构确保分类链存在(镜像导入用):
+    /// 在 baseCategoryId 下按 names 逐级查找,不存在则创建。
+    /// 返回链末端的分类。名称冲突跳过(同名即视为同一分类)。
+    /// </summary>
+    public async Task<Category> EnsurePathAsync(int baseCategoryId, IReadOnlyList<string> names)
+    {
+        var currentId = (int?)baseCategoryId;
+        Category? current = null;
+
+        foreach (var name in names)
+        {
+            var trimmed = name.Trim();
+            if (trimmed.Length == 0) continue;
+
+            ValidateName(trimmed);
+            await using var db = await _dbFactory.CreateDbContextAsync();
+
+            var existing = await db.Categories
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.ParentId == currentId && c.Name == trimmed);
+            if (existing is not null)
+            {
+                current = existing;
+                currentId = existing.Id;
+                continue;
+            }
+
+            current = await CreateAsync(trimmed, currentId);
+            currentId = current.Id;
+        }
+
+        return current ?? (await GetByIdAsync(baseCategoryId))!;
+    }
+
     public async Task<Category> CreateAsync(string name, int? parentId)
     {
         ValidateName(name);

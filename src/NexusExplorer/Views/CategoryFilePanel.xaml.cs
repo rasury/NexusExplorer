@@ -389,23 +389,38 @@ public partial class CategoryFilePanel : UserControl
 
     private async Task OnTreeDropCore(DragEventArgs e)
     {
-        // Explorer 拖入文件/文件夹 → 加入目标分类
+        // Explorer 拖入文件/文件夹 → 文件夹镜像导入(目录结构→同名分类),散文件直接加入
         if (e.Data.GetData(DataFormats.FileDrop) is string[] paths && paths.Length > 0)
         {
             var target = GetCategoryFromDrop(e);
             if (target is null) return;
-            var files = new List<string>();
+
+            var categoryService = AppServices.Categories;
+            if (categoryService is null) return;
+
+            var looseFiles = new List<string>();
+            var added = 0;
             foreach (var path in paths)
             {
                 if (Directory.Exists(path))
-                    files.AddRange(Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories));
+                {
+                    var result = await AppServices.FileService!.ImportDirectoryAsync(path, target.Id, categoryService);
+                    added += result.Added.Count;
+                }
                 else if (File.Exists(path))
-                    files.Add(path);
+                {
+                    looseFiles.Add(path);
+                }
             }
-            if (files.Count == 0) return;
-            var result = await AppServices.FileService!.AddRangeAsync(files, target.Id);
+            if (looseFiles.Count > 0)
+            {
+                var result = await AppServices.FileService!.AddRangeAsync(looseFiles, target.Id);
+                added += result.Added.Count;
+            }
+            if (added == 0) return;
+            await _main.RefreshTreeAsync();
             await _main.RefreshFilesAsync();
-            MessageBox.Show($"已添加 {result.Added.Count} 个文件到「{target.Name}」", "提示",
+            MessageBox.Show($"已导入 {added} 个文件到「{target.Name}」(文件夹已按目录结构创建对应分类)", "提示",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }

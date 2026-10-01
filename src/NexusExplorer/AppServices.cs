@@ -16,5 +16,7 @@ public static class AppServices
 
     public static FileService? FileService => _provider?.GetService<FileService>();
 
+    public static CategoryService? Categories => _provider?.GetService<CategoryService>();
+
     public static void Initialize(ServiceProvider provider) => _provider = provider;
 }
