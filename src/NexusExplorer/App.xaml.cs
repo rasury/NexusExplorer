@@ -50,12 +50,13 @@ public partial class App : Application
         // 分类物理根目录跟随配置
         _services.GetRequiredService<CategoryService>().StorageRoot = config.Storage.ResolvedRoot;
 
-        // 数据库初始化
+        // 数据库初始化 + 轻量迁移(EnsureCreated 不改已有表结构)
         using (var scope = _services.CreateScope())
         {
             var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
             using var db = factory.CreateDbContext();
             db.Database.EnsureCreated();
+            MigrateDatabase(db, config.Database.ResolvedPath);
             Log.Information("数据库初始化完成: {Path}", config.Database.ResolvedPath);
         }
 
@@ -64,6 +65,32 @@ public partial class App : Application
         mainWindow.Show();
 
         Log.Information("主窗口已显示");
+    }
+
+    /// <summary>SQLite 轻量迁移:给已存在的表补缺失的列(EnsureCreated 不会改表)。</summary>
+    private static void MigrateDatabase(AppDbContext db, string dbPath)
+    {
+        try
+        {
+            var connection = db.Database.GetDbConnection();
+            connection.Open();
+
+            using var check = connection.CreateCommand();
+            check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Categories') WHERE name='IsPinned'";
+            var exists = Convert.ToInt64(check.ExecuteScalar()!) > 0;
+
+            if (!exists)
+            {
+                using var alter = connection.CreateCommand();
+                alter.CommandText = "ALTER TABLE Categories ADD COLUMN IsPinned INTEGER NOT NULL DEFAULT 0";
+                alter.ExecuteNonQuery();
+                Log.Information("数据库迁移: Categories.IsPinned 列已添加");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "数据库迁移检查失败(继续启动)");
+        }
     }
 
     private static ServiceProvider ConfigureServices(AppConfig config)

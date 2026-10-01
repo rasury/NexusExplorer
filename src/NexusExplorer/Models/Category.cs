@@ -15,6 +15,9 @@ public class Category
     /// <summary>同级排序,越小越靠前。</summary>
     public int SortOrder { get; set; }
 
+    /// <summary>是否钉在底栏快捷分类层。</summary>
+    public bool IsPinned { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

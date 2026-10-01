@@ -318,6 +318,44 @@ public class CategoryService
             targetParent is null ? "(顶层)" : targetParent.Name);
     }
 
+    // ---------- 快捷分类(底栏第二层) ----------
+
+    /// <summary>所有钉在底栏快捷层的分类(按钉的顺序)。</summary>
+    public async Task<List<Category>> GetPinnedAsync()
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        return await db.Categories
+            .AsNoTracking()
+            .Where(c => c.IsPinned)
+            .OrderBy(c => c.SortOrder)
+            .ThenBy(c => c.Id)
+            .ToListAsync();
+    }
+
+    /// <summary>钉到底栏快捷层。</summary>
+    public async Task PinAsync(int categoryId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var category = await db.Categories.FirstOrDefaultAsync(c => c.Id == categoryId)
+            ?? throw new OperationException("分类不存在。");
+        category.IsPinned = true;
+        category.UpdatedAt = DateTime.Now;
+        await db.SaveChangesAsync();
+        Log.Information("分类已钉到底栏: {Name}", category.Name);
+    }
+
+    /// <summary>从底栏快捷层取消。</summary>
+    public async Task UnpinAsync(int categoryId)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var category = await db.Categories.FirstOrDefaultAsync(c => c.Id == categoryId)
+            ?? throw new OperationException("分类不存在。");
+        category.IsPinned = false;
+        category.UpdatedAt = DateTime.Now;
+        await db.SaveChangesAsync();
+        Log.Information("分类已从底栏取消: {Name}", category.Name);
+    }
+
     // ---------- 排序 ----------
 
     /// <summary>同级排序:把分类移动到新位置(0-based index)。</summary>

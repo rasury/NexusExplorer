@@ -45,6 +45,10 @@ public partial class NavigationViewModel : ObservableObject
     [ObservableProperty]
     private bool _isAtRoot = true;
 
+    /// <summary>底栏第二层:用户钉的快捷分类。</summary>
+    [ObservableProperty]
+    private ObservableCollection<Category> _pinnedCategories = new();
+
     private int? _currentFileCategoryId;
 
     public Action<string>? ShowError { get; set; }
@@ -74,6 +78,7 @@ public partial class NavigationViewModel : ObservableObject
 
         SelectedCategory = Breadcrumb.Count > 0 ? Breadcrumb[^1] : null;
         await RefreshChildrenAsync();
+        await RefreshPinnedAsync();
     }
 
     /// <summary>从根到指定分类的祖先链(含自身)。</summary>
@@ -90,6 +95,29 @@ public partial class NavigationViewModel : ObservableObject
                 : await _categoryService.GetByIdAsync(current.ParentId.Value);
         }
         return chain;
+    }
+
+    /// <summary>刷新底栏第二层的快捷分类。</summary>
+    public async Task RefreshPinnedAsync()
+    {
+        var pinned = await _categoryService.GetPinnedAsync();
+        PinnedCategories = new ObservableCollection<Category>(pinned);
+    }
+
+    /// <summary>钉/取消钉后由 UI 调用:刷新钉层并保持选中态。</summary>
+    public async Task OnPinsChangedAsync()
+    {
+        await RefreshPinnedAsync();
+        UpdateSelectionState();
+    }
+
+    /// <summary>点击快捷分类:选中它(与导航层选中互斥,共用绿勾)。</summary>
+    public async Task SelectPinnedAsync(Category category)
+    {
+        // 快捷分类可能位于任意层级;面包屑同步展开到它的链(与导航层一致)
+        var chain = await GetAncestorChainAsync(category.Id);
+        Breadcrumb = new ObservableCollection<Category>(chain);
+        await RefreshChildrenAsync();
     }
 
     /// <summary>刷新当前层的子分类列表。</summary>

@@ -149,6 +149,32 @@ public partial class CategoryViewModel : ObservableObject
         }
     }
 
+    /// <summary>钉到底栏快捷分类层。</summary>
+    public async Task PinAsync(int categoryId)
+    {
+        try
+        {
+            await _categoryService.PinAsync(categoryId);
+        }
+        catch (Exception ex)
+        {
+            ShowError?.Invoke($"钉住失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>从底栏快捷分类层取消。</summary>
+    public async Task UnpinAsync(int categoryId)
+    {
+        try
+        {
+            await _categoryService.UnpinAsync(categoryId);
+        }
+        catch (Exception ex)
+        {
+            ShowError?.Invoke($"取消钉住失败: {ex.Message}");
+        }
+    }
+
     public async Task MoveUpAsync(Category category) => await MoveOffsetAsync(category, -1);
     public async Task MoveDownAsync(Category category) => await MoveOffsetAsync(category, 1);
 
