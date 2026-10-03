@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>NexusExplorer.AudioDiagnostic</AssemblyName>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp" Version="3.9.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <!-- Compile the production engine itself, not a copied approximation. -->
+    <Compile Include="../../src/NexusExplorer/Services/MediaPlayerService.cs" Link="Production/MediaPlayerService.cs" />
+    <Compile Include="../../src/NexusExplorer/Services/OperationException.cs" Link="Production/OperationException.cs" />
+    <Compile Include="../../src/NexusExplorer/Application/PlaybackContracts.cs" Link="Production/PlaybackContracts.cs" />
+    <EmbeddedResource Include="../../src/NexusExplorer/Services/MediaPlayerService.cs" LogicalName="ProductionEngine.cs" />
+  </ItemGroup>
+</Project>

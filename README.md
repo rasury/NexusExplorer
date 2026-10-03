@@ -46,5 +46,6 @@ dotnet test NexusExplorer.sln -c Release --no-restore --filter "FullyQualifiedNa
 - [2.0.1 第一轮反馈修正与验证](docs/FEEDBACK-2.0.1.md)
 - [2.0.2 分类整理状态与验收](docs/ORGANIZATION-STATUS-2.0.2.md)
 - [构建、旧库与真实媒体验证记录](docs/VERIFICATION.md)
+- [独立音频诊断与 A/B 对比](tools/AudioDiagnostic/README.md)
 - [当前移交说明](HANDOVER.md)
 - 第一版开发文档保留为历史需求；本次明确要求和已确认行为优先。

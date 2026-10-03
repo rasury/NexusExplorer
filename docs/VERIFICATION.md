@@ -61,3 +61,11 @@
 ## 用户图片作为软件图标
 
 2026-10-04：保留用户提供图片的完整画面，将 ICO 的 16/24/32/48/64/128/256 像素尺寸嵌入 EXE，并在主窗口引用同一 WPF 图标资源。仅执行资源相关的 1 项测试，通过且无跳过，实际 WPF 解码验证了小／大尺寸帧，输出在 artifacts/app-icon-related-tests.txt。从固定目录已发布 EXE 提取的 32×32 图标，与 ICO 对应帧逐像素一致。通过保护脚本原地更新，用户 data/Storage/logs/配置快照一致；未执行完整回归，也未启动软件或迁移真实数据库。更新输出在 artifacts/app-icon-fixed-update.txt。
+
+## 独立音频诊断
+
+2026-10-04：用户对比同一文件，系统播放器与官方 VLC 正常，NexusExplorer 从头到尾有破音；降低软件音量减轻但未消除。用户要求先测试，尚未修改正式音频逻辑。
+
+提供 tools/AudioDiagnostic 独立 WPF 工具，直接链接生产 MediaPlayerService 源码与接口，加载固定便携目录内同一套 VLC 3.0.21 库，只读硬件解码配置，不使用分类、数据库或主软件界面。A 调用 PlayAsync(path, true)，B 仅改为 PlayAsync(path, false)，比较 Music 与 Video 角色。默认不自动播放，独立日志记录引擎源码 SHA256、VLC 模块输出与音轨信息；操作说明见该工具 README。
+
+只执行直接相关的 Release 发布与静音原生输出自检：生成工具自有 WAV，两种角色均实际解码成功，暂停、恢复、停止、独占读取通过，退出码 0；结果在 artifacts/audio-diagnostic/verification.json。未执行完整应用测试，未启动主软件或打开真实数据库。此检查不验证听感，A/B 是否破音待用户确认。
