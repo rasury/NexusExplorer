@@ -47,7 +47,9 @@ public sealed class MediaPlayerService : IPlaybackEngine
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_player is not null) return;
-        _vlc = new LibVLC(true, "--no-osd");
+        // The user confirmed DirectSound removes the distortion heard with
+        // automatic Windows output. Apply it to both audio and video playback.
+        _vlc = new LibVLC(true, "--no-osd", "--aout=directsound");
         _vlc.Log += (_, e) => Log.Debug("VLC {Module}: {Message}", e.Module, e.Message);
         _player = new NativePlayer(_vlc) { EnableHardwareDecoding = HardwareDecoding };
         _player.EndReached += OnEnded;
@@ -86,7 +88,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
                 _player.Volume = _volume; _player.SetRate(1);
                 Interlocked.Exchange(ref _activeGeneration, generation);
                 if (!_player.Play(media)) throw new OperationException("播放器拒绝打开该媒体。");
-                Log.Information("播放 {Path};硬件解码 {Hardware};音量 {Volume};角色 {Role}", path, HardwareDecoding, _volume, audio ? "Music" : "Video");
+                Log.Information("播放 {Path};硬件解码 {Hardware};音量 {Volume};角色 {Role};请求音频输出 DirectSound", path, HardwareDecoding, _volume, audio ? "Music" : "Video");
             }, cancellationToken);
         }
         finally { _commands.Release(); }
