@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -102,12 +103,21 @@ public partial class CategoryFilePanel : UserControl
     }
     private void RefreshFileList()
     {
+        var timing = Stopwatch.StartNew();
         var ids = FileListBox.SelectedItems.Cast<FileItem>().Select(f => f.Id).ToHashSet();
         var offset = FindChild<ScrollViewer>(FileListBox)?.VerticalOffset ?? 0;
         FileListBox.ItemsSource = FileListVm.Files; FileListVm.UpdateHeader();
         foreach (var f in FileListVm.Files.Where(f => ids.Contains(f.Id))) FileListBox.SelectedItems.Add(f);
         _ = Dispatcher.BeginInvoke(() => FindChild<ScrollViewer>(FileListBox)?.ScrollToVerticalOffset(offset));
         _organizeCommand?.NotifyCanExecuteChanged();
+        var source = FileListBox.ItemsSource;
+        var categoryId = _main.CurrentCategory?.Id;
+        Log.Information("文件列表绑定完成;分类 {CategoryId};数量 {Count};耗时 {ElapsedMs:F1} ms", categoryId, FileListVm.Files.Count, timing.Elapsed.TotalMilliseconds);
+        _ = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, (Action)(() =>
+        {
+            if (ReferenceEquals(FileListBox.ItemsSource, source))
+                Log.Information("文件列表布局检查点;分类 {CategoryId};数量 {Count};绑定后 {ElapsedMs:F1} ms", categoryId, FileListBox.Items.Count, timing.Elapsed.TotalMilliseconds);
+        }));
     }
     public async Task RestoreBrowseAsync()
     {
@@ -245,11 +255,16 @@ public partial class CategoryFilePanel : UserControl
     {
         // Copy OLE data before returning Drop; never keep Explorer's drag loop in a dialog.
         var copiedPaths = paths.ToArray();
+        var queued = Stopwatch.StartNew();
+        var importId = Guid.NewGuid().ToString("N")[..8];
+        Log.Information("外部拖入已排队;导入 {ImportId};分类 {CategoryId};数量 {Count}", importId, target.Id, copiedPaths.Length);
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(async () =>
         {
+            Log.Information("外部拖入开始;导入 {ImportId};排队 {ElapsedMs:F1} ms", importId, queued.Elapsed.TotalMilliseconds);
             OperationStatus.Text = $"正在导入到「{target.Name}」…";
-            try { await FileListVm.ImportIntoAsync(copiedPaths, target); }
+            try { await FileListVm.ImportIntoAsync(copiedPaths, target, importId); }
             catch (Exception ex) { Log.Error(ex, "外部拖入失败"); OperationStatus.Text = $"导入失败：{ex.Message}"; }
+            finally { Log.Information("外部拖入结束;导入 {ImportId};总耗时 {ElapsedMs:F1} ms", importId, queued.Elapsed.TotalMilliseconds); }
         }));
     }
     private Category? DropTarget(DragEventArgs e) => IsControlChrome(e.OriginalSource as DependencyObject) ? null : FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.Header as Category;

@@ -1,5 +1,6 @@
 using NexusExplorer.ApplicationLayer;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using NexusExplorer.Models;
 using NexusExplorer.Services;
@@ -48,23 +49,36 @@ public partial class MainViewModel : ObservableObject
     }
     public async Task RefreshFilesAsync()
     {
+        var timing = Stopwatch.StartNew();
         var version = Interlocked.Increment(ref _browseVersion); var id = CurrentCategory?.Id;
+        Serilog.Log.Information("文件列表查询开始;请求 {Request};分类 {CategoryId}", version, id);
         var files = id is null ? new List<FileItem>() : await Files.GetByCategoryAsync(id.Value);
-        if (version != Interlocked.Read(ref _browseVersion)) return;
+        Serilog.Log.Information("文件列表查询结束;请求 {Request};分类 {CategoryId};数量 {Count};耗时 {ElapsedMs:F1} ms", version, id, files.Count, timing.Elapsed.TotalMilliseconds);
+        if (version != Interlocked.Read(ref _browseVersion))
+        {
+            Serilog.Log.Information("文件列表请求已过期;请求 {Request};最新请求 {LatestRequest};分类 {CategoryId}", version, Interlocked.Read(ref _browseVersion), id);
+            return;
+        }
         foreach (var f in files) f.IsCurrent = f.Id == CurrentFile?.Id;
         CurrentFiles = new ObservableCollection<FileItem>(files); FileListChanged?.Invoke();
     }
     public async Task RefreshTreeAsync()
     {
+        var timing = Stopwatch.StartNew();
         await Category.LoadTreeAsync();
+        Serilog.Log.Information("分类树查询结束;数量 {Count};耗时 {ElapsedMs:F1} ms", Category.FlatCategories.Count, timing.Elapsed.TotalMilliseconds);
         if (CurrentCategory is not null)
         {
+            timing.Restart();
             CurrentCategory = await Categories.GetByIdAsync(CurrentCategory.Id);
             CurrentCategoryPath = CurrentCategory is null ? "" : await Categories.GetCategoryPathAsync(CurrentCategory.Id);
+            Serilog.Log.Information("浏览分类解析结束;分类 {CategoryId};耗时 {ElapsedMs:F1} ms", CurrentCategory?.Id, timing.Elapsed.TotalMilliseconds);
             await RefreshFilesAsync();
         }
+        timing.Restart();
         await Navigation.RefreshAfterTreeChangeAsync();
         CategoryTreeChanged?.Invoke();
+        Serilog.Log.Information("分类树及导览刷新结束;耗时 {ElapsedMs:F1} ms", timing.Elapsed.TotalMilliseconds);
     }
     public async Task RefreshOrganizationStatesAsync()
     {

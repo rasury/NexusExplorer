@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NexusExplorer.Models;
@@ -116,11 +117,18 @@ public partial class FileListViewModel : ObservableObject
         await ImportIntoAsync(paths, _main.CurrentCategory);
     }
 
-    public async Task ImportIntoAsync(string[] paths, Category target)
+    public async Task ImportIntoAsync(string[] paths, Category target, string? importId = null)
     {
+        importId ??= Guid.NewGuid().ToString("N")[..8];
+        var timing = Stopwatch.StartNew();
+        Serilog.Log.Information("分类导入登记开始;导入 {ImportId};目标 {CategoryId};当前浏览 {BrowsedId};数量 {Count}", importId, target.Id, _main.CurrentCategory?.Id, paths.Length);
         var coordinator = new NexusExplorer.ApplicationLayer.ImportCoordinator(_fileService, _categoryService);
         var result = await coordinator.ImportAsync(paths, target.Id);
-        await _main.RefreshTreeAsync(); ReportBatchResult(result, nonBlocking: true);
+        Serilog.Log.Information("分类导入登记结束;导入 {ImportId};成功 {Added};失败 {Failed};耗时 {ElapsedMs:F1} ms", importId, result.Added.Count, result.Failed.Count, timing.Elapsed.TotalMilliseconds);
+        timing.Restart();
+        await _main.RefreshTreeAsync();
+        Serilog.Log.Information("分类导入刷新结束;导入 {ImportId};目标 {CategoryId};当前浏览 {BrowsedId};耗时 {ElapsedMs:F1} ms", importId, target.Id, _main.CurrentCategory?.Id, timing.Elapsed.TotalMilliseconds);
+        ReportBatchResult(result, nonBlocking: true);
     }
 
     private void ReportBatchResult(BatchAddResult result, bool nonBlocking = false)
