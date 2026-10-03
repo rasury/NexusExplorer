@@ -43,6 +43,8 @@ MutationGate 串行修改；未恢复日志阻止继续修改。同卷分类改�
 
 ## 媒体
 
+GIF 不再走静态 BitmapImage 的首帧加载。GifAnimation 在后台用现有 ImageSharp 识别尺寸及帧控制信息，用 WPF/WIC 解码原始局部帧，显式合成透明像素、背景恢复与前一画面恢复。没有新增或升级依赖；避开了 ImageSharp 3.1.11 在 disposal=2 后接 3 时的旧背景残影（独立 Pillow 参考图验证）。按 GIF 延时驱动 DispatcherTimer，缺失／零延时用 100ms；循环扩展为首次播放后的重复次数，0 无限，没有扩展只播放一次。界面更新同一 WriteableBitmap，不反复重置缩放和平移。切换、停止及面板卸载取消加载并停止动画、释放帧缓存，文件流在后台解码结束时关闭。解码前按原始帧、合成帧及缓冲区保守估算内存，超过 256MiB 时提示而不分配全部画布。
+
 软件图标使用用户提供的完整图片：Assets/AppIcon.png 保留原图，AppIcon.ico 包含 16/24/32/48/64/128/256 像素尺寸。ApplicationIcon 嵌入 EXE，WPF MainWindow.Icon 引用同一 ICO 的内嵌资源，窗口和任务栏统一。
 
 已移除 WPF 像素缓冲回调。一个 VLC 原生播放器串行执行 Play/Stop/Seek/初始化/退出，Stop 在工作线程同步完成；VLC 回调只向 Dispatcher 投递，旧会话事件按版本丢弃。默认音量 100、速率 1，没有主动启用均衡器或音效。

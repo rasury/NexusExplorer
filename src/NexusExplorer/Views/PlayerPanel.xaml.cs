@@ -45,7 +45,11 @@ public partial class PlayerPanel : UserControl
     { VideoView.MediaPlayer = Native?.NativePlayer; ApplyNativeBackground(); }
     private void ApplyNativeBackground() => _nativeBackground.Attach(VideoView.MediaPlayer?.Hwnd ?? IntPtr.Zero);
     public void Detach()
-    { _timer.Stop(); _nativeBackground.Dispose(); VideoView.MediaPlayer = null; }
+    {
+        _timer.Stop(); _nativeBackground.Dispose(); VideoView.MediaPlayer = null;
+        if (_initialized) Vm.ReleaseImagePreview();
+        ImageDisplay.Source = null;
+    }
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         Detach(); Vm.StateChanged -= UpdateUi;

@@ -88,6 +88,14 @@
 
 已通过保护脚本更新固定目录 artifacts/NexusExplorer-2.0.4-preview-win-x64。data/配置/日志的内容哈希与时间戳、Storage 文件和目录长度/时间戳前后快照一致，未启动主软件或执行数据库迁移，输出在 artifacts/directsound-fixed-update.txt。正式软件的 MP3、WAV/FLAC 与实际视频音轨听感仍需用户更新后复验。
 
+## GIF 动画预览
+
+2026-10-04：用户反馈 GIF 只显示第一帧，源码确认使用静态 BitmapImage 加载。新增 GIF 动画路径，保留静态图片路径及视频／音频 DirectSound 配置。使用 WPF/WIC 原始局部帧并显式合成，按帧延时与循环扩展播放，更新同一位图保留缩放和平移。首次采用 ImageSharp 3.1.11 的完整合成帧时，独立参考测试暴露 disposal=2 后接 3 的透明区域残影；现实现已通过该逐帧对比。
+
+只执行 GIF 及必要图片交互关联的 8 项测试，8 通过、0 失败、0 跳过，结果为 artifacts/gif-tests/gif-related.trx。合成 GIF 与 PNG 参考由 Pillow 独立生成，位于 tests/NexusExplorer.Tests/Assets/Gif，不含用户数据。覆盖真实 PlayerViewModel/PlayerPanel 动画、不同帧延时、无限循环、有限循环（重复一次确实播放两轮）、单帧、透明局部帧及两种恢复策略、缩放按钮、快速切图、停止／面板卸载后旧动画不再刷新，以及播放时文件独占读取。巨大逻辑画布在像素解码前被拒绝，避免压缩小文件导致过量画布分配。没有执行完整应用回归。
+
+固定目录更新采用现有保护脚本，输出在 artifacts/gif-fixed-update.txt；data/配置/日志的内容哈希与时间戳、Storage 元数据快照前后一致。未启动主软件或迁移真实数据库。用户实际 GIF 的画面与速度仍请在固定目录中的新程序中复验。
+
 ## 原生 SDK 排查警示
 
 2026-10-04：将本次经验记录为 SDK-INTEGRATION-LESSONS.md，并在根目录 AGENTS.md 固化后续 AI 的排查规则。区分实际模块/输出验证与功能成功，强调同库最小可编辑实验、单变量对比和证据边界。README 与 HANDOVER 已关联；更新脚本增加警示文档的发布清单。

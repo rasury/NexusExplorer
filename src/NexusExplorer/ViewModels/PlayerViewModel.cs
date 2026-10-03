@@ -2,6 +2,7 @@ using NexusExplorer.ApplicationLayer;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using NexusExplorer.Models;
 using NexusExplorer.Services;
@@ -19,6 +20,7 @@ public partial class PlayerViewModel : ObservableObject
     private long _version;
     private readonly Random _random = new();
     private readonly SemaphoreSlim _ended = new(1, 1);
+    private GifAnimation? _gif;
     [ObservableProperty] private MediaKind _kind;
     [ObservableProperty] private string? _mediaTitle;
     [ObservableProperty] private string? _mediaPath;
@@ -48,6 +50,7 @@ public partial class PlayerViewModel : ObservableObject
     {
         var version = Interlocked.Increment(ref _version);
         _opening?.Cancel(); _opening?.Dispose(); _opening = new CancellationTokenSource(); var token = _opening.Token;
+        ClearGifAnimation();
         await Engine.StopAndReleaseAsync();
         if (version != Interlocked.Read(ref _version)) return;
         ImageSource = null; ImageScale = 0; Position = TimeSpan.Zero; Duration = TimeSpan.Zero; IsPlaying = false;
@@ -58,8 +61,21 @@ public partial class PlayerViewModel : ObservableObject
         {
             if (Kind == MediaKind.Image)
             {
-                var image = await Task.Run(() => { var bitmap = LoadBitmap(file.AbsolutePath); if (bitmap is not null && !bitmap.IsFrozen) bitmap.Freeze(); return bitmap; }, token);
-                if (version == Interlocked.Read(ref _version)) ImageSource = image;
+                if (Path.GetExtension(file.FileName).Equals(".gif", StringComparison.OrdinalIgnoreCase))
+                {
+                    var decoded = await Task.Run(() => GifAnimation.DecodeAsync(file.AbsolutePath, token), token);
+                    if (version != Interlocked.Read(ref _version) || token.IsCancellationRequested)
+                    { decoded.Dispose(); return; }
+                    try { _gif = new GifAnimation(decoded, Dispatcher.CurrentDispatcher); }
+                    catch { decoded.Dispose(); throw; }
+                    ImageSource = _gif.Bitmap;
+                    _gif.Start();
+                }
+                else
+                {
+                    var image = await Task.Run(() => { var bitmap = LoadBitmap(file.AbsolutePath); if (bitmap is not null && !bitmap.IsFrozen) bitmap.Freeze(); return bitmap; }, token);
+                    if (version == Interlocked.Read(ref _version)) ImageSource = image;
+                }
             }
             else if (Kind is MediaKind.Video or MediaKind.Audio)
             {
@@ -71,6 +87,12 @@ public partial class PlayerViewModel : ObservableObject
         catch (OperationCanceledException) { }
         catch (Exception ex) { if (version == Interlocked.Read(ref _version)) OnPlaybackError(file.AbsolutePath, ex.Message); }
         if (version == Interlocked.Read(ref _version)) StateChanged?.Invoke();
+    }
+    private void ClearGifAnimation() { _gif?.Dispose(); _gif = null; }
+    internal void ReleaseImagePreview()
+    {
+        Interlocked.Increment(ref _version); _opening?.Cancel();
+        ClearGifAnimation(); ImageSource = null;
     }
     private static BitmapSource? LoadBitmap(string path)
     {
@@ -139,7 +161,7 @@ public partial class PlayerViewModel : ObservableObject
         if (Engine.Snapshot.IsPlaying || Engine.Snapshot.IsPaused) await Engine.TogglePauseAsync();
         else if (_main.CurrentFile is not null) await Engine.PlayAsync(_main.CurrentFile.AbsolutePath, Kind == MediaKind.Audio);
     }
-    public async Task StopPlaybackAsync() { await Engine.StopAndReleaseAsync(); IsPlaying = false; Position = TimeSpan.Zero; StateChanged?.Invoke(); }
+    public async Task StopPlaybackAsync() { ReleaseImagePreview(); await Engine.StopAndReleaseAsync(); IsPlaying = false; Position = TimeSpan.Zero; StateChanged?.Invoke(); }
     public Task NextAsync() => AdjacentAsync(1);
     public Task PreviousAsync() => AdjacentAsync(-1);
     private async Task AdjacentAsync(int offset)
