@@ -11,7 +11,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>NexusExplorer</AssemblyName>
     <RootNamespace>NexusExplorer</RootNamespace>
-    <Version>2.0.3-preview</Version>
+    <Version>2.0.4-preview</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
     <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
   </PropertyGroup>

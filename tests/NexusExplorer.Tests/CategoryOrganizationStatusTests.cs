@@ -198,7 +198,7 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task LiveTreeAndNavigationFolderIconsUpdateWithoutReplacingExpandedNodes(bool longName)
+    public async Task LiveTreeFolderIconAndTextOnlyNavigationUpdateWithoutReplacingExpandedNodes(bool longName)
     {
         var a = await _host.Categories.CreateAsync(longName ? new string('长', 90) : "A", null); await _host.Categories.PinAsync(a.Id);
         await WpfTestHost.RunAsync(async () =>
@@ -213,21 +213,19 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
             var treeIcon = Assert.IsType<System.Windows.Shapes.Path>(treeContent.Children[0]);
             var navigation = new NavigationBar();
             var navTemplate = (DataTemplate)navigation.Resources["CategoryNavigationContent"];
-            var navContent = (DockPanel)navTemplate.LoadContent(); navContent.DataContext = Assert.Single(main.Navigation.PinnedCategories);
-            Assert.Equal(2, navContent.Children.Count);
-            var navIcon = Assert.IsType<System.Windows.Shapes.Path>(navContent.Children[0]);
+            var navContent = Assert.IsType<TextBlock>(navTemplate.LoadContent());
+            navContent.DataContext = Assert.Single(main.Navigation.PinnedCategories);
             void AssertColor(byte red, byte green, byte blue)
             {
                 var color = System.Windows.Media.Color.FromRgb(red, green, blue);
                 Assert.Equal(color, Assert.IsType<System.Windows.Media.SolidColorBrush>(treeIcon.Fill).Color);
-                Assert.Equal(color, Assert.IsType<System.Windows.Media.SolidColorBrush>(navIcon.Fill).Color);
             }
             await Dispatcher.Yield(DispatcherPriority.DataBind);
-            Assert.Equal(a.Name, Assert.IsType<TextBlock>(navContent.Children[1]).Text);
+            Assert.Equal(a.Name, navContent.Text);
             AssertColor(0xD8, 0x89, 0x24);
-            navContent.Measure(new Size(170, double.PositiveInfinity));
-            navContent.Arrange(new Rect(0, 0, 170, navContent.DesiredSize.Height)); navContent.UpdateLayout();
-            Assert.Equal(16, navIcon.ActualWidth); Assert.Equal(0, navIcon.TranslatePoint(new Point(), navContent).X);
+            treeContent.Measure(new Size(170, double.PositiveInfinity));
+            treeContent.Arrange(new Rect(0, 0, 170, treeContent.DesiredSize.Height)); treeContent.UpdateLayout();
+            Assert.Equal(16, treeIcon.ActualWidth); Assert.Equal(0, treeIcon.TranslatePoint(new Point(), treeContent).X);
             await _host.Organization.OrganizeAsync(a.Id); await main.RefreshOrganizationStatesAsync();
             await Dispatcher.Yield(DispatcherPriority.DataBind);
             AssertColor(0x23, 0x7D, 0x4E);
@@ -235,7 +233,8 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
             main.FileList.PickFiles = () => Task.FromResult<IReadOnlyList<string>>(new[] { _host.CreateTestFile("new.txt") });
             await main.FileList.AddFilesAsync(); await Dispatcher.Yield(DispatcherPriority.DataBind);
             AssertColor(0xD8, 0x89, 0x24);
-            Assert.StartsWith("待整理：", Assert.IsType<string>(navIcon.ToolTip));
+            Assert.StartsWith("待整理：", Assert.IsType<string>(treeIcon.ToolTip));
+            Assert.Equal(a.Name, navContent.Text);
             Assert.Same(node, Assert.Single(main.Category.FlatCategories)); Assert.True(node.IsExpanded);
             Assert.False(main.CurrentCategory!.IsOrganized);
         });
