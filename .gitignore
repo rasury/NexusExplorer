@@ -16,3 +16,10 @@ artifacts/
 /oldtest/
 __pycache__/
 *.py[cod]
+
+# 本地文档、文案清单与工具
+/docs/
+/outputs/user-visible-text/
+/tools/
+/AGENTS.md
+/NexusExplorer V1.0 开发文档.md
