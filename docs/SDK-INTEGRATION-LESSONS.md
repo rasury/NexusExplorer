@@ -18,7 +18,7 @@
 
 相关证据：[验证记录](VERIFICATION.md)、[可编辑音频实验](../tools/AudioLab/README.md)、[正式播放实现](../src/NexusExplorer/Services/MediaPlayerService.cs)。
 
-后续用户在官方 VLC 选择 DirectX 输出，也复现恢复音轨时先响一下，明确要求真正的 Disable，随后选择 WASAPI。当前共享配置因此改为 MMDevice＋显式 WASAPI 后端，继续保留 Speex；原静音替代已撤销。实际模块检查通过不等于重新验证了听感，仍需用户复验杂音与切轨。详见 [本次音轨恢复记录](AUDIO-TRACK-RESTORE.md)。
+后续用户在官方 VLC 选择 DirectX 输出，也复现恢复音轨时先响一下，明确要求真正的 Disable，随后选择 WASAPI。当前共享配置因此改为 MMDevice＋显式 WASAPI 后端，继续保留 Speex；原静音替代已撤销。实际模块检查通过不等于重新验证了听感；2026-10-04 用户复验新版本后反馈“没问题了”，本次问题按该反馈验收通过。此反馈不替代其他设备、素材或后续 SDK 升级的验证。详见 [本次音轨恢复记录](AUDIO-TRACK-RESTORE.md)。
 
 ## 首次播放慢：发布完整性也影响 SDK 性能
 

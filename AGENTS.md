@@ -13,7 +13,7 @@
 - 有效的兼容修正应覆盖所有共享该路径的入口，并有直接相关的真实模块选择或资源释放检查；实际听感与视觉验收单独记录。
 - 区分已验证结果、根因候选和未验证解释。不能仅凭本次 DirectSound 对比，把特定驱动、旧 Windows 兼容策略或其他 SDK 的默认值认定为故障根因。
 
-本项目当前按用户最新选择使用 `--aout=mmdevice`、`--mmdevice-backend=wasapi` 和 `--audio-resampler=speex_resampler`，音频与视频共用。先前 DirectSound＋Speex 改善持续杂音，但用户在官方 VLC 的 DirectX 输出也复现音轨恢复短响，随后要求 WASAPI；实际音质与切轨听感需继续复验。VLC 3 的 WASAPI 是 MMDevice 后端，禁止仅传 `--aout=wasapi` 后把回退当作成功。修改或升级 SDK 时记录实际模块和对比证据。Disable 必须真正取消底层音轨，禁止以静音、音量门控或固定延时替代。
+本项目当前按用户最新选择使用 `--aout=mmdevice`、`--mmdevice-backend=wasapi` 和 `--audio-resampler=speex_resampler`，音频与视频共用。先前 DirectSound＋Speex 改善持续杂音，但用户在官方 VLC 的 DirectX 输出也复现音轨恢复短响，随后要求 WASAPI；2026-10-04 用户复验新版本后反馈“没问题了”。升级或更换输出路径仍需复验听感。VLC 3 的 WASAPI 是 MMDevice 后端，禁止仅传 `--aout=wasapi` 后把回退当作成功。修改或升级 SDK 时记录实际模块和对比证据。Disable 必须真正取消底层音轨，禁止以静音、音量门控或固定延时替代。
 
 ## 变更验证
 
