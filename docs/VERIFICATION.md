@@ -51,3 +51,9 @@
 ## 2.0.4 仅分类树显示颜色图标
 
 导览和快捷按钮使用纯分类名称模板，左侧分类树继续显示状态颜色。最小相关测试共 3 项全部通过，未执行完整回归，输出在 artifacts/preview4-related-tests.txt。验证普通／90 字长名称下导航模板只含文字，分类树橙→绿→橙绑定、悬停说明和展开状态仍正常。数据库版本及整理逻辑保持不变。
+
+## 固定目录更新
+
+后续固定更新 artifacts/NexusExplorer-2.0.4-preview-win-x64，既有版本目录作为历史保留。只运行更新脚本的两项直接相关检查：模拟发布文件中混入 Storage、DB、配置、日志，并把自定义数据库和 Storage 设置到 libvlc 内，验证更新 EXE/依赖/发布元数据后所有数据文件的内容哈希和时间戳不变；独占锁定依赖文件时，验证替换任何文件前即停止。结果见 artifacts/fixed-update-tests.txt，未执行完整应用回归。
+
+固定目录已实际执行更新：对比前后 data、配置、日志的内容哈希与时间戳，以及 Storage 文件／目录长度和时间戳，快照一致。未启动程序或执行数据库迁移。证据在 artifacts/fixed-update-actual.txt 及 fixed-directory-before/after.json。用户数据未复制或重定位。

@@ -53,6 +53,6 @@ MutationGate 串行修改；未恢复日志阻止继续修改。同卷分类改�
 
 媒体测试自行生成素材，缺素材不得静默返回。覆盖 64×48、320×240、640×360 原始视频、PCM WAV，以及已入库的 320×180 H.264/AAC 测试图案。真实 oldtest 的 1080p H.264/AAC 长视频分别执行软件与 D3D11VA 硬件解码跳转，MP3 解码输出与独立解码器比较。实际听画同步、多设备音质、H.265 等更多格式仍需验收。
 
-每次发布使用新版本目录。用户数据不进入 Git，不清空旧运行目录。oldtest 原件保留，在线 SQLite 备份与完整 Storage 副本在 artifacts/old-data-validation；副本明确重映射后升级，未按文件名猜测历史路径。修改完成并通过检查后自动提交、推送 main；推送采用快进方式，不覆盖远端其他提交。
+按用户最新要求，后续固定更新 artifacts/NexusExplorer-2.0.4-preview-win-x64，不再创建版本目录或复制数据。scripts/Update-Preview.ps1 先发布到固定 publish-staging，再仅替换程序、依赖、发布元数据和文档；Storage、DB/WAL/SHM/备份、配置、日志、界面状态及配置指定的数据位置均保留，不重映射路径。运行中或文件占用时在替换前停止，不自动结束用户进程。只运行本次直接相关及必要关联的最小测试；更新脚本验证见 tests/Update-Preview.Tests.ps1。用户数据不进入 Git，既有 oldtest 和验收副本保留。修改完成并通过检查后使用 rasury 的 GitHub 身份自动提交、推送 main；推送采用快进方式，不覆盖远端其他提交。
 
 真实样本暴露了 VLC 3 内置 MP4 demux 的跳转问题：软件和硬件解码均花屏并丢弃过期音频缓冲。MP4/MOV/M4V 明确选择随包已有的 avformat 解复用，保留原生解码与输出；本轮真实视频截图回归通过。证据、边界及音频对比见 docs/VERIFICATION.md。

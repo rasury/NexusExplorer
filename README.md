@@ -22,14 +22,17 @@ Windows x64 分类文件管理与媒体查看软件，保留 WPF、SQLite、EF C
 ```powershell
 dotnet restore NexusExplorer.sln -r win-x64
 dotnet build NexusExplorer.sln -c Release --no-restore
-dotnet test NexusExplorer.sln -c Release --no-restore
-dotnet publish src/NexusExplorer/NexusExplorer.csproj -c Release -r win-x64 --self-contained true --no-restore -o artifacts/NexusExplorer-2.0.4-preview-win-x64
+# 只运行本次修改相关的测试；以下是分类图标的示例过滤条件。
+dotnet test NexusExplorer.sln -c Release --no-restore --filter "FullyQualifiedName~LiveTreeFolderIconAndTextOnlyNavigation|FullyQualifiedName~ResourceDictionaryTests"
+.\scripts\Update-Preview.ps1
 ```
 
-发布到新版本目录，保留旧软件的配置、数据库、日志与 Storage。禁止清空或覆盖旧运行目录。便携包含自包含 EXE、WPF/SQLite 原生 DLL 与完整 libvlc/win-x64 插件目录，须保留整个目录。
+后续固定沿用 `artifacts/NexusExplorer-2.0.4-preview-win-x64`，目录名不随版本变化。更新脚本先发布到固定临时目录 `artifacts/publish-staging`，检查程序是否关闭及文件是否可替换，再只复制 EXE、依赖库、发布元数据和文档。保留原位置的 Storage、数据库（含 WAL/SHM/备份）、界面状态、appsettings.json 和日志；也识别配置中显式指定的数据位置。不会复制、搬迁、重绑定或清空用户数据，不再逐次创建版本目录。便携包含自包含 EXE、WPF/SQLite 原生 DLL 与完整 libvlc/win-x64 插件目录，须保留整个目录。
+
+更新脚本的最小验证：`.\tests\Update-Preview.Tests.ps1`。已有发布产物可通过 `-PublishedDirectory` 复用。更新前先关闭固定目录中的程序；脚本不会自动结束用户进程。
 
 ```powershell
-# 仅在新发布的独立验收目录执行；检查数据库、实际 WPF 资源与 VLC 加载后退出。
+# 此命令会打开数据库并执行必要的迁移；数据库兼容验收只对独立副本执行。
 .\NexusExplorer.exe --verify-startup
 ```
 
