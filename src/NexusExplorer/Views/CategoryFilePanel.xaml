@@ -54,7 +54,7 @@
             <StackPanel>
             <WrapPanel>
                 <Button Style="{StaticResource ButtonPrimary}"
-                        Content="＋ 新建分类"
+                        Content=" 新建分类"
                         Padding="10,6"
                         Command="{Binding CategoryVmBinding.CreateRootCommand}"
                         Margin="0,0,6,6" />
@@ -69,7 +69,7 @@
                         Command="{Binding FileListVmBinding.AddFolderCommand}"
                         Margin="0,0,6,6" />
                 <Button Style="{StaticResource ButtonSecondary}"
-                        Content="⚡ 整理"
+                        Content="整理"
                         Padding="10,6"
                         Command="{Binding OrganizeCommand}"
                         Margin="0,0,6,6"
@@ -86,7 +86,7 @@
         <Grid Grid.Row="1">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border x:Name="RootDropZone" Background="{StaticResource BrushAccentBlueLight}" Padding="8,4" AllowDrop="True" DragOver="OnRootDragOver" Drop="OnRootDrop">
-            <TextBlock Text="⌂ 顶层（将分类拖到这里移回顶层）" Style="{StaticResource TextCaption}" />
+            <TextBlock Text="⌂ 顶层" Style="{StaticResource TextCaption}" />
         </Border>
         <TreeView x:Name="CategoryTree"
                   Grid.Row="1"
@@ -102,7 +102,7 @@
             <TreeView.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="在资源管理器中打开" Click="OnOpenCategoryInExplorer" />
-                    <MenuItem Header="📌 钉到底栏快捷分类" Click="OnPinCategory" />
+                    <MenuItem Header="📌 钉到底栏" Click="OnPinCategory" />
                     <MenuItem Header="新建子分类" Click="OnCreateChild" />
                     <Separator />
                     <MenuItem Header="重命名" Click="OnRenameCategory" />
@@ -112,7 +112,7 @@
                     <MenuItem Header="上移" Click="OnMoveCategoryUp" />
                     <MenuItem Header="下移" Click="OnMoveCategoryDown" />
                     <Separator />
-                    <MenuItem Header="移除（保留目录和文件）" Click="OnRemoveCategory" />
+                    <MenuItem Header="移除" Click="OnRemoveCategory" />
                     <MenuItem Header="删除" Click="OnDeleteCategory" Foreground="{StaticResource BrushDanger}" />
                 </ContextMenu>
             </TreeView.ContextMenu>
@@ -144,8 +144,8 @@
                     <MenuItem Header="在资源管理器中打开" Click="OnOpenFileInExplorer" />
                     <MenuItem Header="重新定位…" Click="OnRelocateFile" />
                     <Separator />
-                    <MenuItem Header="从分类移除(保留源文件)" Click="OnRemoveFile" />
-                    <MenuItem Header="删除(源文件进回收站)" Click="OnDeleteFile" Foreground="{StaticResource BrushDanger}" />
+                    <MenuItem Header="从分类移除" Click="OnRemoveFile" />
+                    <MenuItem Header="删除" Click="OnDeleteFile" Foreground="{StaticResource BrushDanger}" />
                 </ContextMenu>
             </ListBox.ContextMenu>
         </ListBox>

@@ -14,7 +14,7 @@ internal static class LocationPreviewDialog
             Style = (Style)System.Windows.Application.Current.Resources["DialogWindow"]
         };
         var panel = new DockPanel { Margin = new Thickness(20) };
-        var description = new TextBlock { Text = $"仅更新位置，不搬文件。请核对全部 {mapping.Count} 项映射；显示失效的文件不会被猜测修复。", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
+        var description = new TextBlock { Text = $"请核对全部 {mapping.Count} 项映射；显示失效的文件不会被猜测修复。", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
         DockPanel.SetDock(description, Dock.Top); panel.Children.Add(description);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         var accept = new Button { Content = "确认重新定位", Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(8), IsDefault = true };

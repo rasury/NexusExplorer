@@ -2,6 +2,8 @@
 
 整理日期：2026-10-04。源码基线：`6c4770b`。
 
+2026-10-04 已按用户修改的“界面与弹窗”工作表应用新文案：24 项已填写，其中 3 项与原文相同；另外清空 UI-076，共 22 项显示文字发生变化。其余空白项和另外两张工作表保持原样。下表“当前文字”保留上述基线原文，“新文案”记录本次已应用内容；UI-115、UI-116 保留段落末尾换行。
+
 只列用户在运行软件时可能看到的文字，包括界面、菜单、悬停说明、弹窗、错误、数据绑定显示和图片文字。日志、源码注释、开发文档、内部标识及未接入当前界面的辅助方法不列入。
 
 共 291 条使用位置记录：界面与弹窗 139 条，错误与警告 125 条，动态与系统文字 27 条。重复文案保留不同使用位置，条数不是去重后的句子数。
@@ -20,11 +22,11 @@ Excel 文件：[NexusExplorer-用户可见文案清单.xlsx](../outputs/user-vis
 
 | 编号 | 使用位置 | 类型 | 当前文字 | 新文案 | 源码定位 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| UI-001 | 主窗口 | 窗口标题 | NexusExplorer 2.0.4 预览版 |  | [src/NexusExplorer/Views/MainWindow.xaml:1](../src/NexusExplorer/Views/MainWindow.xaml#L1) | Window.Title |
-| UI-002 | 主窗口 | 界面文字 | NexusExplorer |  | [src/NexusExplorer/Views/MainWindow.xaml:29](../src/NexusExplorer/Views/MainWindow.xaml#L29) | TextBlock.Text |
-| UI-003 | 主窗口 | 界面文字 | 分类 · 播放 · 整理 |  | [src/NexusExplorer/Views/MainWindow.xaml:33](../src/NexusExplorer/Views/MainWindow.xaml#L33) | TextBlock.Text |
-| UI-004 | 分类名称输入弹窗 | 固定文字 | 确定 |  | [src/NexusExplorer/Views/Dialogs/InputDialog.cs:31](../src/NexusExplorer/Views/Dialogs/InputDialog.cs#L31) |  |
-| UI-005 | 分类名称输入弹窗 | 固定文字 | 取消 |  | [src/NexusExplorer/Views/Dialogs/InputDialog.cs:43](../src/NexusExplorer/Views/Dialogs/InputDialog.cs#L43) |  |
+| UI-001 | 主窗口 | 窗口标题 | NexusExplorer 2.0.4 预览版 | NexusExplorer | [src/NexusExplorer/Views/MainWindow.xaml:1](../src/NexusExplorer/Views/MainWindow.xaml#L1) | Window.Title |
+| UI-002 | 主窗口 | 界面文字 | NexusExplorer | NexusExplorer | [src/NexusExplorer/Views/MainWindow.xaml:29](../src/NexusExplorer/Views/MainWindow.xaml#L29) | TextBlock.Text |
+| UI-003 | 主窗口 | 界面文字 | 分类 · 播放 · 整理 | 文件分类工具 | [src/NexusExplorer/Views/MainWindow.xaml:33](../src/NexusExplorer/Views/MainWindow.xaml#L33) | TextBlock.Text |
+| UI-004 | 分类名称输入弹窗 | 固定文字 | 确定 | 确定 | [src/NexusExplorer/Views/Dialogs/InputDialog.cs:31](../src/NexusExplorer/Views/Dialogs/InputDialog.cs#L31) |  |
+| UI-005 | 分类名称输入弹窗 | 固定文字 | 取消 | 取消 | [src/NexusExplorer/Views/Dialogs/InputDialog.cs:43](../src/NexusExplorer/Views/Dialogs/InputDialog.cs#L43) |  |
 | UI-006 | 分类操作 | 动态文字模板 | {c.Name}: {c.PhysicalPath} → {Path.Combine(newDirectory, Path.GetRelativePath(category.PhysicalPath, c.PhysicalPath))} |  | [src/NexusExplorer/Services/CategoryService.cs:153](../src/NexusExplorer/Services/CategoryService.cs#L153) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-007 | 分类操作 | 动态文字模板 | {f.FileName}: {path} ({(File.Exists(path) ? "存在" : "失效")}) |  | [src/NexusExplorer/Services/CategoryService.cs:155](../src/NexusExplorer/Services/CategoryService.cs#L155) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-008 | 分类操作 | 固定文字 | 失效 |  | [src/NexusExplorer/Services/CategoryService.cs:155](../src/NexusExplorer/Services/CategoryService.cs#L155) | 这是外层模板中的可选词，单独列出便于替换。 |
@@ -33,20 +35,20 @@ Excel 文件：[NexusExplorer-用户可见文案清单.xlsx](../outputs/user-vis
 | UI-011 | 分类操作 | 固定文字 | 新建分类 |  | [src/NexusExplorer/ViewModels/CategoryViewModel.cs:61](../src/NexusExplorer/ViewModels/CategoryViewModel.cs#L61) |  |
 | UI-012 | 分类操作 | 动态文字模板 | 在「{parent.Name}」下新建分类 |  | [src/NexusExplorer/ViewModels/CategoryViewModel.cs:68](../src/NexusExplorer/ViewModels/CategoryViewModel.cs#L68) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-013 | 分类操作 | 动态文字模板 | 重命名「{category.Name}」 |  | [src/NexusExplorer/ViewModels/CategoryViewModel.cs:92](../src/NexusExplorer/ViewModels/CategoryViewModel.cs#L92) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
-| UI-014 | 分类操作 | 动态文字模板 | 确定移除分类「{category.Name}」？<br><br>将移除该分类、{childCount} 个子分类及 {fileCount} 个文件的软件登记。<br>所有物理目录和文件保留原样，不移动、不删除，也不进入回收站。 |  | [src/NexusExplorer/ViewModels/CategoryViewModel.cs:115](../src/NexusExplorer/ViewModels/CategoryViewModel.cs#L115) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
-| UI-015 | 分类操作 | 动态文字模板 | 确定删除分类「{category.Name}」?<br><br>包含 {childCount} 个子分类、{fileCount} 个已登记文件。<br>仅回收归属这些分类的文件；其他分类文件与未登记文件保留，非空目录保留。 |  | [src/NexusExplorer/ViewModels/CategoryViewModel.cs:131](../src/NexusExplorer/ViewModels/CategoryViewModel.cs#L131) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
-| UI-016 | 分类操作 | 动态文字模板 | 确定删除分类「{category.Name}」?<br>对应的物理目录将进入回收站。 |  | [src/NexusExplorer/ViewModels/CategoryViewModel.cs:132](../src/NexusExplorer/ViewModels/CategoryViewModel.cs#L132) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
-| UI-017 | 分类整理状态说明 | 悬停说明 | 已整理：上次整理全部成功，本分类绑定文件已位于分类目录。软件外部的移动或删除不自动检测。 |  | [src/NexusExplorer/Models/Category.cs:40](../src/NexusExplorer/Models/Category.cs#L40) |  |
-| UI-018 | 分类整理状态说明 | 悬停说明 | 待整理：尚未确认，或绑定文件、分类目录已变动；可能有文件位于其他目录。完整整理成功后更新标识。 |  | [src/NexusExplorer/Models/Category.cs:41](../src/NexusExplorer/Models/Category.cs#L41) |  |
-| UI-019 | 分类树与文件区 | 按钮或控件文字 | ＋ 新建分类 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:56](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L56) | Button.Content |
+| UI-014 | 分类操作 | 动态文字模板 | 确定移除分类「{category.Name}」？<br><br>将移除该分类、{childCount} 个子分类及 {fileCount} 个文件的软件登记。<br>所有物理目录和文件保留原样，不移动、不删除，也不进入回收站。 | 确定移除分类「{category.Name}」？ | [src/NexusExplorer/ViewModels/CategoryViewModel.cs:115](../src/NexusExplorer/ViewModels/CategoryViewModel.cs#L115) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
+| UI-015 | 分类操作 | 动态文字模板 | 确定删除分类「{category.Name}」?<br><br>包含 {childCount} 个子分类、{fileCount} 个已登记文件。<br>仅回收归属这些分类的文件；其他分类文件与未登记文件保留，非空目录保留。 | 确定删除分类「{category.Name}」? | [src/NexusExplorer/ViewModels/CategoryViewModel.cs:131](../src/NexusExplorer/ViewModels/CategoryViewModel.cs#L131) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
+| UI-016 | 分类操作 | 动态文字模板 | 确定删除分类「{category.Name}」?<br>对应的物理目录将进入回收站。 | 确定删除分类「{category.Name}」? | [src/NexusExplorer/ViewModels/CategoryViewModel.cs:132](../src/NexusExplorer/ViewModels/CategoryViewModel.cs#L132) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
+| UI-017 | 分类整理状态说明 | 悬停说明 | 已整理：上次整理全部成功，本分类绑定文件已位于分类目录。软件外部的移动或删除不自动检测。 | 分类内不包含外部文件 | [src/NexusExplorer/Models/Category.cs:40](../src/NexusExplorer/Models/Category.cs#L40) |  |
+| UI-018 | 分类整理状态说明 | 悬停说明 | 待整理：尚未确认，或绑定文件、分类目录已变动；可能有文件位于其他目录。完整整理成功后更新标识。 | 分类内包含外部文件 | [src/NexusExplorer/Models/Category.cs:41](../src/NexusExplorer/Models/Category.cs#L41) |  |
+| UI-019 | 分类树与文件区 | 按钮或控件文字 | ＋ 新建分类 |  新建分类 | [src/NexusExplorer/Views/CategoryFilePanel.xaml:56](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L56) | Button.Content |
 | UI-020 | 分类树与文件区 | 按钮或控件文字 | 添加文件 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:61](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L61) | Button.Content |
 | UI-021 | 分类树与文件区 | 按钮或控件文字 | 添加文件夹 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:66](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L66) | Button.Content |
-| UI-022 | 分类树与文件区 | 按钮或控件文字 | ⚡ 整理 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:71](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L71) | Button.Content |
+| UI-022 | 分类树与文件区 | 按钮或控件文字 | ⚡ 整理 | 整理 | [src/NexusExplorer/Views/CategoryFilePanel.xaml:71](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L71) | Button.Content |
 | UI-023 | 分类树与文件区 | 悬停说明 | 整理当前打开分类及全部子分类 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:71](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L71) | Button.ToolTip |
 | UI-024 | 分类树与文件区 | 按钮或控件文字 | 取消整理 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:79](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L79) | Button.Content |
-| UI-025 | 分类树与文件区 | 界面文字 | ⌂ 顶层（将分类拖到这里移回顶层） |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:89](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L89) | TextBlock.Text |
+| UI-025 | 分类树与文件区 | 界面文字 | ⌂ 顶层（将分类拖到这里移回顶层） | ⌂ 顶层 | [src/NexusExplorer/Views/CategoryFilePanel.xaml:89](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L89) | TextBlock.Text |
 | UI-026 | 分类树与文件区 | 右键菜单 | 在资源管理器中打开 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:104](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L104) | MenuItem.Header |
-| UI-027 | 分类树与文件区 | 右键菜单 | 📌 钉到底栏快捷分类 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:105](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L105) | MenuItem.Header |
+| UI-027 | 分类树与文件区 | 右键菜单 | 📌 钉到底栏快捷分类 | 📌 钉到底栏 | [src/NexusExplorer/Views/CategoryFilePanel.xaml:105](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L105) | MenuItem.Header |
 | UI-028 | 分类树与文件区 | 右键菜单 | 新建子分类 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:106](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L106) | MenuItem.Header |
 | UI-029 | 分类树与文件区 | 右键菜单 | 重命名 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:108](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L108) | MenuItem.Header |
 | UI-030 | 分类树与文件区 | 右键菜单 | 重新定位目录… |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:109](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L109) | MenuItem.Header |
@@ -54,19 +56,19 @@ Excel 文件：[NexusExplorer-用户可见文案清单.xlsx](../outputs/user-vis
 | UI-032 | 分类树与文件区 | 右键菜单 | 移到顶层 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:111](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L111) | MenuItem.Header |
 | UI-033 | 分类树与文件区 | 右键菜单 | 上移 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:112](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L112) | MenuItem.Header |
 | UI-034 | 分类树与文件区 | 右键菜单 | 下移 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:113](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L113) | MenuItem.Header |
-| UI-035 | 分类树与文件区 | 右键菜单 | 移除（保留目录和文件） |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:115](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L115) | MenuItem.Header |
+| UI-035 | 分类树与文件区 | 右键菜单 | 移除（保留目录和文件） | 移除 | [src/NexusExplorer/Views/CategoryFilePanel.xaml:115](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L115) | MenuItem.Header |
 | UI-036 | 分类树与文件区 | 右键菜单 | 删除 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:116](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L116) | MenuItem.Header |
 | UI-037 | 分类树与文件区 | 右键菜单 | 在资源管理器中打开 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:144](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L144) | MenuItem.Header |
 | UI-038 | 分类树与文件区 | 右键菜单 | 重新定位… |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:145](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L145) | MenuItem.Header |
-| UI-039 | 分类树与文件区 | 右键菜单 | 从分类移除(保留源文件) |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:147](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L147) | MenuItem.Header |
-| UI-040 | 分类树与文件区 | 右键菜单 | 删除(源文件进回收站) |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml:148](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L148) | MenuItem.Header |
+| UI-039 | 分类树与文件区 | 右键菜单 | 从分类移除(保留源文件) | 从分类移除 | [src/NexusExplorer/Views/CategoryFilePanel.xaml:147](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L147) | MenuItem.Header |
+| UI-040 | 分类树与文件区 | 右键菜单 | 删除(源文件进回收站) | 删除 | [src/NexusExplorer/Views/CategoryFilePanel.xaml:148](../src/NexusExplorer/Views/CategoryFilePanel.xaml#L148) | MenuItem.Header |
 | UI-041 | 分类树与文件区 | 固定文字 | 分类名称: |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:45](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L45) |  |
 | UI-042 | 分类树与文件区 | 固定文字 | 选择文件 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:52](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L52) |  |
 | UI-043 | 分类树与文件区 | 固定文字 | 选择导入文件夹 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:55](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L55) |  |
 | UI-044 | 分类树与文件区 | 动态文字模板 | 重新定位「{name}」 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:58](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L58) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-045 | 分类树与文件区 | 固定文字 | 确认 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:65](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L65) |  |
 | UI-046 | 分类树与文件区 | 固定文字 | 错误 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:66](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L66) |  |
-| UI-047 | 分类树与文件区 | 固定文字 | 选择分类的新位置（不搬文件） |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:185](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L185) |  |
+| UI-047 | 分类树与文件区 | 固定文字 | 选择分类的新位置（不搬文件） | 选择分类的新位置 | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:185](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L185) |  |
 | UI-048 | 分类树与文件区 | 固定文字 | 选择迁移目标父目录 |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:192](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L192) |  |
 | UI-049 | 分类树与文件区 | 动态文字模板 | 迁移完整物理目录：<br>{c.PhysicalPath}<br>→ {Path.Combine(parent, Path.GetFileName(c.PhysicalPath))}<br>包含未登记文件。继续？ |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:193](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L193) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-050 | 分类树与文件区 | 动态文字模板 | 整理 {p.Completed}/{p.Total}: {p.FileName} |  | [src/NexusExplorer/Views/CategoryFilePanel.xaml.cs:214](../src/NexusExplorer/Views/CategoryFilePanel.xaml.cs#L214) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
@@ -92,10 +94,10 @@ Excel 文件：[NexusExplorer-用户可见文案清单.xlsx](../outputs/user-vis
 | UI-070 | 底栏导览与快捷分类 | 界面文字 | › |  | [src/NexusExplorer/Views/NavigationBar.xaml:148](../src/NexusExplorer/Views/NavigationBar.xaml#L148) | TextBlock.Text |
 | UI-071 | 底栏导览与快捷分类 | 按钮或控件文字 | ⌂ 顶层 |  | [src/NexusExplorer/Views/NavigationBar.xaml:157](../src/NexusExplorer/Views/NavigationBar.xaml#L157) | Button.Content |
 | UI-072 | 底栏导览与快捷分类 | 按钮或控件文字 | ✔ |  | [src/NexusExplorer/Views/NavigationBar.xaml:184](../src/NexusExplorer/Views/NavigationBar.xaml#L184) | Button.Content |
-| UI-073 | 底栏导览与快捷分类 | 界面文字 | 快捷: |  | [src/NexusExplorer/Views/NavigationBar.xaml:200](../src/NexusExplorer/Views/NavigationBar.xaml#L200) | TextBlock.Text |
+| UI-073 | 底栏导览与快捷分类 | 界面文字 | 快捷: | 快捷标签: | [src/NexusExplorer/Views/NavigationBar.xaml:200](../src/NexusExplorer/Views/NavigationBar.xaml#L200) | TextBlock.Text |
 | UI-074 | 底栏导览与快捷分类 | 悬停说明 | 点击选中此分类,然后按 ✔ 归类 |  | [src/NexusExplorer/Views/NavigationBar.xaml:221](../src/NexusExplorer/Views/NavigationBar.xaml#L221) | Button.ToolTip |
 | UI-075 | 底栏导览与快捷分类 | 右键菜单 | ✖ 取消钉住 |  | [src/NexusExplorer/Views/NavigationBar.xaml:230](../src/NexusExplorer/Views/NavigationBar.xaml#L230) | MenuItem.Header |
-| UI-076 | 底栏导览与快捷分类 | 界面文字 | 在左侧分类树上右键可钉到这里 |  | [src/NexusExplorer/Views/NavigationBar.xaml:240](../src/NexusExplorer/Views/NavigationBar.xaml#L240) | TextBlock.Text |
+| UI-076 | 底栏导览与快捷分类 | 界面文字 | 在左侧分类树上右键可钉到这里 | 【清空】 | [src/NexusExplorer/Views/NavigationBar.xaml:240](../src/NexusExplorer/Views/NavigationBar.xaml#L240) | TextBlock.Text |
 | UI-077 | 底栏导览与快捷分类 | 固定文字 | 文件已在此分类中 |  | [src/NexusExplorer/Views/NavigationBar.xaml.cs:132](../src/NexusExplorer/Views/NavigationBar.xaml.cs#L132) |  |
 | UI-078 | 底栏导览与快捷分类 | 固定文字 | 先点击选择一个分类 |  | [src/NexusExplorer/Views/NavigationBar.xaml.cs:134](../src/NexusExplorer/Views/NavigationBar.xaml.cs#L134) |  |
 | UI-079 | 底栏导览与快捷分类 | 动态文字模板 | 把文件归入「{Vm.SelectedCategory.Name}」 |  | [src/NexusExplorer/Views/NavigationBar.xaml.cs:135](../src/NexusExplorer/Views/NavigationBar.xaml.cs#L135) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
@@ -134,8 +136,8 @@ Excel 文件：[NexusExplorer-用户可见文案清单.xlsx](../outputs/user-vis
 | UI-112 | 播放区 | 动态文字模板 | {_effectiveScale:0.##}× |  | [src/NexusExplorer/Views/PlayerPanel.xaml.cs:136](../src/NexusExplorer/Views/PlayerPanel.xaml.cs#L136) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-113 | 播放区 | 固定文字 | 适合窗口 |  | [src/NexusExplorer/Views/PlayerPanel.xaml.cs:136](../src/NexusExplorer/Views/PlayerPanel.xaml.cs#L136) |  |
 | UI-114 | 整理结果弹窗 | 动态文字模板 | 分类「{categoryName}」整理完成:<br> |  | [src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs:19](../src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs#L19) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 整理汇总的四段文字按顺序拼接。 |
-| UI-115 | 整理结果弹窗 | 动态文字模板 |   移动 {moved + renamed} 个(其中改名保留 {renamed} 个)<br> |  | [src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs:20](../src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs#L20) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 整理汇总的四段文字按顺序拼接。 |
-| UI-116 | 整理结果弹窗 | 动态文字模板 |   跳过搬移并使用已有文件 {skipped} 个,已在目标位置 {already} 个<br> |  | [src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs:21](../src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs#L21) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 整理汇总的四段文字按顺序拼接。 |
+| UI-115 | 整理结果弹窗 | 动态文字模板 |   移动 {moved + renamed} 个(其中改名保留 {renamed} 个)<br> | 移动 {moved + renamed} 个(重命名保留{renamed} 个)<br> | [src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs:20](../src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs#L20) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 整理汇总的四段文字按顺序拼接。 |
+| UI-116 | 整理结果弹窗 | 动态文字模板 |   跳过搬移并使用已有文件 {skipped} 个,已在目标位置 {already} 个<br> | 跳过 {skipped} 个,已有 {already} 个<br> | [src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs:21](../src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs#L21) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 整理汇总的四段文字按顺序拼接。 |
 | UI-117 | 整理结果弹窗 | 动态文字模板 |   失效 {missing} 个,失败 {failed} 个 |  | [src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs:22](../src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs#L22) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 整理汇总的四段文字按顺序拼接。 |
 | UI-118 | 整理结果弹窗 | 固定文字 | <br>未处理的文件: |  | [src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs:41](../src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs#L41) |  |
 | UI-119 | 整理结果弹窗 | 动态文字模板 | • {problem.FileName} — {problem.Error ?? "源文件不存在"} |  | [src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs:49](../src/NexusExplorer/Views/Dialogs/OrganizeResultDialog.cs#L49) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
@@ -153,10 +155,10 @@ Excel 文件：[NexusExplorer-用户可见文案清单.xlsx](../outputs/user-vis
 | UI-131 | 文件操作 | 动态文字模板 | 已添加 {result.Added.Count} 个文件。 |  | [src/NexusExplorer/ViewModels/FileListViewModel.cs:130](../src/NexusExplorer/ViewModels/FileListViewModel.cs#L130) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-132 | 文件操作 | 动态文字模板 | • {f.FileName}: {f.Error} |  | [src/NexusExplorer/ViewModels/FileListViewModel.cs:134](../src/NexusExplorer/ViewModels/FileListViewModel.cs#L134) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-133 | 文件操作 | 动态文字模板 | 已重新定位「{file.FileName}」。 |  | [src/NexusExplorer/ViewModels/FileListViewModel.cs:160](../src/NexusExplorer/ViewModels/FileListViewModel.cs#L160) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
-| UI-134 | 文件操作 | 动态文字模板 | 从分类移除 {files.Count} 个文件？源文件保留。 |  | [src/NexusExplorer/ViewModels/FileListViewModel.cs:186](../src/NexusExplorer/ViewModels/FileListViewModel.cs#L186) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
-| UI-135 | 文件操作 | 动态文字模板 | 删除 {files.Count} 个文件？源文件进入回收站。 |  | [src/NexusExplorer/ViewModels/FileListViewModel.cs:187](../src/NexusExplorer/ViewModels/FileListViewModel.cs#L187) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
+| UI-134 | 文件操作 | 动态文字模板 | 从分类移除 {files.Count} 个文件？源文件保留。 | 从分类移除 {files.Count} 个文件？ | [src/NexusExplorer/ViewModels/FileListViewModel.cs:186](../src/NexusExplorer/ViewModels/FileListViewModel.cs#L186) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
+| UI-135 | 文件操作 | 动态文字模板 | 删除 {files.Count} 个文件？源文件进入回收站。 | 删除 {files.Count} 个文件？ | [src/NexusExplorer/ViewModels/FileListViewModel.cs:187](../src/NexusExplorer/ViewModels/FileListViewModel.cs#L187) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-136 | 重新定位预览弹窗 | 固定文字 | 重新定位预览 |  | [src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs:12](../src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs#L12) |  |
-| UI-137 | 重新定位预览弹窗 | 动态文字模板 | 仅更新位置，不搬文件。请核对全部 {mapping.Count} 项映射；显示失效的文件不会被猜测修复。 |  | [src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs:17](../src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs#L17) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
+| UI-137 | 重新定位预览弹窗 | 动态文字模板 | 仅更新位置，不搬文件。请核对全部 {mapping.Count} 项映射；显示失效的文件不会被猜测修复。 | 请核对全部 {mapping.Count} 项映射；显示失效的文件不会被猜测修复。 | [src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs:17](../src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs#L17) | 花括号为运行时变量或表达式，修改时保留；换行也应保留。 |
 | UI-138 | 重新定位预览弹窗 | 固定文字 | 确认重新定位 |  | [src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs:20](../src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs#L20) |  |
 | UI-139 | 重新定位预览弹窗 | 固定文字 | 取消 |  | [src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs:21](../src/NexusExplorer/Views/Dialogs/LocationPreviewDialog.cs#L21) |  |
 

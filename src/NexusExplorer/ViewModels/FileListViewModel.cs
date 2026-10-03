@@ -183,8 +183,8 @@ public partial class FileListViewModel : ObservableObject
     {
         if (files.Count == 0) return;
         if (ShowConfirmDialog is not null && !await ShowConfirmDialog(removeOnly
-            ? $"从分类移除 {files.Count} 个文件？源文件保留。"
-            : $"删除 {files.Count} 个文件？源文件进入回收站。")) return;
+            ? $"从分类移除 {files.Count} 个文件？"
+            : $"删除 {files.Count} 个文件？")) return;
         var failures = new List<string>(); var succeeded = 0;
         foreach (var file in files)
         {

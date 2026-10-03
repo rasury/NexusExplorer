@@ -198,7 +198,7 @@
             </Grid.ColumnDefinitions>
 
             <TextBlock Grid.Column="0"
-                       Text="快捷:"
+                       Text="快捷标签:"
                        Style="{StaticResource TextCaption}"
                        VerticalAlignment="Center"
                        Margin="0,0,8,0" />
@@ -239,7 +239,7 @@
             <!-- 空提示 -->
             <TextBlock x:Name="PinnedEmptyHint"
                        Grid.Column="1"
-                       Text="在左侧分类树上右键可钉到这里"
+                       Text=""
                        Style="{StaticResource TextCaption}"
                        VerticalAlignment="Center"
                        Visibility="Collapsed" />

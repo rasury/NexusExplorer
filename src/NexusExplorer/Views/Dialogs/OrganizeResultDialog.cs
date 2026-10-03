@@ -17,8 +17,8 @@ public static class OrganizeResultDialog
         var failed = results.Count(r => r.Outcome is OrganizeOutcome.Failed);
 
         var summary = $"分类「{categoryName}」整理完成:\n" +
-                      $"  移动 {moved + renamed} 个(其中改名保留 {renamed} 个)\n" +
-                      $"  跳过搬移并使用已有文件 {skipped} 个,已在目标位置 {already} 个\n" +
+                      $"移动 {moved + renamed} 个(重命名保留{renamed} 个)\n" +
+                      $"跳过 {skipped} 个,已有 {already} 个\n" +
                       $"  失效 {missing} 个,失败 {failed} 个";
 
         var panel = new StackPanel { Margin = new Thickness(20) };

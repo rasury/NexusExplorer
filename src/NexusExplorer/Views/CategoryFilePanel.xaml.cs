@@ -182,7 +182,7 @@ public partial class CategoryFilePanel : UserControl
     { await _main.Categories.PinAsync(c.Id); await _main.Navigation.OnPinsChangedAsync(); });
     private async void OnRelocateCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(async c =>
     {
-        var path = PickDirectory("选择分类的新位置（不搬文件）"); if (path is null) return;
+        var path = PickDirectory("选择分类的新位置"); if (path is null) return;
         var preview = await _main.Categories.PreviewRelocateAsync(c.Id, path);
         if (!Dialogs.LocationPreviewDialog.Confirm(preview)) return;
         await _main.Categories.RelocateAsync(c.Id, path); await _main.RefreshTreeAsync();

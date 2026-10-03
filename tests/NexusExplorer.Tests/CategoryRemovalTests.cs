@@ -98,9 +98,9 @@ public class CategoryRemovalTests
             await main.Navigation.NavigateToAsync(child);
             var panel = new CategoryFilePanel();
             var menu = ((TreeView)panel.FindName("CategoryTree")).ContextMenu;
-            Assert.Contains(menu.Items.OfType<MenuItem>(), item => Equals(item.Header, "移除（保留目录和文件）"));
+            Assert.Contains(menu.Items.OfType<MenuItem>(), item => Equals(item.Header, "移除"));
             var errors = new List<string>(); main.Category.ShowError = errors.Add;
-            main.Category.ShowConfirmDialog = message => { Assert.Contains("物理目录和文件保留原样", message); return Task.FromResult(false); };
+            main.Category.ShowConfirmDialog = message => { Assert.Equal($"确定移除分类「{root.Name}」？", message); return Task.FromResult(false); };
             await main.Category.RemoveAsync(root);
             Assert.NotNull(await host.Categories.GetByIdAsync(child.Id));
             Assert.True(engine.Snapshot.IsPlaying);

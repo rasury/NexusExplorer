@@ -112,7 +112,7 @@ public partial class CategoryViewModel : ObservableObject
         try
         {
             var (childCount, fileCount) = await _categoryService.GetRemovalSummaryAsync(category.Id);
-            var message = $"确定移除分类「{category.Name}」？\n\n将移除该分类、{childCount} 个子分类及 {fileCount} 个文件的软件登记。\n所有物理目录和文件保留原样，不移动、不删除，也不进入回收站。";
+            var message = $"确定移除分类「{category.Name}」？";
             if (ShowConfirmDialog is not null && !await ShowConfirmDialog(message)) return;
             var removedFileIds = await _categoryService.RemoveAsync(category.Id);
             if (_main.CurrentFile is { } current && removedFileIds.Contains(current.Id))
@@ -128,8 +128,8 @@ public partial class CategoryViewModel : ObservableObject
         var fileCount = (await _main.GetCurrentFileCountAsync(category.Id));
 
         var message = childCount > 0 || fileCount > 0
-            ? $"确定删除分类「{category.Name}」?\n\n包含 {childCount} 个子分类、{fileCount} 个已登记文件。\n仅回收归属这些分类的文件；其他分类文件与未登记文件保留，非空目录保留。"
-            : $"确定删除分类「{category.Name}」?\n对应的物理目录将进入回收站。";
+            ? $"确定删除分类「{category.Name}」?"
+            : $"确定删除分类「{category.Name}」?";
 
         if (ShowConfirmDialog is not null && !await ShowConfirmDialog(message))
             return;

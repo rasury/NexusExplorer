@@ -229,11 +229,11 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
             await _host.Organization.OrganizeAsync(a.Id); await main.RefreshOrganizationStatesAsync();
             await Dispatcher.Yield(DispatcherPriority.DataBind);
             AssertColor(0x23, 0x7D, 0x4E);
-            Assert.StartsWith("已整理：", Assert.IsType<string>(treeIcon.ToolTip));
+            Assert.Equal("分类内不包含外部文件", Assert.IsType<string>(treeIcon.ToolTip));
             main.FileList.PickFiles = () => Task.FromResult<IReadOnlyList<string>>(new[] { _host.CreateTestFile("new.txt") });
             await main.FileList.AddFilesAsync(); await Dispatcher.Yield(DispatcherPriority.DataBind);
             AssertColor(0xD8, 0x89, 0x24);
-            Assert.StartsWith("待整理：", Assert.IsType<string>(treeIcon.ToolTip));
+            Assert.Equal("分类内包含外部文件", Assert.IsType<string>(treeIcon.ToolTip));
             Assert.Equal(a.Name, navContent.Text);
             Assert.Same(node, Assert.Single(main.Category.FlatCategories)); Assert.True(node.IsExpanded);
             Assert.False(main.CurrentCategory!.IsOrganized);

@@ -37,8 +37,8 @@ public class Category : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
     }
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string OrganizationStatusHint => IsOrganized
-        ? "已整理：上次整理全部成功，本分类绑定文件已位于分类目录。软件外部的移动或删除不自动检测。"
-        : "待整理：尚未确认，或绑定文件、分类目录已变动；可能有文件位于其他目录。完整整理成功后更新标识。";
+        ? "分类内不包含外部文件"
+        : "分类内包含外部文件";
     public int? DirectoryLocationId { get; set; }
     public DirectoryLocation? Location { get; set; }
 
