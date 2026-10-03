@@ -29,6 +29,14 @@ class MediaStats(C.Structure):
         "i_sent_packets", "i_sent_bytes", "f_send_bitrate")]
 
 
+class TrackDescription(C.Structure):
+    pass
+
+
+TrackDescription._fields_ = [('id', C.c_int), ('name', C.c_char_p),
+                            ('next', C.POINTER(TrackDescription))]
+
+
 def read_settings(**overrides):
     # run_path does not reuse import caches: the next play reads the saved file.
     values = runpy.run_path(str(SETTINGS_FILE))
@@ -107,6 +115,10 @@ class NativePlayback:
             "libvlc_media_player_set_role": (C.c_int, [C.c_void_p, C.c_uint]),
             "libvlc_audio_set_volume": (C.c_int, [C.c_void_p, C.c_int]),
             "libvlc_audio_get_volume": (C.c_int, [C.c_void_p]),
+            "libvlc_audio_get_track": (C.c_int, [C.c_void_p]),
+            "libvlc_audio_set_track": (C.c_int, [C.c_void_p, C.c_int]),
+            "libvlc_audio_get_track_description": (C.POINTER(TrackDescription), [C.c_void_p]),
+            "libvlc_track_description_list_release": (None, [C.POINTER(TrackDescription)]),
             "libvlc_media_player_set_rate": (C.c_int, [C.c_void_p, C.c_float]),
             "libvlc_media_player_get_rate": (C.c_float, [C.c_void_p]),
             "libvlc_media_player_play": (C.c_int, [C.c_void_p]),
@@ -166,6 +178,7 @@ class NativePlayback:
             "duration": self.vlc.libvlc_media_player_get_length(self.player) / 1000,
             "volume": self.vlc.libvlc_audio_get_volume(self.player),
             "rate": self.vlc.libvlc_media_player_get_rate(self.player),
+            "audio_track": self.vlc.libvlc_audio_get_track(self.player),
             "decoded_audio": stats.i_decoded_audio if valid else None,
             "played_buffers": stats.i_played_abuffers if valid else None,
             "lost_buffers": stats.i_lost_abuffers if valid else None,
@@ -269,6 +282,38 @@ def info():
     return snapshot
 
 
+def tracks():
+    """查询实际底层音轨 ID；不要假设 Track 1 的 ID 总是 1。"""
+    lab = _current()
+    head = lab.vlc.libvlc_audio_get_track_description(lab.player)
+    result = []
+    try:
+        node = head
+        while node:
+            entry = node.contents
+            result.append({'id': entry.id, 'name': (entry.name or b'').decode('utf-8', 'replace')})
+            node = entry.next
+    finally:
+        if head:
+            lab.vlc.libvlc_track_description_list_release(head)
+    lab.record('audio_tracks', tracks=result)
+    print(json.dumps(result, ensure_ascii=False))
+    return result
+
+
+def track(track_id):
+    """真正选择底层音轨；-1 取消音轨，不使用静音替代。"""
+    if type(track_id) is not int:
+        raise ValueError('音轨 ID 必须为整数。')
+    lab = _current()
+    started = time.monotonic()
+    result = lab.vlc.libvlc_audio_set_track(lab.player, track_id)
+    lab.record('audio_track_requested', track=track_id, result=result,
+               elapsed_ms=(time.monotonic() - started) * 1000)
+    if result != 0:
+        raise RuntimeError('VLC 拒绝切换该音轨。')
+
+
 atexit.register(stop)
 if __name__ == "__main__":
-    print("音频代码实验室：不自动播放。\n编辑 audio_settings.py，保存后输入 play()。\n可用：play(role='video')、pause()、resume()、volume(50)、seek(30)、info()、stop()、exit()。")
+    print("音频代码实验室：不自动播放。\n编辑 audio_settings.py，保存后输入 play()。\n可用：play(role='video')、tracks()、track(-1)、track(实际ID)、pause()、resume()、volume(50)、seek(30)、info()、stop()、exit()。")

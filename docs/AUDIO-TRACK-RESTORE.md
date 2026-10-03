@@ -1,22 +1,25 @@
-# Disable 后恢复音轨：2026-10-04
+# 真正 Disable 与 WASAPI 音轨恢复：2026-10-04
 
-用户反馈音频与视频都有“恢复后短响、静音约一秒”；官方 VLC 没有短响，但也要等约一秒。正式程序此前直接调用 `SetAudioTrack(-1)` 取消音轨，恢复时重新选择；日志记录 Speex 模块重建。
+音频与视频选择 Disable 再恢复 Track 1 时，用户听到短响后约一秒静音。官方 VLC 默认输出平滑等待约一秒；用户将官方 VLC 改成 DirectX 音频输出并重启后，也复现先响一下。用户要求保留真正的底层音轨切换，明确拒绝静音替代，并随后选择 WASAPI 输出。
 
-## 对比证据
+## 已验证与未验证
 
-Python 最小宿主加载固定目录相同 LibVLC 3.0.21，用相同 DirectSound＋Speex 参数比较取消音轨/恢复与静音/解除静音。素材是自动生成的静音 WAV、320 kbps / 48 kHz MP3，不绕过实际输出。前者重建解码器、DirectSound 流，日志出现 `playback way too early ... playing silence`，分别插入 52,752、50,976 个零采样，约 1.099、1.062 秒；仅静音没有重建和补静音记录。证据在 `artifacts/audio-track-probe.txt`、`artifacts/audio-track-mp3-probe.txt`。
+- 原正式程序与 Python 最小宿主加载相同 LibVLC 3.0.21，DirectSound＋Speex 下取消音轨会销毁解码器和输出流，恢复后日志记录补约一秒静音。独立静音 WAV/MP3 对比见 artifacts/audio-track-probe.txt、audio-track-mp3-probe.txt。
+- 官方应用使用同一输出也复现，说明短响现象不是 NexusExplorer 独有。DirectSound [创建缓冲代码](https://github.com/videolan/vlc/blob/3.0.21/modules/audio_output/directsound.c)会清零新缓冲；未播放时的 TimeGet 会失败。VLC [音频同步](https://github.com/videolan/vlc/blob/3.0.21/src/audio_output/dec.c)在不能获取时间时跳过校正，后续发现过早才补静音。这支持“初始新数据过早输出”的解释，不能把短响直接定性为旧数据未 Flush。
+- 同一 SDK 改用 MMDevice/WASAPI＋Speex 的静音 MP3 对比已实际选中 mmdevice、wasapi、speex_resampler，记录正常补静音对齐；见 artifacts/audio-track-mmdevice-probe.txt。静音素材、状态与日志都不能证明真正听到的波形没有短响，也不能替代持续音质验收。
 
-VLC [同步实现](https://github.com/videolan/vlc/blob/3.0.21/src/audio_output/dec.c)在输出时钟过早时插入静音，支持避免重建的修正。尚未证明“先响一下”的全部内部机理；媒体统计周期更新，不能把 buffer 计数更新间隔等同于扬声器静音时长。
+## 最终实现
 
-## 修正与生命周期
+1. 撤销 56a94ef 中的静音替代：Disable 直接 SetAudioTrack(-1)，真正取消选择、销毁音频解码器。正值直接选择对应音轨；没有静音、音量门控、固定等一秒、seek 或重启媒体来替代底层选择。
+2. 菜单读取实际原生音轨。调用记录返回结果并等待对应 ESSelected/实际音轨确认，五秒仅为失败超时，不是正常切换延迟；订阅在 finally 中解除。保留串行命令和媒体请求版本保护。
+3. 用户选择 WASAPI，音频与视频共享 `--aout=mmdevice`、`--mmdevice-backend=wasapi`、`--audio-resampler=speex_resampler`。VLC 3 的 [MMDevice 定义](https://github.com/videolan/vlc/blob/3.0.21/modules/audio_output/mmdevice.c)提供 audio output，加载 backend；[WASAPI 定义](https://github.com/videolan/vlc/blob/3.0.21/modules/audio_output/wasapi.c)是 aout stream，不能只用 `--aout=wasapi` 假定成功。日志提升实际 aout stream 选择，测试核对真实模块，避免只看传入参数。
+4. 未接管 PCM 输出，也没有通过私有指针或二进制补丁调用 SDK 内部 Flush。WASAPI 自身的 Flush 使用 IAudioClient Stop/Reset，但不把正常音轨重建延迟当成应用应伪造的静音期。
+5. 插件缓存生成/验证使用同一组新参数，缓存独立进程确认 MMDevice 可用且没有扫描加载全部 DLL；实际 WASAPI 后端在真实播放检查中确认。Storage、DB、配置及用户实验参数保留。
 
-- Disable 关闭声音并保留音轨解码、时钟，因此静音期间仍有音频解码开销。恢复同一音轨只解除静音，不 seek、暂停或重启媒体。菜单选中状态与实际解码音轨分开；音量调整不解除静音，恢复保留音量与播放/暂停状态。选择其他实际音轨仍通过 VLC 切换，不能保证它没有解码等待。
-- [原生输出实现](https://github.com/videolan/vlc/blob/3.0.21/src/audio_output/output.c)可能排队静音请求，即时 getter 可仍是旧值。监听 Muted/Unmuted 确认实际状态，结束解除订阅；两秒仅是失败超时，没有固定等待。
-- [Stop](https://github.com/videolan/vlc/blob/3.0.21/lib/media_player.c)会终止输出，[静音 API](https://github.com/videolan/vlc/blob/3.0.21/lib/audio.c)此时不能更新静音。最小测试发现直接在停止后解除静音，会让下一文件继承无声。仅从 Disable 停播时，用公开 `SetAudioOutput("directsound")` 重建停止状态的输出对象，再确认解除静音、恢复音量；保留播放器和视频窗口，不发出旧媒体声音。
-- 沿用串行命令和请求版本检查，不从原生回调调用 Stop；音频与视频共用修正，保留 DirectSound、Speex、插件缓存和既有解码配置。
+## 最小验证与人工验收
 
-## 最小验证
+四项 C# 原生检查：音频 WAV 与带音轨 AVI 确认 mmdevice、wasapi、speex_resampler 实际选中，控制及释放正常；两类文件各验证原生音轨为 -1、解码器销毁、静音状态未被打开、音频解码统计停止、恢复时 WASAPI 流/重采样真实重建、音量保持、暂停状态保持、无效 ID 报错与文件释放。输出 artifacts/audio-track-wasapi-min-tests.txt。
 
-新增音频 WAV、含音轨 AVI 两项原生检查：连续三次关闭/恢复时保留原生音轨、确认实际静音状态；音量保持、静音期间解码推进；无额外输出/重采样重建或补静音日志；暂停时切换不恢复播放；无效音轨报错；关闭后停止再播放不继承静音；停止后文件可独占读取。另外两项必要关联检查验证实际 DirectSound＋Speex、seek、暂停恢复及释放。四项通过、0 失败、0 跳过，见 `artifacts/audio-track-min-tests.txt`，未运行完整套件。素材静音，不代替真实听感验收。
+Python 仅运行新增一项原生切轨检查，覆盖 tracks() 的链表读取及释放、实际 ID、取消与恢复、无效 ID 不改变当前选择；见 artifacts/audio-track-lab-min-tests.txt。C# 四项与 Python 一项均通过，无失败、无跳过。未运行完整测试。
 
-人工验收：音频和视频各连续选择 Disable → Track 1，确认没有短响后静音；关闭声音后调整音量、暂停、恢复音轨，应保留音量且仍暂停；关闭声音后播放下一文件，应恢复声音。更新固定目录继续保护 Storage、数据库、配置和日志。
+以上使用静音素材。实际破音/电流声、切轨短响与视频同步仍需用户在新版本复验。正确的预期是恢复可无声等待正常管线对齐，而非取消解码工作来伪装立即恢复。

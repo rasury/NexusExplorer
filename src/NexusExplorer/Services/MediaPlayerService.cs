@@ -19,7 +19,6 @@ public sealed class MediaPlayerService : IPlaybackEngine
     private long _activeGeneration;
     private bool _disposed;
     private int _volume = 100;
-    private bool _audioDisabled;
     private PlaybackTiming? _playbackTiming;
     private sealed class PlaybackTiming(long generation, long startedAt, string path)
     {
@@ -31,7 +30,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
     }
     public bool HardwareDecoding { get; set; } = true;
     public NativePlayer? NativePlayer => _player;
-    public int SelectedAudioTrack => Volatile.Read(ref _audioDisabled) ? -1 : _player?.AudioTrack ?? -1;
+    public int SelectedAudioTrack => _player?.AudioTrack ?? -1;
     public bool IsVlcReady => _player is not null;
     public string? VlcVersion => _vlc?.Version;
     public string? CurrentPath { get; private set; }
@@ -61,13 +60,14 @@ public sealed class MediaPlayerService : IPlaybackEngine
         if (_player is not null) return;
         var timing = Stopwatch.StartNew();
         Log.Information("VLC 初始化开始;封装版本 {WrapperVersion}", typeof(LibVLC).Assembly.GetName().Version);
-        // DirectSound improved playback; the user then confirmed Speex removes the remaining noise.
-        // Apply both tested choices to the shared audio/video path.
-        _vlc = new LibVLC(true, "--no-osd", "--aout=directsound", "--audio-resampler=speex_resampler");
+        // The user reproduced the restore blip in official VLC with DirectSound
+        // and requested WASAPI. In VLC 3 WASAPI is a stream backend of MMDevice.
+        _vlc = new LibVLC(true, "--no-osd", "--aout=mmdevice", "--mmdevice-backend=wasapi", "--audio-resampler=speex_resampler");
         Log.Information("VLC 实例创建结束;耗时 {ElapsedMs:F1} ms", timing.Elapsed.TotalMilliseconds);
         _vlc.Log += (_, e) =>
         {
             if (e.Message.Contains("using audio output module", StringComparison.Ordinal)
+                || e.Message.Contains("using aout stream module", StringComparison.Ordinal)
                 || e.Message.Contains("using audio resampler module", StringComparison.Ordinal))
                 Log.Information("VLC 实际音频模块;请求 {Request};{Module}: {Message}", Interlocked.Read(ref _activeGeneration), e.Module, e.Message);
             else Log.Debug("VLC {Module}: {Message}", e.Module, e.Message);
@@ -115,7 +115,6 @@ public sealed class MediaPlayerService : IPlaybackEngine
                 step.Restart();
                 Interlocked.Exchange(ref _activeGeneration, 0);
                 _player!.Stop(); _player.Media = null;
-                ResetAudioSelection();
                 Log.Information("VLC 清理旧媒体结束;请求 {Request};耗时 {ElapsedMs:F1} ms", generation, step.Elapsed.TotalMilliseconds);
                 if (generation != Interlocked.Read(ref _generation) || cancellationToken.IsCancellationRequested) return;
                 step.Restart();
@@ -135,7 +134,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
                 Interlocked.Exchange(ref _activeGeneration, generation);
                 if (!_player.Play(media)) throw new OperationException("播放器拒绝打开该媒体。");
                 Log.Information("VLC 打开调用返回;请求 {Request};打开步骤 {StepMs:F1} ms;请求累计 {ElapsedMs:F1} ms", generation, step.Elapsed.TotalMilliseconds, timing.Elapsed.TotalMilliseconds);
-                Log.Information("播放 {Path};硬件解码 {Hardware};音量 {Volume};角色 {Role};请求音频输出 DirectSound;请求重采样 Speex", path, HardwareDecoding, _volume, audio ? "Music" : "Video");
+                Log.Information("播放 {Path};硬件解码 {Hardware};音量 {Volume};角色 {Role};请求音频输出 MMDevice/WASAPI;请求重采样 Speex", path, HardwareDecoding, _volume, audio ? "Music" : "Video");
             }, cancellationToken);
         }
         finally { _commands.Release(); }
@@ -150,7 +149,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
             await Task.Run(() =>
             {
                 Interlocked.Exchange(ref _activeGeneration, 0);
-                if (_player is not null && !_disposed) { _player.Stop(); _player.Media = null; ResetAudioSelection(); }
+                if (_player is not null && !_disposed) { _player.Stop(); _player.Media = null; }
                 CurrentPath = null;
             });
             Log.Information("VLC 停止释放结束;耗时 {ElapsedMs:F1} ms", timing.Elapsed.TotalMilliseconds);
@@ -164,64 +163,26 @@ public sealed class MediaPlayerService : IPlaybackEngine
         var previous = SelectedAudioTrack;
         if (!p.AudioTrackDescription.Any(t => t.Id == id))
             throw new OperationException("所选音轨不可用，请重新打开音轨菜单。");
-        // Disabling a VLC 3 track destroys its decoder and DirectSound stream. Restoring
-        // it can insert ~1s silence for clock alignment. Keep the stream running muted.
-        if (id == -1)
+        if (previous == id) return;
+        var selected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnSelected(object? sender, MediaPlayerESSelectedEventArgs args)
         {
-            await SetMuteAndConfirmAsync(p, true);
-            Volatile.Write(ref _audioDisabled, true);
+            if (args.Type == TrackType.Audio && args.Id == id) selected.TrySetResult();
         }
-        else
-        {
-            if (p.AudioTrack != id && !p.SetAudioTrack(id))
-                throw new OperationException("播放器未能切换音轨。");
-            if (Volatile.Read(ref _audioDisabled))
-            {
-                await SetMuteAndConfirmAsync(p, false);
-                Volatile.Write(ref _audioDisabled, false);
-            }
-        }
-        Log.Information("音轨选择 {Previous} -> {Selected};原生音轨 {NativeTrack};静音 {Muted};媒体时间 {MediaTimeMs} ms;耗时 {ElapsedMs:F1} ms",
-            previous, SelectedAudioTrack, p.AudioTrack, p.Mute, p.Time, timing.Elapsed.TotalMilliseconds);
-    });
-    private static async Task SetMuteAndConfirmAsync(NativePlayer player, bool mute)
-    {
-        if (player.Mute == mute) return;
-        var confirmed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        void OnChanged(object? sender, EventArgs args) => confirmed.TrySetResult();
-        if (mute) player.Muted += OnChanged; else player.Unmuted += OnChanged;
+        p.ESSelected += OnSelected;
         try
         {
-            // VLC may queue the request under its aout lock. An immediate getter
-            // can still report the old value; wait for the actual state change.
-            player.Mute = mute;
-            if (player.Mute != mute) await confirmed.Task.WaitAsync(TimeSpan.FromSeconds(2));
-            if (player.Mute != mute) throw new TimeoutException();
+            // Preserve real VLC track selection: -1 destroys the decoder. No mute,
+            // volume gate, artificial delay, seek or playback restart substitutes it.
+            if (!p.SetAudioTrack(id)) throw new OperationException("播放器未能切换音轨。");
+            if (p.AudioTrack != id) await selected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            if (p.AudioTrack != id) throw new TimeoutException();
         }
-        catch (TimeoutException)
-        {
-            throw new OperationException(mute ? "播放器未能关闭声音。" : "播放器未能恢复声音。");
-        }
-        finally
-        {
-            if (mute) player.Muted -= OnChanged; else player.Unmuted -= OnChanged;
-        }
-    }
-    private void ResetAudioSelection()
-    {
-        if (Volatile.Read(ref _audioDisabled))
-        {
-            // Stop terminates VLC's aout. Mute=false without an aout is ignored and
-            // leaves the inherited mute flag set for the next media. Recreate only
-            // the stopped output so resetting mute succeeds without an audible blip.
-            if (!_player!.SetAudioOutput("directsound"))
-                throw new OperationException("播放器未能重置音频输出。");
-            _player.Mute = false;
-            if (_player.Mute) throw new OperationException("播放器未能恢复声音。");
-            _player.Volume = _volume;
-        }
-        Volatile.Write(ref _audioDisabled, false);
-    }
+        catch (TimeoutException) { throw new OperationException("播放器未能切换音轨。"); }
+        finally { p.ESSelected -= OnSelected; }
+        Log.Information("底层音轨切换 {Previous} -> {Selected};实际音轨 {NativeTrack};静音 {Muted};媒体时间 {MediaTimeMs} ms;确认耗时 {ElapsedMs:F1} ms",
+            previous, id, p.AudioTrack, p.Mute, p.Time, timing.Elapsed.TotalMilliseconds);
+    });
     public Task SeekAsync(float fraction) => CommandAsync(p =>
     {
         if (p.Length > 0) p.SeekTo(TimeSpan.FromMilliseconds(p.Length * Math.Clamp(fraction, 0, 1)));

@@ -20,6 +20,39 @@ def wait_for(predicate):
 
 
 class AudioLabTest(unittest.TestCase):
+    def test_real_audio_track_disable_restore(self):
+        original_settings, original_logs = lab.SETTINGS_FILE, lab.LOG_DIRECTORY
+        with tempfile.TemporaryDirectory(prefix='nexus-native-tracks-') as temporary:
+            root = Path(temporary)
+            audio = root / 'silent.wav'
+            with wave.open(str(audio), 'wb') as file:
+                file.setnchannels(2); file.setsampwidth(2); file.setframerate(48000)
+                file.writeframes(bytes(48000 * 4 * 8))
+            native = Path(__file__).resolve().parents[2] / 'artifacts/NexusExplorer-2.0.4-preview-win-x64/libvlc/win-x64'
+            settings = root / 'settings.py'
+            settings.write_text(
+                f'MEDIA_PATH = {str(audio)!r}\nVLC_DIRECTORY = {str(native)!r}\n'
+                "VLC_OPTIONS = ['--no-osd', '--aout=mmdevice', '--mmdevice-backend=wasapi', '--audio-resampler=speex_resampler']\n"
+                "MEDIA_OPTIONS = []\nROLE = 'music'\nVOLUME = 0\nRATE = 1.0\n", encoding='utf-8')
+            lab.SETTINGS_FILE, lab.LOG_DIRECTORY = settings, root / 'logs'
+            try:
+                lab.play()
+                wait_for(lambda: lab._active.snapshot()['audio_track'] >= 0)
+                available = lab.tracks()
+                track = lab._active.snapshot()['audio_track']
+                self.assertTrue(any(item['id'] == track for item in available))
+                self.assertTrue(any(item['id'] == -1 for item in available))
+                lab.track(-1)
+                wait_for(lambda: lab._active.snapshot()['audio_track'] == -1)
+                lab.track(track)
+                wait_for(lambda: lab._active.snapshot()['audio_track'] == track)
+                with self.assertRaises(RuntimeError):
+                    lab.track(999999)
+                self.assertEqual(track, lab._active.snapshot()['audio_track'])
+            finally:
+                lab.stop()
+                lab.SETTINGS_FILE, lab.LOG_DIRECTORY = original_settings, original_logs
+
     def test_native_roles_reload_controls_and_release(self):
         original_settings, original_logs = lab.SETTINGS_FILE, lab.LOG_DIRECTORY
         with tempfile.TemporaryDirectory(prefix="nexus-audio-lab-") as temporary:

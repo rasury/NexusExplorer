@@ -47,14 +47,14 @@ public static class NexusVlcCacheNative
         public double LibVlcMs;
         public double PlayerMs;
         public int LoadedPluginLibraries;
-        public bool DirectSoundLoaded;
+        public bool MmDeviceLoaded;
     }
     public static Result Run(string directory, bool generate)
     {
         IntPtr core = IntPtr.Zero, library = IntPtr.Zero, instance = IntPtr.Zero, player = IntPtr.Zero, argv = IntPtr.Zero;
         string[] options = generate
-            ? new[] { "--no-osd", "--aout=directsound", "--audio-resampler=speex_resampler", "--reset-plugins-cache" }
-            : new[] { "--no-osd", "--aout=directsound", "--audio-resampler=speex_resampler" };
+            ? new[] { "--no-osd", "--aout=mmdevice", "--mmdevice-backend=wasapi", "--audio-resampler=speex_resampler", "--reset-plugins-cache" }
+            : new[] { "--no-osd", "--aout=mmdevice", "--mmdevice-backend=wasapi", "--audio-resampler=speex_resampler" };
         var strings = new IntPtr[options.Length];
         Release releaseInstance = null, releasePlayer = null;
         try
@@ -90,7 +90,7 @@ public static class NexusVlcCacheNative
                         && module.ModuleName.EndsWith("_plugin.dll", StringComparison.OrdinalIgnoreCase))
                     {
                         result.LoadedPluginLibraries++;
-                        if (module.ModuleName.Equals("libdirectsound_plugin.dll", StringComparison.OrdinalIgnoreCase)) result.DirectSoundLoaded = true;
+                        if (module.ModuleName.Equals("libmmdevice_plugin.dll", StringComparison.OrdinalIgnoreCase)) result.MmDeviceLoaded = true;
                     }
             return result;
         }
@@ -117,12 +117,12 @@ finally { $env:VLC_PLUGIN_PATH = $taskPreviousPluginPath }
 if (-not (Test-Path -LiteralPath $taskCache -PathType Leaf) -or (Get-Item -LiteralPath $taskCache).Length -eq 0) {
     throw 'VLC did not generate a nonempty plugins.dat. Publishing stopped.'
 }
-if ($VerifyOnly -and ($taskResult.LoadedPluginLibraries -gt 10 -or -not $taskResult.DirectSoundLoaded)) {
+if ($VerifyOnly -and ($taskResult.LoadedPluginLibraries -gt 10 -or -not $taskResult.MmDeviceLoaded)) {
     throw "VLC still loaded $($taskResult.LoadedPluginLibraries) plugin libraries. Cache verification failed."
 }
 [pscustomobject]@{
     cache = $taskCache; cacheBytes = (Get-Item -LiteralPath $taskCache).Length;
     generated = -not $VerifyOnly; nativeVersion = $taskResult.NativeVersion;
     libvlcMs = [Math]::Round($taskResult.LibVlcMs, 2); playerMs = [Math]::Round($taskResult.PlayerMs, 2);
-    loadedPluginLibraries = $taskResult.LoadedPluginLibraries; directSoundLoaded = $taskResult.DirectSoundLoaded
+    loadedPluginLibraries = $taskResult.LoadedPluginLibraries; mmDeviceLoaded = $taskResult.MmDeviceLoaded
 } | ConvertTo-Json

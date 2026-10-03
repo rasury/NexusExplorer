@@ -23,7 +23,7 @@ public class VideoPlaybackSmokeTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task DirectSoundAndSpeex_AreActuallySelectedForAudioAndVideoAsync(bool video)
+    public async Task WasapiAndSpeex_AreActuallySelectedForAudioAndVideoAsync(bool video)
     {
         var path = video
             ? SyntheticMedia.WriteAvi(Path.Combine(_host.RootDir, "silent.avi"), audio: true, silentAudio: true)
@@ -51,9 +51,12 @@ public class VideoPlaybackSmokeTests : IDisposable
                 return engine.Snapshot.IsPlaying && media is not null
                     && media.Statistics.DecodedAudio > 0 && (!video || media.Statistics.DecodedVideo > 0);
             });
-            Assert.Contains(messages.Messages, message => message.Contains("using audio output module \"directsound\"", StringComparison.Ordinal));
+            Assert.Contains(messages.Messages, message => message.Contains("using audio output module \"mmdevice\"", StringComparison.Ordinal));
+            Assert.Contains(messages.Messages, message => message.Contains("using aout stream module \"wasapi\"", StringComparison.Ordinal));
+            Assert.DoesNotContain(messages.Messages, message => message.Contains("using aout stream module \"directsound\"", StringComparison.Ordinal));
             Assert.Contains(messages.Messages, message => message.Contains("using audio resampler module \"speex_resampler\"", StringComparison.Ordinal));
             await engine.SetVolumeAsync(50);
+            await WaitUntilAsync(() => engine.NativePlayer!.Volume == 50);
             Assert.Equal(50, engine.NativePlayer!.Volume);
             await engine.SeekAsync(.5f);
             await WaitUntilAsync(() => engine.Snapshot.Position.TotalSeconds >= 1.5);
@@ -82,11 +85,11 @@ public class VideoPlaybackSmokeTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task DisableRestoreAudio_KeepsNativeStreamAndResetsForNextMedia(bool video)
+    public async Task DisableRestoreAudio_ReallyUnselectsAndRebuildsDecoder(bool video)
     {
         var path = video
-            ? SyntheticMedia.WriteAvi(Path.Combine(_host.RootDir, "mute.avi"), audio: true, silentAudio: true)
-            : SyntheticMedia.WriteWave(Path.Combine(_host.RootDir, "mute.wav"), silent: true);
+            ? SyntheticMedia.WriteAvi(Path.Combine(_host.RootDir, "tracks.avi"), audio: true, silentAudio: true)
+            : SyntheticMedia.WriteWave(Path.Combine(_host.RootDir, "tracks.wav"), silent: true);
         var messages = new NativeLogSink();
         var previousLogger = Log.Logger;
         using var logger = new LoggerConfiguration().MinimumLevel.Debug().WriteTo.Sink(messages).CreateLogger();
@@ -98,7 +101,7 @@ public class VideoPlaybackSmokeTests : IDisposable
             await engine.InitializeAsync();
             if (video)
             {
-                window = CreateWindowEx(0, "STATIC", "Nexus silent track test", unchecked((int)0x80000000),
+                window = CreateWindowEx(0, "STATIC", "Nexus native track test", unchecked((int)0x80000000),
                     -5000, -5000, 96, 64, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
                 Assert.NotEqual(IntPtr.Zero, window);
                 engine.NativePlayer!.Hwnd = window;
@@ -109,47 +112,38 @@ public class VideoPlaybackSmokeTests : IDisposable
             var native = engine.NativePlayer!;
             var track = native.AudioTrack;
             var resamplerStarts = messages.Messages.Count(m => m.Contains("using audio resampler module"));
-            var streamStarts = messages.Messages.Count(m => m.Contains("Opening DirectSound Audio Output"));
-            Assert.True(streamStarts > 0);
-            for (var i = 0; i < 3; i++)
+            var streamStarts = messages.Messages.Count(m => m.Contains("using aout stream module \"wasapi\""));
+            var decoderStops = messages.Messages.Count(m => m.Contains("killing decoder"));
+            await engine.SetAudioTrackAsync(-1);
+            Assert.Equal(-1, native.AudioTrack);
+            Assert.Equal(-1, engine.SelectedAudioTrack);
+            Assert.False(native.Mute);
+            Assert.True(engine.Snapshot.IsPlaying);
+            await WaitUntilAsync(() => messages.Messages.Count(m => m.Contains("killing decoder")) > decoderStops);
+            using (var media = native.Media)
             {
-                await engine.SetAudioTrackAsync(-1);
-                Assert.Equal(-1, engine.SelectedAudioTrack);
-                Assert.Equal(track, native.AudioTrack);
-                Assert.True(native.Mute);
-                await engine.SetVolumeAsync(35 + i);
-                await WaitUntilAsync(() => native.Volume == 35 + i);
-                Assert.True(native.Mute);
-                Assert.Equal(35 + i, native.Volume);
-                if (i == 0)
-                {
-                    using var media = native.Media;
-                    var decoded = media!.Statistics.DecodedAudio;
-                    await WaitUntilAsync(() => media.Statistics.DecodedAudio > decoded);
-                }
-                await engine.SetAudioTrackAsync(track);
-                Assert.Equal(track, engine.SelectedAudioTrack);
-                Assert.False(native.Mute);
-                Assert.Equal(35 + i, native.Volume);
+                await Task.Delay(300); // Allow the native statistics snapshot to catch up.
+                var decoded = media!.Statistics.DecodedAudio;
+                await Task.Delay(300);
+                Assert.Equal(decoded, media.Statistics.DecodedAudio);
             }
-            Assert.Equal(resamplerStarts, messages.Messages.Count(m => m.Contains("using audio resampler module")));
-            Assert.Equal(streamStarts, messages.Messages.Count(m => m.Contains("Opening DirectSound Audio Output")));
-            Assert.DoesNotContain(messages.Messages, m => m.Contains("playing silence") || m.Contains("killing decoder"));
-
+            await engine.SetVolumeAsync(35);
+            await WaitUntilAsync(() => native.Volume == 35);
+            await engine.SetAudioTrackAsync(track);
+            Assert.Equal(track, native.AudioTrack);
+            Assert.False(native.Mute);
+            await WaitUntilAsync(() => messages.Messages.Count(m => m.Contains("using audio resampler module")) > resamplerStarts);
+            Assert.True(messages.Messages.Count(m => m.Contains("using aout stream module \"wasapi\"")) > streamStarts);
+            Assert.Equal(35, native.Volume);
             await engine.TogglePauseAsync();
             await WaitUntilAsync(() => engine.Snapshot.IsPaused);
             await engine.SetAudioTrackAsync(-1);
+            Assert.Equal(-1, native.AudioTrack);
             await engine.SetAudioTrackAsync(track);
             Assert.True(engine.Snapshot.IsPaused);
+            Assert.False(native.Mute);
             await Assert.ThrowsAsync<OperationException>(() => engine.SetAudioTrackAsync(int.MaxValue));
-            Assert.Equal(track, engine.SelectedAudioTrack);
-
-            await engine.SetAudioTrackAsync(-1);
-            await engine.StopAndReleaseAsync();
-            Assert.False(native.Mute);
-            await engine.PlayAsync(path, !video);
-            await WaitUntilAsync(() => engine.Snapshot.IsPlaying && engine.SelectedAudioTrack >= 0);
-            Assert.False(native.Mute);
+            Assert.Equal(track, native.AudioTrack);
             await engine.StopAndReleaseAsync();
             using var exclusive = File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
         }
@@ -163,7 +157,6 @@ public class VideoPlaybackSmokeTests : IDisposable
             Log.Logger = previousLogger;
         }
     }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

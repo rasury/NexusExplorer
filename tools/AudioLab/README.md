@@ -17,6 +17,9 @@ resume()
 volume(50)                          # 当前播放即时调音量
 seek(30)                            # 跳到第 30 秒
 info()                              # 状态、时间、实际音量/速度与解码统计
+tracks()                            # 查看实际音轨 ID（音频 Track 1 常为 0，视频可能为 1）
+track(-1)                           # 真正取消音轨选择，不是静音
+track(0)                            # 恢复 tracks() 中显示的实际 ID
 stop()
 exit()                              # 释放资源后退出
 ```
@@ -34,6 +37,8 @@ exit()                              # 释放资源后退出
 2026-10-04 用户确认启用 `--aout=directsound` 后完全正常，并确认与角色无关。正式软件随后统一选择 DirectSound，作用于音频与视频。若要复现修复后的输出设置，启用参数文件中的该选项，或输入 `play(role="music", vlc_options=["--no-osd", "--aout=directsound"])`。实验参数继续由用户调整，此次正式修复不重置它们。
 
 这里没有 LibVLCSharp、WPF 控件、分类/数据库与主软件后台任务；每次 play 重建实例以使初始化参数生效，生产软件则复用实例。因此它是 VLC 调用层的实验环境，不能单凭脚本正常就认定正式软件修复。硬件视频解码设置不在此音频实验中模拟。原 C# 诊断工具保留，但本次实验使用这个脚本。
+
+用户后来在官方 VLC 的 DirectX 输出也复现切轨短响，并要求正式软件改用 WASAPI，保留真正的 Disable。复现当前参数使用 `play(vlc_options=["--no-osd", "--aout=mmdevice", "--mmdevice-backend=wasapi", "--audio-resampler=speex_resampler"])`。VLC 3 的 WASAPI 是 MMDevice 后端，单独 `--aout=wasapi` 不能保证选中。脚本新增 `tracks()` 和 `track(id)` 直接调用原生音轨 API；`info()` 包含实际音轨。原参数文件保留用户设置，没有自动重写；更改脚本后退出并重新打开 start.cmd。
 
 ## 环境和记录
 
