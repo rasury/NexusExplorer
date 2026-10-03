@@ -1,6 +1,6 @@
 # NexusExplorer 重构移交说明
 
-更新日期：2026-10-03。审查基线：main 的 0a3c02f。实施分支：codex/refactor-nexus-explorer。远端 main 在用户验收通过后才更新。
+更新日期：2026-10-03。审查基线：main 的 0a3c02f。实施分支：codex/refactor-nexus-explorer。按用户最新要求，每次修改完成并通过检查后自动以中文提交并推送远端 main；人工验收结果独立记录。
 
 本说明替代原仓库内的移交结论。用户提供的本地移交文档原件保留在根目录；同名本地开发文档原件保存在 local-documents 中，没有改写。
 
@@ -49,6 +49,6 @@ MutationGate 串行修改；未恢复日志阻止继续修改。同卷分类改�
 
 媒体测试自行生成素材，缺素材不得静默返回。覆盖 64×48、320×240、640×360 原始视频、PCM WAV，以及已入库的 320×180 H.264/AAC 测试图案。真实 oldtest 的 1080p H.264/AAC 长视频分别执行软件与 D3D11VA 硬件解码跳转，MP3 解码输出与独立解码器比较。实际听画同步、多设备音质、H.265 等更多格式仍需验收。
 
-每次发布使用新版本目录。用户数据不进入 Git，不清空旧运行目录。oldtest 原件保留，在线 SQLite 备份与完整 Storage 副本在 artifacts/old-data-validation；副本明确重映射后升级，未按文件名猜测历史路径。验收通过后再用中文提交更新 main。
+每次发布使用新版本目录。用户数据不进入 Git，不清空旧运行目录。oldtest 原件保留，在线 SQLite 备份与完整 Storage 副本在 artifacts/old-data-validation；副本明确重映射后升级，未按文件名猜测历史路径。修改完成并通过检查后自动提交、推送 main；推送采用快进方式，不覆盖远端其他提交。
 
 真实样本暴露了 VLC 3 内置 MP4 demux 的跳转问题：软件和硬件解码均花屏并丢弃过期音频缓冲。MP4/MOV/M4V 明确选择随包已有的 avformat 解复用，保留原生解码与输出；本轮真实视频截图回归通过。证据、边界及音频对比见 docs/VERIFICATION.md。
