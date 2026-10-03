@@ -173,6 +173,7 @@ public partial class CategoryFilePanel : UserControl
     { if (_contextMenuCategory is { } c) await RunAsync(() => action(c)); }
     private async void OnCreateChild(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.CreateChildAsync);
     private async void OnRenameCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.RenameAsync);
+    private async void OnRemoveCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.RemoveAsync);
     private async void OnDeleteCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.DeleteAsync);
     private async void OnMoveCategoryUp(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.MoveUpAsync);
     private async void OnMoveCategoryDown(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.MoveDownAsync);

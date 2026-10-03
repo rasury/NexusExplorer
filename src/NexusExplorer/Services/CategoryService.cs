@@ -238,6 +238,39 @@ public sealed class CategoryService
         var c = await GetByIdAsync(id) ?? throw new OperationException("分类不存在。"); var siblings = await GetChildrenAsync(c.ParentId);
         await ReorderAsync(id, Math.Clamp(siblings.FindIndex(x => x.Id == id) + offset, 0, siblings.Count - 1));
     }
+    /// <summary>Remove the logical subtree and its file registrations, preserving every physical path.</summary>
+    public Task<(int ChildCount, int FileCount)> GetRemovalSummaryAsync(int id) => Task.Run(async () =>
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        var all = await db.Categories.AsNoTracking().ToListAsync();
+        if (!all.Any(c => c.Id == id)) throw new OperationException("分类不存在。");
+        var ids = SubtreeIds(all, id);
+        // Count in SQLite instead of loading every file and resolving its path for the prompt.
+        return (ids.Count - 1, await db.Files.CountAsync(f => ids.Contains(f.CategoryId)));
+    });
+    public Task<List<int>> RemoveAsync(int id) => Task.Run(() => RemoveAsyncCore(id));
+    private async Task<List<int>> RemoveAsyncCore(int id)
+    {
+        using var lease = await MutationGate.AcquireAsync(_factory);
+        await using var db = await _factory.CreateDbContextAsync();
+        var all = await db.Categories.ToListAsync();
+        var root = all.FirstOrDefault(c => c.Id == id) ?? throw new OperationException("分类不存在。");
+        var ids = SubtreeIds(all, id);
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var files = db.Files.Where(f => ids.Contains(f.CategoryId));
+        var removedFileIds = await files.Select(f => f.Id).ToListAsync();
+        await files.ExecuteDeleteAsync();
+        // Foreign keys restrict parent deletion; commit all levels together or roll everything back.
+        foreach (var layer in all.Where(c => ids.Contains(c.Id)).GroupBy(c => Depth(all, c)).OrderByDescending(g => g.Key))
+        {
+            db.Categories.RemoveRange(layer);
+            await db.SaveChangesAsync();
+        }
+        // Directory identities can still be referenced by files belonging to another category.
+        await transaction.CommitAsync();
+        Log.Information("分类移除(保留物理目录和文件): {Name};分类数 {Categories};文件登记数 {Files}", root.Name, ids.Count, removedFileIds.Count);
+        return removedFileIds;
+    }
     public List<string> LastDeleteWarnings { get; } = new();
     public Task DeleteAsync(int id, IRecycleBinService recycleBin) => Task.Run(() => DeleteAsyncCore(id, recycleBin));
     private async Task DeleteAsyncCore(int id, IRecycleBinService recycleBin)

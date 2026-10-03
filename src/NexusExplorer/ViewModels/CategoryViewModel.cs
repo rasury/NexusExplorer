@@ -107,6 +107,21 @@ public partial class CategoryViewModel : ObservableObject
         }
     }
 
+    public async Task RemoveAsync(Category category)
+    {
+        try
+        {
+            var (childCount, fileCount) = await _categoryService.GetRemovalSummaryAsync(category.Id);
+            var message = $"确定移除分类「{category.Name}」？\n\n将移除该分类、{childCount} 个子分类及 {fileCount} 个文件的软件登记。\n所有物理目录和文件保留原样，不移动、不删除，也不进入回收站。";
+            if (ShowConfirmDialog is not null && !await ShowConfirmDialog(message)) return;
+            var removedFileIds = await _categoryService.RemoveAsync(category.Id);
+            if (_main.CurrentFile is { } current && removedFileIds.Contains(current.Id))
+                await _main.SelectFileAsync(null);
+            await _main.RefreshTreeAsync();
+        }
+        catch (Exception ex) { ShowError?.Invoke($"移除分类失败: {ex.Message}"); }
+    }
+
     public async Task DeleteAsync(Category category)
     {
         var childCount = (await _categoryService.GetSubtreeAsync(category.Id)).Count - 1;

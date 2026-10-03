@@ -112,6 +112,7 @@
                     <MenuItem Header="上移" Click="OnMoveCategoryUp" />
                     <MenuItem Header="下移" Click="OnMoveCategoryDown" />
                     <Separator />
+                    <MenuItem Header="移除（保留目录和文件）" Click="OnRemoveCategory" />
                     <MenuItem Header="删除" Click="OnDeleteCategory" Foreground="{StaticResource BrushDanger}" />
                 </ContextMenu>
             </TreeView.ContextMenu>
