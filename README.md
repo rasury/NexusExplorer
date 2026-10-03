@@ -1,72 +1,43 @@
-# NexusExplorer
+# NexusExplorer 2.0 预览版
 
-面向 Windows 桌面的分类文件管理与媒体查看软件。详见《NexusExplorer V1.0 开发文档.md》。
+Windows x64 分类文件管理与媒体查看软件，保留 WPF、SQLite、EF Core、LibVLC 与三区布局。此版本正在验收，已完成 oldtest 旧库副本升级与真实异常视频跳转回归；实际试听与完整鼠标交互仍待用户验收。
 
-## 核心功能
+## 使用
 
-- **多级分类管理**:树形分类(最多 10 层),每个分类对应真实物理目录
-- **分类与移动解耦**:文件加入分类或重新归类时只改数据库,物理文件不动
-- **内置媒体查看**:视频/音频(LibVLC)、图片(WPF + ImageSharp)
-- **播放时快速归类**:底部导航栏逐层浏览分类,一键把当前文件归入其他分类
-- **整理**:把当前分类的文件实际移动到分类对应物理目录(冲突支持替换/跳过/保留两个)
-- **安全删除**:文件与分类删除均送入 Windows 回收站
-- **失效检测与重新定位**:外部移动/改名文件后手动重新定位,不自动猜测
+- 左侧分类单击只选择操作对象；双击标题打开文件列表，展开箭头独立展开。
+- 文件支持 Ctrl 多选、Shift 区间选择、批量拖到分类、移除与删除；双击播放。
+- 归类只改变归属，整理才搬文件。整理默认递归整个分类子树，各文件进入自己的分类目录。
+- 播放队列保存文件 ID。归类当前播放文件后前进一次，跳过本批成功归类项；浏览其他分类不更换队列。
+- 分类可重命名、移动、拖回顶层、重新定位与迁移目录。重新定位只重绑定已有目录；迁移搬整个物理目录。
+- 删除分类只回收该子树所属的已登记文件，保留其他分类文件、未登记文件及非空目录。
+- 快捷分类自动换行，可跨行拖动排序，顺序独立保存。
+- 视频由 VLC 原生窗口输出，控制条在画面下方。默认硬件解码，可关闭并重新打开媒体；选项保存到配置。
+- 图片默认适合窗口，支持缩放、平移、原始尺寸与前后切换。
 
-## 界面布局
+## 构建、测试和发布
 
-```
-┌──────────────┬────────────────────────────┐
-│ 分类树        │                            │
-│   ↓          │        播放区域             │
-│ 当前分类文件  │   (未播放时纯黑)           │
-├──────────────┴────────────────────────────┤
-│              分类导航栏(快速归类)           │
-└───────────────────────────────────────────┘
-```
+需要 Windows x64 与 .NET 8 SDK。Visual Studio 解决方案使用 x64 配置。
 
-## 技术栈
-
-.NET 8 · WPF · MVVM(CommunityToolkit.Mvvm) · EF Core + SQLite · LibVLCSharp · ImageSharp · Serilog · xUnit
-
-## 构建与运行
-
-```bash
-# 构建
-dotnet build
-
-# 运行单元测试
-dotnet test
-
-# 发布便携版(自包含,x64,单文件 exe)
-dotnet publish src/NexusExplorer/NexusExplorer.csproj -c Release -r win-x64 --self-contained true -o publish/NexusExplorer-win-x64
+```powershell
+dotnet restore NexusExplorer.sln -r win-x64
+dotnet build NexusExplorer.sln -c Release --no-restore
+dotnet test NexusExplorer.sln -c Release --no-restore
+dotnet publish src/NexusExplorer/NexusExplorer.csproj -c Release -r win-x64 --self-contained true --no-restore -o artifacts/NexusExplorer-2.0-preview-win-x64
 ```
 
-发布目录结构(托管 DLL 全部打包进单文件 exe):
+发布到新版本目录，保留旧软件的配置、数据库、日志与 Storage。禁止清空或覆盖旧运行目录。便携包含自包含 EXE、WPF/SQLite 原生 DLL 与完整 libvlc/win-x64 插件目录，须保留整个目录。
 
-```
-NexusExplorer.exe           # 单文件,含全部托管程序集与运行时(约 66MB)
-appsettings.json            # 配置
-libvlc\win-x64\            # VLC 原生库与插件(必须独立于 exe 存放)
-*_cor3.dll / e_sqlite3.dll  # WPF/SQLite 原生库(.NET 单文件发布 WPF 的硬约束,必须留在 exe 旁)
-data\ logs\ Storage\       # 运行时自动创建
+```powershell
+# 仅在新发布的独立验收目录执行；检查数据库、实际 WPF 资源与 VLC 加载后退出。
+.\NexusExplorer.exe --verify-startup
 ```
 
-## 便携式目录布局
+结果写入 startup-verification.json，失败返回退出码 1。首次运行在 EXE 旁创建 data、logs、Storage，配置允许显式指定其他位置。
 
-首次运行会在 exe 同目录自动创建:
+## 资料
 
-```
-NexusExplorer.exe
-appsettings.json   # 配置(Storage.RootPath 留空 = exe旁的 Storage 目录)
-data\              # SQLite 数据库
-logs\              # Serilog 滚动日志
-Storage\           # 分类对应的物理目录根
-```
-
-`appsettings.json` 中 `Storage.RootPath` 可指定其他根目录(如 `D:\\NexusExplorer`)。
-
-## 拖拽
-
-- **Explorer → 文件列表/分类树**:文件或文件夹(递归)加入当前/目标分类
-- **文件 → 分类树节点**:重新归类(只改 CategoryId)
-- **分类 → 分类树节点**:移动整个子分类(数据库 + 物理目录同步)
+- [重构评估与实现说明](docs/REFACTOR.md)
+- [18 项验收步骤](docs/ACCEPTANCE.md)
+- [构建、旧库与真实媒体验证记录](docs/VERIFICATION.md)
+- [当前移交说明](HANDOVER.md)
+- 第一版开发文档保留为历史需求；本次明确要求和已确认行为优先。

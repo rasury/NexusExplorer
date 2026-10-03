@@ -40,7 +40,7 @@ public class PinnedCategoryTests : IDisposable
     [Fact]
     public async Task SelectPinned_UpdatesBreadcrumbToCategoryChain()
     {
-        var main = new MainViewModel(_host.Categories, _host.Files, _host.Organization, new MediaPlayerService());
+        var main = new MainViewModel(_host.Categories, _host.Files, _host.Organization, new FakePlaybackEngine());
         var root = await _host.Categories.CreateAsync("视频", null);
         var child = await _host.Categories.CreateAsync("科幻", root.Id);
         var grandChild = await _host.Categories.CreateAsync("星际穿越", child.Id);
@@ -63,7 +63,7 @@ public class PinnedCategoryTests : IDisposable
     public async Task SelectPinned_ThenConfirm_RecategorizesFile()
     {
         // 完整链路:钉住深层分类 → 点快捷按钮选中 → 绿勾归类
-        var main = new MainViewModel(_host.Categories, _host.Files, _host.Organization, new MediaPlayerService());
+        var main = new MainViewModel(_host.Categories, _host.Files, _host.Organization, new FakePlaybackEngine());
         var root = await _host.Categories.CreateAsync("视频", null);
         var target = await _host.Categories.CreateAsync("科幻", root.Id);
         await _host.Categories.PinAsync(target.Id);
@@ -79,6 +79,6 @@ public class PinnedCategoryTests : IDisposable
 
         var latest = await _host.Files.GetByIdAsync(added.Id);
         Assert.Equal(target.Id, latest!.CategoryId);
-        Assert.True(main.Navigation.IsSelectedCategoryCurrent); // 勾应置灰
+        Assert.False(main.Navigation.HasCurrentFile); // 队列耗尽停止，不能从头重播
     }
 }

@@ -1,221 +1,77 @@
+using NexusExplorer.ApplicationLayer;
 using System.IO;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using NexusExplorer.Models;
 using NexusExplorer.Services;
-using LibVLCSharp.Shared;
 using Serilog;
 using SixLabors.ImageSharp;
 using Image = SixLabors.ImageSharp.Image;
 
 namespace NexusExplorer.ViewModels;
-
-/// <summary>当前文件的媒体类型。</summary>
-public enum MediaKind
-{
-    None,
-    Video,
-    Audio,
-    Image,
-    Unsupported
-}
-
-/// <summary>右侧播放面板 ViewModel。物理渲染在 View,VLC 状态在此同步。</summary>
+public enum MediaKind { None, Video, Audio, Image, Unsupported }
 public partial class PlayerViewModel : ObservableObject
 {
-    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts", ".3gp"
-    };
-
-    private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".ape", ".opus"
-    };
-
-    private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".ico", ".svg"
-    };
-
     private readonly MainViewModel _main;
-    private readonly FileService _fileService;
-    private readonly MediaPlayerService _mediaPlayer;
-
-    [ObservableProperty]
-    private MediaKind _kind = MediaKind.None;
-
-    [ObservableProperty]
-    private string? _mediaTitle;
-
-    [ObservableProperty]
-    private string? _mediaPath;
-
-    // ---------- 播放器状态 ----------
-    [ObservableProperty]
-    private bool _isPlaying;
-
-    [ObservableProperty]
-    private TimeSpan _position;
-
-    [ObservableProperty]
-    private TimeSpan _duration;
-
-    [ObservableProperty]
-    private int _volume = 100; // 默认 100=VLC 原样输出(软件音量<100 有量化损耗)
-
-    /// <summary>用户是否调整过音量(未调整时绝不写 VLC,保持 0 损耗直出)。</summary>
-    private bool _userAdjustedVolume;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsRepeatOne), nameof(IsRepeatAll), nameof(IsShuffle), nameof(IsSequential))]
-    private PlayMode _playMode = PlayMode.Sequential;
-
-    public bool IsRepeatOne => PlayMode == PlayMode.RepeatOne;
-    public bool IsRepeatAll => PlayMode == PlayMode.RepeatAll;
-    public bool IsShuffle => PlayMode == PlayMode.Shuffle;
-    public bool IsSequential => PlayMode == PlayMode.Sequential;
-
-    // ---------- 图片状态 ----------
-    [ObservableProperty]
-    private ImageSource? _imageSource;
-
-    [ObservableProperty]
-    private double _imageScale = 1.0;
-
-    public event Action? StateChanged;
-
-    public Action<string>? ShowError { get; set; }
-
-    public PlayerViewModel(MainViewModel main, FileService fileService, MediaPlayerService mediaPlayer)
-    {
-        _main = main;
-        _fileService = fileService;
-        _mediaPlayer = mediaPlayer;
-
-        _mediaPlayer.PlaybackError += OnPlaybackError;
-        _mediaPlayer.MediaEnded += OnMediaEnded;
-    }
-
-    /// <summary>当前媒体播完(VLC 线程):按播放模式前进,统一经 Main 以同步左侧选中。</summary>
-    private void OnMediaEnded()
-    {
-        _ = System.Windows.Application.Current?.Dispatcher.InvokeAsync(async () =>
-        {
-            switch (PlayMode)
-            {
-                case PlayMode.RepeatOne:
-                    _mediaPlayer.Replay();
-                    break;
-
-                case PlayMode.Shuffle:
-                    await PlayRandomAsync();
-                    break;
-
-                default:
-                    if (!await _main.PlayAdjacentAsync(1)
-                        && PlayMode == PlayMode.RepeatAll
-                        && _main.CurrentFiles.Count > 0)
-                    {
-                        await _main.SelectFileAsync(_main.CurrentFiles[0]);
-                    }
-                    break;
-            }
-        });
-    }
-
-    private async Task PlayRandomAsync()
-    {
-        var files = _main.CurrentFiles.Where(f => f.ExistsOnDisk).ToList();
-        if (files.Count == 0) return;
-
-        var candidates = files.Where(f => f.Id != _main.CurrentFile?.Id).ToList();
-        var pick = candidates.Count == 0 ? files[0] : candidates[_random.Next(candidates.Count)];
-        await _main.SelectFileAsync(pick);
-    }
-
+    public IPlaybackEngine Engine { get; }
+    private CancellationTokenSource? _opening;
+    private long _version;
     private readonly Random _random = new();
-
-    public MediaPlayerService MediaPlayer => _mediaPlayer;
-
-    /// <summary>根据扩展名判断媒体类型。</summary>
-    public static MediaKind GetMediaKind(string fileName)
+    private readonly SemaphoreSlim _ended = new(1, 1);
+    [ObservableProperty] private MediaKind _kind;
+    [ObservableProperty] private string? _mediaTitle;
+    [ObservableProperty] private string? _mediaPath;
+    [ObservableProperty] private bool _isPlaying;
+    [ObservableProperty] private TimeSpan _position;
+    [ObservableProperty] private TimeSpan _duration;
+    [ObservableProperty] private int _volume = 100;
+    [ObservableProperty] private PlayMode _playMode = PlayMode.Sequential;
+    [ObservableProperty] private ImageSource? _imageSource;
+    [ObservableProperty] private double _imageScale; // 0 means fit; effective scale is computed by the view.
+    public Action<string>? ShowError { get; set; }
+    public event Action? StateChanged;
+    public PlayerViewModel(MainViewModel main, FileService files, IPlaybackEngine engine)
     {
-        var ext = Path.GetExtension(fileName).ToLowerInvariant();
-        if (VideoExtensions.Contains(ext)) return MediaKind.Video;
-        if (AudioExtensions.Contains(ext)) return MediaKind.Audio;
-        if (ImageExtensions.Contains(ext)) return MediaKind.Image;
+        _main = main; Engine = engine;
+        engine.PlaybackError += OnPlaybackError; engine.MediaEnded += OnMediaEnded;
+    }
+    public static MediaKind GetMediaKind(string name)
+    {
+        var ext = Path.GetExtension(name).ToLowerInvariant();
+        if (new[] { ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts", ".3gp" }.Contains(ext)) return MediaKind.Video;
+        if (new[] { ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".ape", ".opus" }.Contains(ext)) return MediaKind.Audio;
+        if (new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".ico" }.Contains(ext)) return MediaKind.Image;
         return MediaKind.Unsupported;
     }
-
-    /// <summary>打开文件:图片直接解码,视频/音频交给 VLC,其他类型提示。</summary>
     public async Task PlayFileAsync(FileItem? file)
     {
-        // 停掉旧媒体
-        _mediaPlayer.Stop();
-        ImageSource = null;
-        ImageScale = 1.0;
-        Position = TimeSpan.Zero;
-        Duration = TimeSpan.Zero;
-        IsPlaying = false;
-
-        if (file is null)
-        {
-            Kind = MediaKind.None;
-            MediaTitle = null;
-            MediaPath = null;
-            StateChanged?.Invoke();
-            return;
-        }
-
-        MediaTitle = file.FileName;
-        MediaPath = file.AbsolutePath;
-        Kind = GetMediaKind(file.FileName);
-
-        switch (Kind)
-        {
-            case MediaKind.Image:
-                await LoadImageAsync(file);
-                break;
-
-            case MediaKind.Video:
-            case MediaKind.Audio:
-                StartVlcPlayback();
-                break;
-
-            case MediaKind.Unsupported:
-                ShowError?.Invoke($"暂不支持预览该文件类型:\n{file.FileName}");
-                break;
-        }
-
+        var version = Interlocked.Increment(ref _version);
+        _opening?.Cancel(); _opening?.Dispose(); _opening = new CancellationTokenSource(); var token = _opening.Token;
+        await Engine.StopAndReleaseAsync();
+        if (version != Interlocked.Read(ref _version)) return;
+        ImageSource = null; ImageScale = 0; Position = TimeSpan.Zero; Duration = TimeSpan.Zero; IsPlaying = false;
+        Kind = file is null ? MediaKind.None : GetMediaKind(file.FileName); MediaTitle = file?.FileName; MediaPath = file?.AbsolutePath;
         StateChanged?.Invoke();
-    }
-
-    private async Task LoadImageAsync(FileItem file)
-    {
+        if (file is null) return;
         try
         {
-            // 解码+Freeze 都在后台线程内完成——WPF Freezable 的属性读取
-            // (含 IsFrozen)同样受线程亲和保护,任何访问都不得跨线程;
-            // 冻结后的位图才能安全交给 UI 线程
-            var source = await Task.Run(() =>
+            if (Kind == MediaKind.Image)
             {
-                var bitmap = LoadBitmap(file.AbsolutePath);
-                if (bitmap is not null && !bitmap.IsFrozen)
-                    bitmap.Freeze();
-                return bitmap;
-            });
-            ImageSource = source;
+                var image = await Task.Run(() => { var bitmap = LoadBitmap(file.AbsolutePath); if (bitmap is not null && !bitmap.IsFrozen) bitmap.Freeze(); return bitmap; }, token);
+                if (version == Interlocked.Read(ref _version)) ImageSource = image;
+            }
+            else if (Kind is MediaKind.Video or MediaKind.Audio)
+            {
+                await Engine.PlayAsync(file.AbsolutePath, Kind == MediaKind.Audio, token);
+                if (version == Interlocked.Read(ref _version)) IsPlaying = true;
+            }
+            else ShowError?.Invoke("暂不支持预览该文件类型。");
         }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "图片加载失败: {Path}", file.AbsolutePath);
-            ShowError?.Invoke($"图片加载失败: {file.FileName}");
-            Kind = MediaKind.Unsupported;
-        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { if (version == Interlocked.Read(ref _version)) OnPlaybackError(file.AbsolutePath, ex.Message); }
+        if (version == Interlocked.Read(ref _version)) StateChanged?.Invoke();
     }
-
     private static BitmapSource? LoadBitmap(string path)
     {
         BitmapSource? DecodeWithImageSharp()
@@ -248,133 +104,51 @@ public partial class PlayerViewModel : ObservableObject
         }
     }
 
-    private void StartVlcPlayback()
-    {
-        // 播放列表 = 当前分类的媒体文件(按列表顺序)
-        var playlist = _main.CurrentFiles
-            .Where(f => GetMediaKind(f.FileName) is MediaKind.Video or MediaKind.Audio && f.ExistsOnDisk)
-            .Select(f => f.AbsolutePath)
-            .ToList();
 
-        var index = playlist.FindIndex(p => string.Equals(p, MediaPath, StringComparison.OrdinalIgnoreCase));
-        if (index < 0)
+    private void OnPlaybackError(string path, string message)
+    { Log.Error("播放失败 {Path}: {Message}", path, message); ShowError?.Invoke(message); IsPlaying = false; StateChanged?.Invoke(); }
+    private async void OnMediaEnded()
+    {
+        if (!await _ended.WaitAsync(0)) return;
+        try
         {
-            playlist.Insert(0, MediaPath!);
-            index = 0;
+            if (_main.CurrentFile is null) return;
+            if (PlayMode == PlayMode.RepeatOne) await PlayFileAsync(_main.CurrentFile);
+            else if (PlayMode == PlayMode.Shuffle)
+            {
+                var choices = _main.Session.Queue.Where(id => id != _main.CurrentFile.Id).ToList();
+                if (choices.Count > 0)
+                {
+                    var file = await _main.Files.GetByIdAsync(choices[_random.Next(choices.Count)]);
+                    if (file is not null && file.ExistsOnDisk)
+                    { await _main.PlayQueuedIdAsync(file.Id); }
+                }
+            }
+            else if (!await _main.PlayAdjacentAsync(1))
+            {
+                if (PlayMode == PlayMode.RepeatAll) await _main.ReplayQueueAsync();
+                else await StopPlaybackAsync();
+            }
         }
-
-        _mediaPlayer.Mode = PlayMode;
-        IsPlaying = true;
-        // VLC 冷启动初始化可能未完成(Lazy 触发会阻塞),放后台线程执行
-        _ = Task.Run(() =>
-        {
-            // 纯音频按 Music 角色输出(避免视频流音效处理);视频含音轨保持 Video
-            _mediaPlayer.SetMusicRole(Kind == MediaKind.Audio);
-            _mediaPlayer.Play(playlist, index);
-            // 用户没动过音量 → 保持 VLC 默认 100(零损耗);
-            // VLC 的音量是软件衰减,主动写 <100 会造成量化损失
-            if (_userAdjustedVolume && _mediaPlayer.IsVlcReady)
-                _mediaPlayer.Player.Volume = Volume;
-        });
+        catch (Exception ex) { OnPlaybackError(MediaPath ?? "", ex.Message); }
+        finally { _ended.Release(); }
     }
-
-    // ---------- 播放控制 ----------
-
-    public void TogglePlayPause()
+    public async Task TogglePlayPauseAsync()
     {
         if (Kind is not (MediaKind.Video or MediaKind.Audio)) return;
-        if (!_mediaPlayer.IsVlcReady) return;
-
-        // VLC 的 Pause 对已停止/播完的播放器无效,此时需要重新 Play
-        var state = _mediaPlayer.Player.State;
-        if (state is VLCState.Playing or VLCState.Paused)
-            _mediaPlayer.PlayPause();
-        else
-            _mediaPlayer.Replay();
-        // 播放状态由 UI 轮询 VLC 同步
+        if (Engine.Snapshot.IsPlaying || Engine.Snapshot.IsPaused) await Engine.TogglePauseAsync();
+        else if (_main.CurrentFile is not null) await Engine.PlayAsync(_main.CurrentFile.AbsolutePath, Kind == MediaKind.Audio);
     }
-
-    public void StopPlayback()
+    public async Task StopPlaybackAsync() { await Engine.StopAndReleaseAsync(); IsPlaying = false; Position = TimeSpan.Zero; StateChanged?.Invoke(); }
+    public Task NextAsync() => AdjacentAsync(1);
+    public Task PreviousAsync() => AdjacentAsync(-1);
+    private async Task AdjacentAsync(int offset)
     {
-        _mediaPlayer.Stop();
-        IsPlaying = false;
-        Position = TimeSpan.Zero;
-        StateChanged?.Invoke();
+        if (await _main.PlayAdjacentAsync(offset)) return;
+        if (PlayMode == PlayMode.RepeatAll) await _main.ReplayQueueAsync(offset < 0);
     }
-
-    public void Next() => _ = PlayAdjacentAsync(1);
-
-    public void Previous() => _ = PlayAdjacentAsync(-1);
-
-    /// <summary>前进/后退统一走 Main(同步左侧选中);列表循环模式下到尾回绕。</summary>
-    private async Task PlayAdjacentAsync(int offset)
-    {
-        if (await _main.PlayAdjacentAsync(offset))
-            return;
-
-        if (_main.CurrentFiles.Count == 0) return;
-
-        if (offset > 0 && PlayMode is PlayMode.RepeatAll or PlayMode.RepeatOne)
-            await _main.SelectFileAsync(_main.CurrentFiles[0]);
-        else if (offset < 0 && PlayMode is PlayMode.RepeatAll or PlayMode.RepeatOne)
-            await _main.SelectFileAsync(_main.CurrentFiles[^1]);
-    }
-
-    public void Seek(float fraction)
-    {
-        if (Kind is not (MediaKind.Video or MediaKind.Audio)) return;
-        if (!_mediaPlayer.IsVlcReady) return;
-
-        var lengthMs = _mediaPlayer.Player.Length;
-        if (lengthMs <= 0) return;
-
-        fraction = Math.Clamp(fraction, 0f, 1f);
-        _mediaPlayer.Player.SeekTo(TimeSpan.FromMilliseconds(lengthMs * fraction));
-    }
-
-    public void SetVolume(int volume)
-    {
-        Volume = Math.Clamp(volume, 0, 100);
-        _userAdjustedVolume = true;
-        if (_mediaPlayer.IsVlcReady)
-            _mediaPlayer.Player.Volume = Volume;
-    }
-
-    public void CyclePlayMode()
-    {
-        PlayMode = PlayMode switch
-        {
-            PlayMode.Sequential => PlayMode.RepeatAll,
-            PlayMode.RepeatAll => PlayMode.RepeatOne,
-            PlayMode.RepeatOne => PlayMode.Shuffle,
-            _ => PlayMode.Sequential
-        };
-        _mediaPlayer.Mode = PlayMode;
-        StateChanged?.Invoke();
-    }
-
-    // ---------- VLC 事件(已由 View 调度回 UI 线程) ----------
-
-    public void OnPlaybackError(string path, string message)
-    {
-        ShowError?.Invoke(message);
-        IsPlaying = false;
-        StateChanged?.Invoke();
-    }
-
-    /// <summary>
-    /// 图片缩放系数:0 = Fit 窗口(默认);&gt;0 = 缩放系数(1.0 = 原始像素)。
-    /// </summary>
-    public void Zoom(double delta)
-    {
-        var current = ImageScale < 0.001 ? 1.0 : ImageScale;
-        ImageScale = Math.Clamp(current * delta, 0.05, 20.0);
-        StateChanged?.Invoke();
-    }
-
-    public void ResetZoom()
-    {
-        ImageScale = 0; // 回到 Fit 窗口
-        StateChanged?.Invoke();
-    }
+    public Task SeekAsync(float fraction) => Engine.SeekAsync(fraction);
+    public Task SetVolumeAsync(int value) { Volume = Math.Clamp(value, 0, 100); return Engine.SetVolumeAsync(Volume); }
+    public void CyclePlayMode() { PlayMode = (PlayMode)(((int)PlayMode + 1) % 4); StateChanged?.Invoke(); }
+    public void ResetZoom() { ImageScale = 0; StateChanged?.Invoke(); }
 }

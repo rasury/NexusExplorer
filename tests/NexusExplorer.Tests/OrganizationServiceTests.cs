@@ -53,7 +53,7 @@ public class OrganizationServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Organize_DoesNotRecurseIntoSubcategories()
+    public async Task Organize_RecursesIntoSubcategories()
     {
         var parent = await _host.Categories.CreateAsync("电影", null);
         var child = await _host.Categories.CreateAsync("科幻", parent.Id);
@@ -66,11 +66,11 @@ public class OrganizationServiceTests : IDisposable
         // 只整理父分类
         var results = await _host.Organization.OrganizeAsync(parent.Id);
 
-        Assert.Single(results);
+        Assert.Equal(2, results.Count);
         Assert.True(File.Exists(Path.Combine(parent.PhysicalPath, "P.mp4")));
         // 子分类的文件不动
-        Assert.True(File.Exists(fileChild));
-        Assert.Empty(Directory.GetFiles(child.PhysicalPath));
+        Assert.False(File.Exists(fileChild));
+        Assert.Single(Directory.GetFiles(child.PhysicalPath));
     }
 
     [Fact]

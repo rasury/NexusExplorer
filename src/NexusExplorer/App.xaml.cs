@@ -1,3 +1,4 @@
+using NexusExplorer.ApplicationLayer;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
@@ -17,9 +18,12 @@ public partial class App : Application
 {
     private ServiceProvider? _services;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        try
+        {
 
         var config = AppConfig.LoadOrDefault(AppPaths.SettingsPath);
 
@@ -45,53 +49,52 @@ public partial class App : Application
         System.Threading.Tasks.TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
         _services = ConfigureServices(config);
-        AppServices.Initialize(_services);
 
         // 分类物理根目录跟随配置
         _services.GetRequiredService<CategoryService>().StorageRoot = config.Storage.ResolvedRoot;
 
-        // 数据库初始化 + 轻量迁移(EnsureCreated 不改已有表结构)
+        // 版本化升级与持久操作恢复。无法识别的数据保持原样并停止启动。
         using (var scope = _services.CreateScope())
         {
             var factory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
             using var db = factory.CreateDbContext();
-            db.Database.EnsureCreated();
-            MigrateDatabase(db, config.Database.ResolvedPath);
+            await NexusExplorer.Data.DatabaseInitializer.InitializeAsync(db, config.Database.ResolvedPath);
+            var recoveryProblems = await _services.GetRequiredService<FileOperationExecutor>().RecoverAsync();
+            if (recoveryProblems.Count > 0)
+                MessageBox.Show("以下操作需要手动检查，已保留原件：\n" + string.Join("\n", recoveryProblems), "操作恢复");
             Log.Information("数据库初始化完成: {Path}", config.Database.ResolvedPath);
         }
 
         var mainWindow = _services.GetRequiredService<MainWindow>();
         MainWindow = mainWindow;
+        if (e.Args.Contains("--verify-startup", StringComparer.Ordinal))
+        {
+            Log.Information("自检：构建界面与状态");
+            await _services.GetRequiredService<MainViewModel>().RefreshTreeAsync();
+            mainWindow.Measure(new Size(1280, 800)); mainWindow.Arrange(new Rect(0, 0, 1280, 800)); mainWindow.UpdateLayout();
+            await _services.GetRequiredService<MediaPlayerService>().InitializeAsync();
+            Log.Information("自检：VLC 原生库已加载");
+            File.WriteAllText(Path.Combine(AppPaths.AppRoot, "startup-verification.json"),
+                System.Text.Json.JsonSerializer.Serialize(new { Success = true, SchemaVersion = DatabaseInitializer.SchemaVersion, Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(), NativeVlc = _services.GetRequiredService<MediaPlayerService>().VlcVersion }));
+            mainWindow.PrepareForVerificationExit();
+            await _services.GetRequiredService<MediaPlayerService>().StopAndReleaseAsync();
+            Log.Information("自检：资源已释放，即将退出");
+            Shutdown(0); return;
+        }
         mainWindow.Show();
 
         Log.Information("主窗口已显示");
-    }
-
-    /// <summary>SQLite 轻量迁移:给已存在的表补缺失的列(EnsureCreated 不会改表)。</summary>
-    private static void MigrateDatabase(AppDbContext db, string dbPath)
-    {
-        try
-        {
-            var connection = db.Database.GetDbConnection();
-            connection.Open();
-
-            using var check = connection.CreateCommand();
-            check.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Categories') WHERE name='IsPinned'";
-            var exists = Convert.ToInt64(check.ExecuteScalar()!) > 0;
-
-            if (!exists)
-            {
-                using var alter = connection.CreateCommand();
-                alter.CommandText = "ALTER TABLE Categories ADD COLUMN IsPinned INTEGER NOT NULL DEFAULT 0";
-                alter.ExecuteNonQuery();
-                Log.Information("数据库迁移: Categories.IsPinned 列已添加");
-            }
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "数据库迁移检查失败(继续启动)");
+            Log.Fatal(ex, "启动失败，原数据保留");
+            if (e.Args.Contains("--verify-startup", StringComparer.Ordinal))
+                File.WriteAllText(Path.Combine(AppPaths.AppRoot, "startup-verification.json"), System.Text.Json.JsonSerializer.Serialize(new { Success = false, Error = ex.ToString() }));
+            else MessageBox.Show("启动失败，原数据保留：\n" + ex.Message, "NexusExplorer", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
         }
     }
+
 
     private static ServiceProvider ConfigureServices(AppConfig config)
     {
@@ -103,10 +106,12 @@ public partial class App : Application
             new Infrastructure.DbContextFactoryStub(config.Database.ResolvedPath));
 
         services.AddSingleton<IRecycleBinService, RecycleBinService>();
+        services.AddSingleton<FileOperationExecutor>();
         services.AddSingleton<CategoryService>();
         services.AddSingleton<FileService>();
         services.AddSingleton<OrganizationService>();
-        services.AddSingleton(new MediaPlayerService(System.Windows.Threading.Dispatcher.FromThread(System.Threading.Thread.CurrentThread)));
+        services.AddSingleton(new MediaPlayerService(System.Windows.Threading.Dispatcher.FromThread(System.Threading.Thread.CurrentThread)) { HardwareDecoding = config.Playback.HardwareDecoding });
+        services.AddSingleton<IPlaybackEngine>(p => p.GetRequiredService<MediaPlayerService>());
 
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();
@@ -142,7 +147,6 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _services?.GetRequiredService<MediaPlayerService>().Dispose();
         _services?.Dispose();
         Log.Information("===== NexusExplorer 退出 =====");
         Log.CloseAndFlush();

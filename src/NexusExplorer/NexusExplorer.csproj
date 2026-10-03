@@ -11,6 +11,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>NexusExplorer</AssemblyName>
     <RootNamespace>NexusExplorer</RootNamespace>
+    <Version>2.0.0-preview</Version>
     <InvariantGlobalization>false</InvariantGlobalization>
     <SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
   </PropertyGroup>
@@ -30,8 +31,9 @@
 
   <Target Name="RestoreLibVlcNative" AfterTargets="Publish">
     <PropertyGroup>
-      <LibVlcPackageDir>$(UserProfile)\.nuget\packages\videolan.libvlc.windows\3.0.21\build\x64</LibVlcPackageDir>
+      <LibVlcPackageDir>$(PkgVideoLAN_LibVLC_Windows)\build\x64</LibVlcPackageDir>
     </PropertyGroup>
+    <Error Condition="!Exists('$(LibVlcPackageDir)\libvlc.dll')" Text="VLC x64 原生库缺失，请先还原 NuGet 依赖。" />
     <ItemGroup>
       <LibVlcFiles Include="$(LibVlcPackageDir)\**\*.*" Exclude="$(LibVlcPackageDir)\include\**\*.*" />
     </ItemGroup>
@@ -52,12 +54,11 @@
     <PackageReference Include="LibVLCSharp.WPF" Version="3.9.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.11.20" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
-    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.21" GeneratePathProperty="true" />
   </ItemGroup>
 
   <ItemGroup>

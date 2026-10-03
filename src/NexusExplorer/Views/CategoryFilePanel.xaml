@@ -25,6 +25,10 @@
                            TextTrimming="CharacterEllipsis" />
             </StackPanel>
             <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                    <Setter TargetName="FileNameText" Property="FontWeight" Value="Bold" />
+                    <Setter TargetName="FileNameText" Property="Foreground" Value="{StaticResource BrushAccentOrange}" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding ExistsOnDisk}" Value="False">
                     <Setter TargetName="FileNameText" Property="Foreground" Value="{StaticResource BrushDisabledText}" />
                     <Setter TargetName="FileNameText" Property="TextDecorations" Value="Strikethrough" />
@@ -47,6 +51,7 @@
                 BorderBrush="{StaticResource BrushDivider}"
                 BorderThickness="0,0,0,1"
                 Padding="10,8">
+            <StackPanel>
             <WrapPanel>
                 <Button Style="{StaticResource ButtonPrimary}"
                         Content="＋ 新建分类"
@@ -67,17 +72,27 @@
                         Content="⚡ 整理"
                         Padding="10,6"
                         Command="{Binding OrganizeCommand}"
-                        ToolTip="将当前分类中的文件移动到分类对应的物理目录" />
+                         ToolTip="整理当前打开分类及全部子分类" />
             </WrapPanel>
+            <DockPanel Margin="0,4,0,0">
+                <Button x:Name="CancelOrganizeButton" DockPanel.Dock="Right" Content="取消整理" Click="OnCancelOrganize" Visibility="Collapsed" />
+                <TextBlock x:Name="OperationStatus" TextWrapping="Wrap" />
+            </DockPanel>
+            </StackPanel>
         </Border>
 
         <!-- 分类树 -->
+        <Grid Grid.Row="1">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border x:Name="RootDropZone" Background="{StaticResource BrushAccentBlueLight}" Padding="8,4" AllowDrop="True" DragOver="OnRootDragOver" Drop="OnRootDrop">
+            <TextBlock Text="⌂ 顶层（将分类拖到这里移回顶层）" Style="{StaticResource TextCaption}" />
+        </Border>
         <TreeView x:Name="CategoryTree"
                   Grid.Row="1"
                   Padding="6,8"
                   VirtualizingPanel.IsVirtualizing="True"
                   AllowDrop="True"
-                  SelectedItemChanged="OnCategorySelected"
+                   MouseDoubleClick="OnCategoryDoubleClick"
                   ContextMenuOpening="OnCategoryTreeContextMenuOpening"
                   Drop="OnTreeDrop"
                   DragOver="OnTreeDragOver">
@@ -88,6 +103,9 @@
                     <MenuItem Header="新建子分类" Click="OnCreateChild" />
                     <Separator />
                     <MenuItem Header="重命名" Click="OnRenameCategory" />
+                    <MenuItem Header="重新定位目录…" Click="OnRelocateCategory" />
+                    <MenuItem Header="迁移目录…" Click="OnMigrateCategory" />
+                    <MenuItem Header="移到顶层" Click="OnMoveCategoryToRoot" />
                     <MenuItem Header="上移" Click="OnMoveCategoryUp" />
                     <MenuItem Header="下移" Click="OnMoveCategoryDown" />
                     <Separator />
@@ -95,6 +113,7 @@
                 </ContextMenu>
             </TreeView.ContextMenu>
         </TreeView>
+        </Grid>
 
         <!-- 分割线 + 文件列表标题 -->
         <Border Grid.Row="2"
@@ -111,11 +130,11 @@
                  Grid.Row="3"
                  Padding="6,4"
                  AllowDrop="True"
-                 SelectionMode="Single"
+                  SelectionMode="Extended"
                  MouseDoubleClick="OnFileDoubleClick"
                  Drop="OnFilesDrop"
                  DragOver="OnFilesDragOver"
-                 SelectionChanged="OnFileSelected">
+                  ContextMenuOpening="OnFileContextMenuOpening">
             <ListBox.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="在资源管理器中打开" Click="OnOpenFileInExplorer" />

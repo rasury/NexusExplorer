@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
@@ -20,6 +22,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Update="Assets\seek-h264-aac.mp4" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,11 +5,14 @@ using NexusExplorer.Services;
 namespace NexusExplorer.Views.Dialogs;
 
 /// <summary>整理时同名文件冲突对话框:替换/跳过/保留两个/取消。支持应用到全部。</summary>
+public record ConflictDecision(ConflictResolution Resolution, bool ApplyToAll);
 public static class ConflictDialog
 {
     public static ConflictResolution Show(string fileName, string targetPath)
+        => ShowDecision(fileName, targetPath).Resolution;
+    public static ConflictDecision ShowDecision(string fileName, string targetPath)
     {
-        ConflictResolution result = ConflictResolution.Skip;
+        ConflictResolution result = ConflictResolution.Ask;
         bool applyToAll = false;
 
         var dialog = new Window
@@ -22,12 +25,7 @@ public static class ConflictDialog
         };
         DialogChrome.Apply(dialog);
 
-        var applyToAllCheckBox = new CheckBox
-        {
-            Content = "应用到全部后续冲突",
-            Margin = new Thickness(0, 12, 0, 0)
-        };
-        applyToAllCheckBox.SetResourceReference(FrameworkElement.StyleProperty, "TextSecondary");
+        var applyToAllCheckBox = CreateApplyToAllCheckBox();
 
         var panel = new StackPanel { Margin = new Thickness(20) };
         panel.Children.Add(new TextBlock
@@ -88,9 +86,12 @@ public static class ConflictDialog
         dialog.ShowDialog();
 
         // 取消整理:返回特殊标记(Ask 表示中止)
-        if (result == ConflictResolution.Ask && !applyToAll)
-            return ConflictResolution.Ask;
-
-        return result;
+        return new ConflictDecision(result, applyToAll);
+    }
+    internal static CheckBox CreateApplyToAllCheckBox()
+    {
+        var checkBox = new CheckBox { Content = "应用到全部后续冲突", Margin = new Thickness(0, 12, 0, 0) };
+        checkBox.SetResourceReference(Control.ForegroundProperty, "BrushSecondaryText");
+        return checkBox;
     }
 }

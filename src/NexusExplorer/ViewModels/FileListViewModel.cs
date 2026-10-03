@@ -97,6 +97,7 @@ public partial class FileListViewModel : ObservableObject
         try
         {
             var result = await _fileService.ImportDirectoryAsync(directory, _main.CurrentCategory.Id, _categoryService);
+            await _main.RefreshTreeAsync();
             await _main.RefreshFilesAsync();
             ReportBatchResult(result);
         }
@@ -109,58 +110,15 @@ public partial class FileListViewModel : ObservableObject
     /// <summary>Windows Explorer 拖入:文件或文件夹。</summary>
     public async Task ImportDroppedPathsAsync(string[] paths)
     {
-        if (_main.CurrentCategory is null)
-        {
-            ShowError?.Invoke("请先选择一个分类,再拖入文件。");
-            return;
-        }
+        if (_main.CurrentCategory is null) { ShowError?.Invoke("请先双击打开分类，再拖入文件。"); return; }
+        await ImportIntoAsync(paths, _main.CurrentCategory);
+    }
 
-        // 文件夹走镜像导入(目录结构 → 同名分类树);散文件平铺加入当前分类
-        var allResults = new List<BatchAddResult>();
-        var looseFiles = new List<string>();
-
-        foreach (var path in paths)
-        {
-            if (Directory.Exists(path))
-            {
-                try
-                {
-                    allResults.Add(await _fileService.ImportDirectoryAsync(
-                        path, _main.CurrentCategory.Id, _categoryService));
-                }
-                catch (Exception ex)
-                {
-                    ShowError?.Invoke($"导入文件夹失败: {ex.Message}");
-                }
-            }
-            else if (File.Exists(path))
-            {
-                looseFiles.Add(path);
-            }
-        }
-
-        if (looseFiles.Count > 0)
-            allResults.Add(await _fileService.AddRangeAsync(looseFiles, _main.CurrentCategory.Id));
-
-        if (allResults.Count == 0) return;
-
-        // 镜像导入创建了新分类 → 刷新分类树
-        await _main.RefreshTreeAsync();
-        await _main.RefreshFilesAsync();
-
-        var added = allResults.Sum(r => r.Added.Count);
-        var failed = allResults.SelectMany(r => r.Failed).ToList();
-        if (failed.Count == 0)
-        {
-            ShowInfo?.Invoke($"已导入 {added} 个文件(文件夹已按目录结构创建对应分类)。");
-        }
-        else
-        {
-            var errors = string.Join("\n", failed.Take(5).Select(f => $"• {f.FileName}: {f.Error}"));
-            if (failed.Count > 5)
-                errors += $"\n… 以及另外 {failed.Count - 5} 个失败";
-            ShowError?.Invoke($"成功导入 {added} 个,失败 {failed.Count} 个:\n{errors}");
-        }
+    public async Task ImportIntoAsync(string[] paths, Category target)
+    {
+        var coordinator = new NexusExplorer.ApplicationLayer.ImportCoordinator(_fileService, _categoryService);
+        var result = await coordinator.ImportAsync(paths, target.Id);
+        await _main.RefreshTreeAsync(); ReportBatchResult(result);
     }
 
     private void ReportBatchResult(BatchAddResult result)
@@ -179,56 +137,9 @@ public partial class FileListViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task RemoveFileAsync(FileItem? file)
-    {
-        if (file is null) return;
-
-        if (ShowConfirmDialog is not null &&
-            !await ShowConfirmDialog($"确定把「{file.FileName}」从分类中移除?\n\n源文件保留在原位置,不会删除。"))
-            return;
-
-        try
-        {
-            await _fileService.RemoveAsync(file.Id);
-            if (_main.CurrentFile?.Id == file.Id)
-                await _main.SelectFileAsync(null);
-            await _main.RefreshFilesAsync();
-        }
-        catch (OperationException ex)
-        {
-            ShowError?.Invoke(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            ShowError?.Invoke($"移除失败: {ex.Message}");
-        }
-    }
-
+    public Task RemoveFileAsync(FileItem? file) => DeleteManyAsync(file is null ? Array.Empty<FileItem>() : new[] { file }, true);
     [RelayCommand]
-    public async Task DeleteFileAsync(FileItem? file)
-    {
-        if (file is null) return;
-
-        if (ShowConfirmDialog is not null &&
-            !await ShowConfirmDialog($"确定删除文件「{file.FileName}」?\n文件将进入 Windows 回收站。"))
-            return;
-
-        try
-        {
-            await _fileService.DeleteAsync(file.Id, RecycleBin);
-            if (_main.CurrentFile?.Id == file.Id)
-                await _main.SelectFileAsync(null);
-            await _main.RefreshFilesAsync();
-        }
-        catch (OperationException ex)
-        {
-            ShowError?.Invoke(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            ShowError?.Invoke($"删除失败: {ex.Message}");
-        }
-    }
+    public Task DeleteFileAsync(FileItem? file) => DeleteManyAsync(file is null ? Array.Empty<FileItem>() : new[] { file }, false);
 
     [RelayCommand]
     public async Task RelocateFileAsync(FileItem? file)
@@ -251,17 +162,39 @@ public partial class FileListViewModel : ObservableObject
         }
     }
 
-    /// <summary>文件拖到分类树上某分类节点 → 重新分类。</summary>
-    public async Task RecategorizeAsync(FileItem file, Category targetCategory)
+    public async Task RecategorizeManyAsync(IReadOnlyList<FileItem> files, Category target)
     {
-        try
+        var succeeded = new List<int>(); var errors = new List<string>();
+        foreach (var f in files)
         {
-            await _fileService.RecategorizeAsync(file.Id, targetCategory.Id);
-            await _main.OnFileRecategorizedAsync();
+            if (f.CategoryId == target.Id) continue;
+            try { await _fileService.RecategorizeAsync(f.Id, target.Id); succeeded.Add(f.Id); }
+            catch (Exception ex) { errors.Add($"{f.FileName}: {ex.Message}"); Serilog.Log.Error(ex, "批量归类失败"); }
         }
-        catch (OperationException ex)
+        await _main.OnFilesRecategorizedAsync(succeeded);
+        if (errors.Count > 0) ShowError?.Invoke($"成功 {succeeded.Count}，失败 {errors.Count}\n" + string.Join("\n", errors));
+    }
+    public Task RecategorizeAsync(FileItem file, Category target) => RecategorizeManyAsync(new[] { file }, target);
+
+    public async Task DeleteManyAsync(IReadOnlyList<FileItem> files, bool removeOnly)
+    {
+        if (files.Count == 0) return;
+        if (ShowConfirmDialog is not null && !await ShowConfirmDialog(removeOnly
+            ? $"从分类移除 {files.Count} 个文件？源文件保留。"
+            : $"删除 {files.Count} 个文件？源文件进入回收站。")) return;
+        var failures = new List<string>(); var succeeded = 0;
+        foreach (var file in files)
         {
-            ShowError?.Invoke(ex.Message);
+            try
+            {
+                if (_main.CurrentFile?.Id == file.Id) await _main.SelectFileAsync(null);
+                if (removeOnly) await _fileService.RemoveAsync(file.Id);
+                else await _fileService.DeleteAsync(file.Id, RecycleBin);
+                succeeded++;
+            }
+            catch (Exception ex) { failures.Add($"{file.FileName}: {ex.Message}"); Serilog.Log.Error(ex, "批量文件操作失败"); }
         }
+        await _main.RefreshFilesAsync();
+        if (failures.Count > 0) ShowError?.Invoke($"成功 {succeeded}，失败 {failures.Count}\n" + string.Join("\n", failures));
     }
 }

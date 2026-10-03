@@ -54,154 +54,62 @@ public enum OrganizeOutcome
     Failed
 }
 
-/// <summary>
-/// 整理服务:把当前分类中的文件实际移动到分类对应的物理目录。
-/// 只整理当前分类,不递归子分类。
-/// 文件移动成功后才更新数据库 AbsolutePath;失败绝不更新。
-/// </summary>
+public record OrganizeProgress(int Completed, int Total, string FileName);
 public class OrganizationService
 {
-    private readonly IDbContextFactory<AppDbContext> _dbFactory;
+    private readonly IDbContextFactory<AppDbContext> _factory;
+    private readonly FileOperationExecutor _operations;
+    public Func<IReadOnlyCollection<string>, Task>? BeforePhysicalOperationAsync { get; set; }
+    public OrganizationService(IDbContextFactory<AppDbContext> factory, FileOperationExecutor? operations = null)
+    { _factory = factory; _operations = operations ?? new FileOperationExecutor(factory); }
 
-    public OrganizationService(IDbContextFactory<AppDbContext> dbFactory)
-    {
-        _dbFactory = dbFactory;
-    }
-
-    /// <summary>支持 UI 干预的整理入口:遇到冲突时回调由调用方决定处理方式。</summary>
-    public async Task<List<OrganizeFileResult>> OrganizeAsync(
-        int categoryId,
+    public async Task<List<OrganizeFileResult>> OrganizeAsync(int categoryId,
         Func<string, string, Task<ConflictResolution>>? conflictHandler = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, IProgress<OrganizeProgress>? progress = null)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync();
-
-        var category = await db.Categories.FirstOrDefaultAsync(c => c.Id == categoryId)
-            ?? throw new OperationException("分类不存在。");
-
-        var files = await db.Files
-            .Where(f => f.CategoryId == categoryId)
-            .OrderBy(f => f.FileName)
-            .ToListAsync();
-
-        var targetDir = category.PhysicalPath;
-        Directory.CreateDirectory(targetDir);
-
+        using var lease = await MutationGate.AcquireAsync(_factory);
+        await using var db = await _factory.CreateDbContextAsync();
+        var categories = await db.Categories.ToListAsync(); await LocationService.ResolveAsync(db, categories: categories);
+        if (!categories.Any(c => c.Id == categoryId)) throw new OperationException("分类不存在。");
+        var ids = new HashSet<int>(); var stack = new Stack<int>(); stack.Push(categoryId);
+        while (stack.TryPop(out var id))
+        { if (!ids.Add(id)) throw new OperationException("分类结构存在循环。"); foreach (var child in categories.Where(c => c.ParentId == id)) stack.Push(child.Id); }
+        var files = await db.Files.Where(f => ids.Contains(f.CategoryId)).OrderBy(f => f.CategoryId).ThenBy(f => f.FileName).ThenBy(f => f.Id).ToListAsync();
+        await LocationService.ResolveAsync(db, files: files);
+        if (BeforePhysicalOperationAsync is not null) await BeforePhysicalOperationAsync(files.Select(f => f.AbsolutePath).ToList());
         var results = new List<OrganizeFileResult>();
-
         foreach (var file in files)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            results.Add(await OrganizeOneAsync(db, file, targetDir, conflictHandler));
+            if (cancellationToken.IsCancellationRequested) break;
+            var source = file.AbsolutePath;
+            try
+            {
+                if (!File.Exists(source)) { results.Add(OrganizeFileResult.Missing(file.FileName, source)); continue; }
+                var dir = categories.First(c => c.Id == file.CategoryId).PhysicalPath; Directory.CreateDirectory(dir);
+                var target = Path.Combine(dir, Path.GetFileName(source)); var resolution = ConflictResolution.Skip;
+                if (string.Equals(LocationService.Normalize(source), LocationService.Normalize(target), StringComparison.OrdinalIgnoreCase))
+                { results.Add(OrganizeFileResult.AlreadyOrganized(file.FileName, source)); continue; }
+                if (File.Exists(target))
+                {
+                    resolution = conflictHandler is null ? ConflictResolution.Skip : await conflictHandler(file.FileName, target);
+                    if (resolution == ConflictResolution.Ask) break;
+                    if (resolution == ConflictResolution.Skip) { results.Add(OrganizeFileResult.Skipped(file.FileName, source)); continue; }
+                    if (resolution == ConflictResolution.KeepBoth) target = UniquePath(target);
+                }
+                await _operations.MoveFileAsync(file.Id, target, resolution == ConflictResolution.Replace);
+                results.Add(resolution == ConflictResolution.KeepBoth ? OrganizeFileResult.Renamed(Path.GetFileName(target), source, target) : OrganizeFileResult.Moved(file.FileName, source, target));
+            }
+            catch (Exception ex) { Log.Error(ex, "整理文件失败 {Path}", source); results.Add(OrganizeFileResult.Failed(file.FileName, source, ex.Message)); }
+            finally { progress?.Report(new OrganizeProgress(results.Count, files.Count, file.FileName)); }
         }
-
-        await db.SaveChangesAsync();
-
-        var moved = results.Count(r => r.Outcome is OrganizeOutcome.Moved or OrganizeOutcome.Renamed);
-        Log.Information("整理完成: 分类 {Category}, 共 {Total} 个文件, 移动 {Moved} 个, 跳过 {Skipped} 个, 失败 {Failed} 个",
-            category.Name, files.Count, moved,
-            results.Count(r => r.Outcome is OrganizeOutcome.Skipped or OrganizeOutcome.AlreadyOrganized),
-            results.Count(r => r.Outcome is OrganizeOutcome.Failed or OrganizeOutcome.Missing));
-
+        Log.Information("递归整理完成 {CategoryId}:已处理 {Count}/{Total}", categoryId, results.Count, files.Count);
         return results;
     }
-
-    private static async Task<OrganizeFileResult> OrganizeOneAsync(
-        AppDbContext db,
-        FileItem file,
-        string targetDir,
-        Func<string, string, Task<ConflictResolution>>? conflictHandler)
+    private static string UniquePath(string path)
     {
-        // 源文件已失效:跳过,不更新数据库
-        if (!File.Exists(file.AbsolutePath))
-            return OrganizeFileResult.Missing(file.FileName, file.AbsolutePath);
-
-        var sourcePath = file.AbsolutePath;
-        var targetPath = Path.Combine(targetDir, Path.GetFileName(sourcePath));
-
-        // 已在目标位置
-        if (string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
-            return OrganizeFileResult.AlreadyOrganized(file.FileName, sourcePath);
-
-        // 冲突处理
-        var resolution = ConflictResolution.Ask;
-        if (File.Exists(targetPath))
-        {
-            if (conflictHandler is not null)
-            {
-                resolution = await conflictHandler(file.FileName, targetPath);
-            }
-            else
-            {
-                // 无交互回调时默认跳过,保证不误删
-                resolution = ConflictResolution.Skip;
-            }
-
-            switch (resolution)
-            {
-                case ConflictResolution.Skip:
-                    return OrganizeFileResult.Skipped(file.FileName, sourcePath);
-
-                case ConflictResolution.KeepBoth:
-                    targetPath = GetUniquePath(targetPath);
-                    break;
-
-                case ConflictResolution.Replace:
-                    TryDeleteTarget(targetPath, out var deleteError);
-                    if (deleteError is not null)
-                        return OrganizeFileResult.Failed(file.FileName, sourcePath, deleteError);
-                    break;
-            }
-        }
-
-        // 执行移动
-        try
-        {
-            File.Move(sourcePath, targetPath);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "文件移动失败: {Source} -> {Target}", sourcePath, targetPath);
-            // 移动失败:不更新数据库
-            return OrganizeFileResult.Failed(file.FileName, sourcePath, ex.Message);
-        }
-
-        // 移动成功才更新数据库
-        file.AbsolutePath = targetPath;
-        file.UpdatedAt = DateTime.Now;
-
-        return resolution == ConflictResolution.KeepBoth
-            ? OrganizeFileResult.Renamed(file.FileName, sourcePath, targetPath)
-            : OrganizeFileResult.Moved(file.FileName, sourcePath, targetPath);
-    }
-
-    private static void TryDeleteTarget(string path, out string? error)
-    {
-        error = null;
-        try
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-        catch (Exception ex)
-        {
-            error = $"无法替换目标文件: {ex.Message}";
-            Log.Error(ex, "替换冲突文件失败: {Path}", path);
-        }
-    }
-
-    private static string GetUniquePath(string path)
-    {
-        var directory = Path.GetDirectoryName(path)!;
-        var name = Path.GetFileNameWithoutExtension(path);
-        var extension = Path.GetExtension(path);
-        var index = 2;
-        string candidate;
-        do
-        {
-            candidate = Path.Combine(directory, $"{name} ({index}){extension}");
-            index++;
-        } while (File.Exists(candidate));
-        return candidate;
+        var index = 2; var directory = Path.GetDirectoryName(path)!;
+        var stem = Path.GetFileNameWithoutExtension(path); var extension = Path.GetExtension(path); string result;
+        do { result = Path.Combine(directory, $"{stem} ({index++}){extension}"); } while (File.Exists(result));
+        return result;
     }
 }

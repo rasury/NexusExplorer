@@ -114,7 +114,7 @@ public class FileServiceTests : IDisposable
 
         var updated = await _host.Files.GetByIdAsync(file.Id);
         Assert.Equal(Path.GetFullPath(newPath), updated!.AbsolutePathPathForTest());
-        Assert.Equal("A-renamed.mp4", updated.FileName);
+        Assert.Equal("A-renamed.mp4", updated!.FileName);
     }
 
     [Fact]

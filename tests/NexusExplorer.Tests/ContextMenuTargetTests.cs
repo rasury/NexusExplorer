@@ -1,97 +1,97 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Threading;
+using System.Windows.Controls.Primitives;
 using NexusExplorer.Models;
+using NexusExplorer.Views;
+using NexusExplorer.Views.Dialogs;
+using NexusExplorer.ViewModels;
 
 namespace NexusExplorer.Tests;
 
-/// <summary>
-/// 右键菜单目标解析测试:右键不改变 TreeView 选中,
-/// ContextMenuOpening 必须从命中的 TreeViewItem 记录目标分类
-/// (之前直接右键未先左击时菜单命令无反应的根因)。
-/// </summary>
 public class ContextMenuTargetTests
 {
     [Fact]
-    public void ContextMenuOpening_RecordsHoveredCategory_NotSelection()
+    public async Task ContextMenuRecordsActualHitAndDragRejectsScrollbarAndExpander()
     {
-        string? failure = null;
-        string? recordedName = null;
-        string? selectedName = null;
-
-        var thread = new Thread(() =>
+        await WpfTestHost.RunAsync(() =>
         {
-            try
-            {
-                using var host = new TestHost();
-                var catA = host.Categories.CreateAsync("分类A", null).GetAwaiter().GetResult();
-                var catB = host.Categories.CreateAsync("分类B", null).GetAwaiter().GetResult();
+            var panel = new CategoryFilePanel();
+            var catA = new Category { Id = 1, Name = "A" }; var catB = new Category { Id = 2, Name = "B" };
+            var text = new TextBlock { Text = catB.Name };
+            var row = new TreeViewItem { Header = catB }; row.Items.Add(text);
+            var tree = new TreeView(); tree.Items.Add(new TreeViewItem { Header = catA, IsSelected = true }); tree.Items.Add(row);
+            panel.RecordContextMenuSource(text);
+            Assert.Same(catB, panel.GetContextMenuCategory());
+            Assert.Same(catB, CategoryFilePanel.HitCategory(text));
+            var expander = new ToggleButton(); row.Items.Clear(); row.Items.Add(expander);
+            Assert.Null(CategoryFilePanel.HitCategory(expander));
 
-                var tree = new TreeView();
-                var window = new Window
-                {
-                    WindowStyle = WindowStyle.None,
-                    ShowInTaskbar = false,
-                    ShowActivated = false,
-                    AllowsTransparency = true,
-                    WindowStartupLocation = WindowStartupLocation.Manual,
-                    Left = -5000, Top = -5000,
-                    Width = 300, Height = 400,
-                    Content = tree
-                };
-                tree.ItemsSource = new[] { catA, catB };
-                window.Show();
-                tree.UpdateLayout();
-                Pump();
-
-                var itemA = TreeViewItemFor(tree, catA);
-                var itemB = TreeViewItemFor(tree, catB);
-                Assert.NotNull(itemA);
-                Assert.NotNull(itemB);
-
-                // 左击选中 A
-                itemA!.IsSelected = true;
-                Pump();
-
-                // 右键 B:从命中的 TreeViewItem 记录目标(与面板事件处理同一逻辑)
-                recordedName = (itemB!.Header as Category)?.Name;
-                selectedName = (tree.SelectedItem as Category)?.Name;
-
-                window.Close();
-            }
-            catch (Exception ex)
-            {
-                failure = ex.ToString();
-            }
+            var file = new FileItem { Id = 77, FileName = "new.mp4" };
+            var fileText = new TextBlock(); var fileRow = new ListBoxItem { DataContext = file, Content = fileText };
+            Assert.Same(file, CategoryFilePanel.HitFile(fileText));
+            var scrollbar = new ScrollBar(); fileRow.Content = scrollbar;
+            Assert.Null(CategoryFilePanel.HitFile(scrollbar));
+            Assert.True(CategoryFilePanel.IsControlChrome(scrollbar));
+            Assert.Equal(SelectionMode.Extended, ((ListBox)panel.FindName("FileListBox")).SelectionMode);
         });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join(30000);
-
-        Assert.Null(failure);
-        Assert.Equal("分类B", recordedName);  // 目标=右键命中的 B
-        Assert.Equal("分类A", selectedName);  // 选中仍是 A(右键不改选中)
     }
 
-    private static TreeViewItem? TreeViewItemFor(TreeView tree, Category category)
+    [Fact]
+    public async Task RealConflictCheckboxAppliesResourcesWithoutTargetTypeMismatch()
     {
-        foreach (var child in tree.Items)
+        await WpfTestHost.RunAsync(() =>
         {
-            if (tree.ItemContainerGenerator.ContainerFromItem(child)
-                is TreeViewItem item
-                && item.Header is Category c && c.Id == category.Id)
-                return item;
-        }
-        return null;
+            var checkbox = ConflictDialog.CreateApplyToAllCheckBox();
+            checkbox.Measure(new Size(400, 100)); checkbox.Arrange(new Rect(0, 0, 400, 100));
+            checkbox.ApplyTemplate();
+            Assert.NotNull(checkbox.Foreground);
+            Assert.True(checkbox.Style is null || checkbox.Style.TargetType.IsAssignableFrom(typeof(CheckBox)));
+        });
     }
 
-    private static void Pump()
+    [Fact]
+    public async Task ActualPinnedLayoutWrapsInsideNarrowViewport()
     {
-        var frame = new DispatcherFrame();
-        var timer = new DispatcherTimer(TimeSpan.FromMilliseconds(30), DispatcherPriority.Background,
-            (_, _) => frame.Continue = false, Dispatcher.CurrentDispatcher);
-        timer.Start();
-        Dispatcher.PushFrame(frame);
-        timer.Stop();
+        using var host = new TestHost();
+        var pinned = new List<Category>();
+        for (var i = 0; i < 12; i++)
+        {
+            var c = await host.Categories.CreateAsync("快捷分类" + i, null);
+            await host.Categories.PinAsync(c.Id); pinned.Add(c);
+        }
+        await WpfTestHost.RunAsync(async () =>
+        {
+            var main = new MainViewModel(host.Categories, host.Files, host.Organization, new FakePlaybackEngine());
+            await main.Navigation.RefreshPinnedAsync();
+            var bar = new NavigationBar(); bar.Initialize(main);
+            bar.Measure(new Size(520, 500)); bar.Arrange(new Rect(0, 0, 520, bar.DesiredSize.Height)); bar.UpdateLayout();
+            var items = (ItemsControl)bar.FindName("PinnedHost");
+            var first = (FrameworkElement)items.ItemContainerGenerator.ContainerFromIndex(0);
+            var last = (FrameworkElement)items.ItemContainerGenerator.ContainerFromIndex(11);
+            Assert.NotNull(first); Assert.NotNull(last);
+            Assert.True(last.TranslatePoint(new Point(), items).Y > first.TranslatePoint(new Point(), items).Y);
+            Assert.True(last.TranslatePoint(new Point(), items).X + last.ActualWidth <= items.ActualWidth + 1);
+            Assert.True(bar.ActualHeight < 340);
+        });
+    }
+
+    [Fact]
+    public async Task ActualImageControlsRemainVisibleAndFitScaleIsFinite()
+    {
+        using var host = new TestHost();
+        await WpfTestHost.RunAsync(() =>
+        {
+            var main = new MainViewModel(host.Categories, host.Files, host.Organization, new FakePlaybackEngine());
+            var panel = new PlayerPanel(); panel.Initialize(main);
+            main.Player.Kind = MediaKind.Image;
+            // Exercise the production state refresh through the public event.
+            main.Player.ResetZoom();
+            Assert.Equal(Visibility.Visible, ((FrameworkElement)panel.FindName("ImageButtonsRow")).Visibility);
+            Assert.Equal(Visibility.Visible, ((FrameworkElement)panel.FindName("ControlsBar")).Visibility);
+            Assert.Equal(Visibility.Collapsed, ((FrameworkElement)panel.FindName("MediaButtonsRow")).Visibility);
+            Assert.InRange(PlayerPanel.FitScale(4000, 2000, 500, 500), .124, .126);
+            Assert.True(double.IsFinite(PlayerPanel.FitScale(4000, 2000, 0, 0)));
+            panel.Detach();
+        });
     }
 }

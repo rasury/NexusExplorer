@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using NexusExplorer.Models;
 using NexusExplorer.ViewModels;
 
@@ -14,12 +13,47 @@ namespace NexusExplorer.Views;
 /// </summary>
 public partial class NavigationBar : UserControl
 {
+    private const string PinnedFormat = "NexusExplorer.PinnedCategory";
+    private Point _pinStart;
+    private Category? _pressedPin;
+    private bool _reordering;
+    private void OnPinnedMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        _pressedPin = CategoryFilePanel.FindAncestor<Button>(e.OriginalSource as DependencyObject)?.Tag as Category;
+        _pinStart = e.GetPosition(PinnedHost);
+    }
+    private void OnPinnedMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (_pressedPin is null || e.LeftButton != System.Windows.Input.MouseButtonState.Pressed) return;
+        var p = e.GetPosition(PinnedHost);
+        if (Math.Abs(p.X - _pinStart.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(p.Y - _pinStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        var id = _pressedPin.Id; _pressedPin = null; _reordering = true;
+        try { DragDrop.DoDragDrop(PinnedHost, new DataObject(PinnedFormat, id), DragDropEffects.Move); }
+        finally { _reordering = false; }
+    }
+    private void OnPinnedDragOver(object sender, DragEventArgs e)
+    { e.Effects = e.Data.GetDataPresent(PinnedFormat) ? DragDropEffects.Move : DragDropEffects.None; e.Handled = true; }
+    private async void OnPinnedDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (e.Data.GetData(PinnedFormat) is not int id) return;
+        try
+        {
+            var button = CategoryFilePanel.FindAncestor<Button>(e.OriginalSource as DependencyObject);
+            var remaining = Vm.PinnedCategories.Where(c => c.Id != id).ToList();
+            var index = remaining.Count;
+            if (button?.Tag is Category target)
+            {
+                if (target.Id == id) return;
+                index = remaining.FindIndex(c => c.Id == target.Id);
+                if (e.GetPosition(button).X > button.ActualWidth / 2) index++;
+            }
+            await _main.Categories.ReorderPinnedAsync(id, index); await Vm.OnPinsChangedAsync();
+        }
+        catch (Exception ex) { Serilog.Log.Error(ex, "快捷分类排序失败"); MessageBox.Show(ex.Message, "排序失败"); }
+    }
     private MainViewModel _main = null!;
     private NavigationViewModel Vm => _main.Navigation;
-
-    // 快捷按钮选中高亮(与默认橙浅色区分)
-    private static readonly Brush PinnedSelectedBrush = new SolidColorBrush(Color.FromRgb(0xE9, 0x8A, 0x3A));
-    private static readonly Brush PinnedNormalBrush = new SolidColorBrush(Color.FromRgb(0xF8, 0xE2, 0xCE));
 
     public NavigationBar()
     {
@@ -34,7 +68,7 @@ public partial class NavigationBar : UserControl
 
         DataContext = Vm;
         Vm.PropertyChanged += OnVmPropertyChanged;
-        Vm.Breadcrumb.CollectionChanged += (_, _) => UpdateActionBar();
+        Unloaded += (_, _) => Vm.PropertyChanged -= OnVmPropertyChanged;
         UpdateActionBar();
     }
 
@@ -71,37 +105,6 @@ public partial class NavigationBar : UserControl
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        // 快捷按钮选中高亮(选中分类 == 该按钮的分类)
-        HighlightPinnedButtons(PinnedHost);
-    }
-
-    private void HighlightPinnedButtons(ItemsControl host)
-    {
-        foreach (var item in host.Items)
-        {
-            var container = host.ItemContainerGenerator.ContainerFromItem(item);
-            if (container is null) continue;
-            var button = FindVisualChild<Button>(container);
-            if (button?.Tag is not Category category) continue;
-
-            var selected = Vm.SelectedCategory?.Id == category.Id;
-            button.Background = selected ? PinnedSelectedBrush : PinnedNormalBrush;
-            button.Foreground = selected
-                ? Brushes.White
-                : new SolidColorBrush(Color.FromRgb(0xB4, 0x5F, 0x1D));
-        }
-    }
-
-    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
-    {
-        for (var i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
-        {
-            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
-            if (child is T typed) return typed;
-            var result = FindVisualChild<T>(child);
-            if (result is not null) return result;
-        }
-        return null;
     }
 
     /// <summary>点击子分类:导航下钻并选中。</summary>
@@ -142,6 +145,7 @@ public partial class NavigationBar : UserControl
     /// <summary>点击快捷分类(第二层):选中它,面包屑同步到其所在链。</summary>
     private async void OnPinnedClick(object sender, RoutedEventArgs e)
     {
+        if (_reordering) return;
         if (sender is not Button { Tag: Category category }) return;
         try
         {

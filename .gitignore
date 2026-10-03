@@ -3,7 +3,7 @@ obj/
 publish/
 *.user
 .vs/
-data/
+/data/
 logs/
 Storage/
 nexus.db*
@@ -11,3 +11,6 @@ nexus.db*
 # 工具/临时文件
 .zcode/
 testmedia/
+local-documents/
+artifacts/
+/oldtest/

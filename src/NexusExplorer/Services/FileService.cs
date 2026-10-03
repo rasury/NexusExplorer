@@ -13,6 +13,7 @@ namespace NexusExplorer.Services;
 public class FileService
 {
     private readonly IDbContextFactory<AppDbContext> _dbFactory;
+    public Func<IReadOnlyCollection<string>, Task>? BeforePhysicalOperationAsync { get; set; }
 
     public FileService(IDbContextFactory<AppDbContext> dbFactory)
     {
@@ -24,25 +25,31 @@ public class FileService
     public async Task<List<FileItem>> GetByCategoryAsync(int categoryId)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        return await db.Files
+        var files = await db.Files
             .AsNoTracking()
             .Where(f => f.CategoryId == categoryId)
-            .OrderBy(f => f.FileName)
+            .OrderBy(f => f.FileName).ThenBy(f => f.Id)
             .ToListAsync();
+        await LocationService.ResolveAsync(db, files: files);
+        return files;
     }
 
     public async Task<FileItem?> GetByIdAsync(int id)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        return await db.Files.AsNoTracking().FirstOrDefaultAsync(f => f.Id == id);
+        var file = await db.Files.AsNoTracking().FirstOrDefaultAsync(f => f.Id == id);
+        if (file is not null) await LocationService.ResolveAsync(db, files: new[] { file });
+        return file;
     }
 
     /// <summary>检查绝对路径是否已在数据库中(同一文件只允许属于一个分类)。</summary>
     public async Task<FileItem?> FindByPathAsync(string absolutePath)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var normalized = Path.GetFullPath(absolutePath);
-        return await db.Files.AsNoTracking().FirstOrDefaultAsync(f => f.AbsolutePath == normalized);
+        var normalized = LocationService.Normalize(absolutePath);
+        var file = await db.Files.AsNoTracking().FirstOrDefaultAsync(f => EF.Functions.Collate(f.AbsolutePath, "NOCASE") == normalized);
+        if (file is not null) await LocationService.ResolveAsync(db, files: new[] { file });
+        return file;
     }
 
     // ---------- 添加 ----------
@@ -53,6 +60,7 @@ public class FileService
     /// </summary>
     public async Task<FileItem> AddAsync(string absolutePath, int categoryId)
     {
+        using var lease = await MutationGate.AcquireAsync(_dbFactory);
         if (!File.Exists(absolutePath))
             throw new OperationException($"文件不存在: {absolutePath}");
 
@@ -61,8 +69,8 @@ public class FileService
         _ = await db.Categories.FirstOrDefaultAsync(c => c.Id == categoryId)
             ?? throw new OperationException("目标分类不存在。");
 
-        var normalized = Path.GetFullPath(absolutePath);
-        var existing = await db.Files.FirstOrDefaultAsync(f => f.AbsolutePath == normalized);
+        var normalized = LocationService.Normalize(absolutePath);
+        var existing = await db.Files.FirstOrDefaultAsync(f => EF.Functions.Collate(f.AbsolutePath, "NOCASE") == normalized);
 
         var now = DateTime.Now;
         if (existing is not null)
@@ -83,6 +91,7 @@ public class FileService
             CreatedAt = now,
             UpdatedAt = now
         };
+        await LocationService.BindFileAsync(db, file);
         db.Files.Add(file);
         await db.SaveChangesAsync();
         Log.Information("文件添加: {Path} -> 分类 {CategoryId}", normalized, categoryId);
@@ -116,6 +125,8 @@ public class FileService
     /// </summary>
     public async Task<BatchAddResult> ImportDirectoryAsync(string directory, int categoryId, CategoryService categoryService)
     {
+        if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+            throw new OperationException("不递归导入目录联接点或符号链接。");
         if (!Directory.Exists(directory))
             throw new OperationException($"文件夹不存在: {directory}");
 
@@ -165,6 +176,7 @@ public class FileService
     /// <summary>修改文件所属分类。物理文件不动,待整理时移动。</summary>
     public async Task RecategorizeAsync(int fileId, int targetCategoryId)
     {
+        using var lease = await MutationGate.AcquireAsync(_dbFactory);
         await using var db = await _dbFactory.CreateDbContextAsync();
 
         var file = await db.Files.FirstOrDefaultAsync(f => f.Id == fileId)
@@ -188,6 +200,7 @@ public class FileService
     /// <summary>外部移动/改名导致文件失效时,由用户手动指定新位置。</summary>
     public async Task RelocateAsync(int fileId, string newAbsolutePath)
     {
+        using var lease = await MutationGate.AcquireAsync(_dbFactory);
         if (!File.Exists(newAbsolutePath))
             throw new OperationException($"文件不存在: {newAbsolutePath}");
 
@@ -195,8 +208,10 @@ public class FileService
         var file = await db.Files.FirstOrDefaultAsync(f => f.Id == fileId)
             ?? throw new OperationException("文件记录不存在。");
 
-        var normalized = Path.GetFullPath(newAbsolutePath);
-        var conflict = await db.Files.FirstOrDefaultAsync(f => f.AbsolutePath == normalized && f.Id != fileId);
+        var normalized = LocationService.Normalize(newAbsolutePath);
+        var all = await db.Files.ToListAsync(); await LocationService.ResolveAsync(db, files: all);
+        var conflict = all.FirstOrDefault(f => f.Id != fileId && string.Equals(f.AbsolutePath, normalized, StringComparison.OrdinalIgnoreCase));
+        if (BeforePhysicalOperationAsync is not null) await BeforePhysicalOperationAsync(new[] { file.AbsolutePath });
         if (conflict is not null)
             throw new OperationException($"该路径已被文件「{conflict.FileName}」占用。");
 
@@ -204,6 +219,7 @@ public class FileService
         file.AbsolutePath = normalized;
         file.FileName = Path.GetFileName(normalized);
         file.UpdatedAt = DateTime.Now;
+        await LocationService.BindFileAsync(db, file);
         await db.SaveChangesAsync();
         Log.Information("文件重新定位: {Old} -> {New}", oldPath, normalized);
     }
@@ -225,6 +241,7 @@ public class FileService
     /// </summary>
     public async Task RemoveAsync(int fileId)
     {
+        using var lease = await MutationGate.AcquireAsync(_dbFactory);
         await using var db = await _dbFactory.CreateDbContextAsync();
         var file = await db.Files.FirstOrDefaultAsync(f => f.Id == fileId)
             ?? throw new OperationException("文件不存在。");
@@ -237,19 +254,10 @@ public class FileService
     /// <summary>删除文件:确认后送回收站,再删数据库记录。</summary>
     public async Task DeleteAsync(int fileId, IRecycleBinService recycleBin)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync();
-        var file = await db.Files.FirstOrDefaultAsync(f => f.Id == fileId)
-            ?? throw new OperationException("文件不存在。");
-
-        if (File.Exists(file.AbsolutePath))
-        {
-            if (!recycleBin.SendFileToRecycleBin(file.AbsolutePath))
-                throw new OperationException($"无法将文件送入回收站: {file.FileName}");
-        }
-
-        db.Files.Remove(file);
-        await db.SaveChangesAsync();
-        Log.Information("文件删除: {Path}", file.AbsolutePath);
+        using var lease = await MutationGate.AcquireAsync(_dbFactory);
+        var file = await GetByIdAsync(fileId) ?? throw new OperationException("文件不存在。");
+        if (BeforePhysicalOperationAsync is not null) await BeforePhysicalOperationAsync(new[] { file.AbsolutePath });
+        await new FileOperationExecutor(_dbFactory, recycleBin).DeleteFileAsync(fileId);
     }
 }
 

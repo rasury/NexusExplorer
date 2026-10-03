@@ -13,7 +13,7 @@ public class NavigationViewModelTests : IDisposable
 
     private async Task<(MainViewModel Main, Category Root, Category Child)> CreateScenarioAsync()
     {
-        var main = new MainViewModel(_host.Categories, _host.Files, _host.Organization, new MediaPlayerService());
+        var main = new MainViewModel(_host.Categories, _host.Files, _host.Organization, new FakePlaybackEngine());
         var root = await _host.Categories.CreateAsync("视频", null);
         var child = await _host.Categories.CreateAsync("科幻", root.Id);
         return (main, root, child);
@@ -52,7 +52,7 @@ public class NavigationViewModelTests : IDisposable
         var latest = await _host.Files.GetByIdAsync(added.Id);
         Assert.Equal(child.Id, latest!.CategoryId);
         // 归类后:选中分类=文件分类 → 打勾应禁用
-        Assert.True(main.Navigation.IsSelectedCategoryCurrent);
+        Assert.False(main.Navigation.HasCurrentFile);
     }
 
     [Fact]

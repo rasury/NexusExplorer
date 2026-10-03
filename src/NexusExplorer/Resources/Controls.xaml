@@ -11,7 +11,8 @@
         <Setter Property="ItemContainerStyle">
             <Setter.Value>
                 <Style TargetType="TreeViewItem">
-                    <Setter Property="IsExpanded" Value="False" />
+                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
                     <Setter Property="Padding" Value="2,3" />
                     <Setter Property="Template">
                         <Setter.Value>
@@ -244,29 +245,9 @@
         <Setter Property="FontSize" Value="{StaticResource FontSizeNormal}" />
     </Style>
 
-    <!-- ===== ScrollBar 细滚动条 ===== -->
+    <!-- Keep the WPF ScrollBar template: track paging, hit testing and capture are essential. -->
     <Style TargetType="ScrollBar">
-        <Setter Property="Width" Value="8" />
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ScrollBar">
-                    <Track x:Name="PART_Track" IsDirectionReversed="True">
-                        <Track.Thumb>
-                            <Thumb>
-                                <Thumb.Template>
-                                    <ControlTemplate TargetType="Thumb">
-                                        <Border Background="{StaticResource BrushDivider}"
-                                                CornerRadius="4"
-                                                Margin="1" />
-                                    </ControlTemplate>
-                                </Thumb.Template>
-                            </Thumb>
-                        </Track.Thumb>
-                    </Track>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+        <Setter Property="Background" Value="{StaticResource BrushSecondaryBg}" />
     </Style>
 
 </ResourceDictionary>

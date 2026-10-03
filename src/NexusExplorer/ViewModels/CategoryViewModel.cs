@@ -37,7 +37,10 @@ public partial class CategoryViewModel : ObservableObject
 
     public async Task LoadTreeAsync()
     {
+        var states = FlatCategories.ToDictionary(c => c.Id, c => (c.IsExpanded, c.IsSelected));
         var tree = await _categoryService.GetTreeAsync();
+        foreach (var c in Flatten(tree))
+            if (states.TryGetValue(c.Id, out var state)) { c.IsExpanded = state.IsExpanded; c.IsSelected = state.IsSelected; }
         RootCategories = new ObservableCollection<Category>(tree);
         FlatCategories = new ObservableCollection<Category>(Flatten(tree));
     }
@@ -110,7 +113,7 @@ public partial class CategoryViewModel : ObservableObject
         var fileCount = (await _main.GetCurrentFileCountAsync(category.Id));
 
         var message = childCount > 0 || fileCount > 0
-            ? $"确定删除分类「{category.Name}」?\n\n包含 {childCount} 个子分类、{fileCount} 个文件。\n分类下所有文件和物理目录将进入回收站。"
+            ? $"确定删除分类「{category.Name}」?\n\n包含 {childCount} 个子分类、{fileCount} 个已登记文件。\n仅回收归属这些分类的文件；其他分类文件与未登记文件保留，非空目录保留。"
             : $"确定删除分类「{category.Name}」?\n对应的物理目录将进入回收站。";
 
         if (ShowConfirmDialog is not null && !await ShowConfirmDialog(message))
@@ -120,6 +123,8 @@ public partial class CategoryViewModel : ObservableObject
         {
             await _categoryService.DeleteAsync(category.Id, RecycleBin);
             await _main.RefreshTreeAsync();
+            if (_categoryService.LastDeleteWarnings.Count > 0)
+                ShowError?.Invoke(string.Join("\n", _categoryService.LastDeleteWarnings));
         }
         catch (OperationException ex)
         {
@@ -129,6 +134,7 @@ public partial class CategoryViewModel : ObservableObject
         {
             ShowError?.Invoke($"删除失败: {ex.Message}");
         }
+        finally { await _main.RefreshTreeAsync(); }
     }
 
     /// <summary>把分类移动到目标父分类(拖拽)。target = null 表示移到顶层。</summary>

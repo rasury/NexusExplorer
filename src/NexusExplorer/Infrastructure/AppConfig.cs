@@ -15,6 +15,7 @@ public class AppConfig
 
     [JsonPropertyName("Logging")]
     public LoggingConfig Logging { get; set; } = new();
+    public PlaybackConfig Playback { get; set; } = new();
 
     public static AppConfig LoadOrDefault(string path)
     {
@@ -27,9 +28,9 @@ public class AppConfig
                     return config;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // 配置损坏时回退默认值,不打断启动
+            throw new InvalidDataException("配置文件无法读取，已停止启动以避免切换到错误数据库。", ex);
         }
 
         return new AppConfig();
@@ -41,7 +42,7 @@ public class AppConfig
         {
             WriteIndented = true
         });
-        File.WriteAllText(path, json);
+        File.WriteAllText(path + ".tmp", json); File.Move(path + ".tmp", path, true);
     }
 
     /// <summary>确保数据/日志目录存在。</summary>
@@ -51,6 +52,11 @@ public class AppConfig
         Directory.CreateDirectory(Logging.ResolvedDirectory);
         Directory.CreateDirectory(Storage.ResolvedRoot);
     }
+}
+
+public class PlaybackConfig
+{
+    public bool HardwareDecoding { get; set; } = true;
 }
 
 public class StorageConfig

@@ -50,6 +50,7 @@ public partial class NavigationViewModel : ObservableObject
     private ObservableCollection<Category> _pinnedCategories = new();
 
     private int? _currentFileCategoryId;
+    private long _version;
 
     public Action<string>? ShowError { get; set; }
 
@@ -63,22 +64,16 @@ public partial class NavigationViewModel : ObservableObject
     /// <summary>当前文件变化:刷新路径显示,面包屑展开到该文件所属分类链。</summary>
     public async Task OnCurrentFileChangedAsync(Category? category)
     {
+        var version = Interlocked.Increment(ref _version);
+        var path = category is null ? "未分类" : await _categoryService.GetCategoryPathAsync(category.Id);
+        var chain = category is null ? new List<Category>() : await GetAncestorChainAsync(category.Id);
+        var children = await _categoryService.GetChildrenAsync(category?.Id);
+        var pinned = await _categoryService.GetPinnedAsync();
+        if (version != Interlocked.Read(ref _version)) return;
         _currentFileCategoryId = category?.Id;
         HasCurrentFile = category is not null;
-        CurrentPathText = category is null ? "未分类" : await _categoryService.GetCategoryPathAsync(category.Id);
-
-        Breadcrumb = new ObservableCollection<Category>();
-        if (category is not null)
-        {
-            // 预展开:从根到该分类的完整链(当前分类可进入看子分类)
-            var chain = await GetAncestorChainAsync(category.Id);
-            foreach (var ancestor in chain)
-                Breadcrumb.Add(ancestor);
-        }
-
-        SelectedCategory = Breadcrumb.Count > 0 ? Breadcrumb[^1] : null;
-        await RefreshChildrenAsync();
-        await RefreshPinnedAsync();
+        CurrentPathText = path; Breadcrumb = new(chain); Children = new(children); PinnedCategories = new(pinned);
+        IsAtRoot = chain.Count == 0; UpdateSelectionState();
     }
 
     /// <summary>从根到指定分类的祖先链(含自身)。</summary>
@@ -86,9 +81,11 @@ public partial class NavigationViewModel : ObservableObject
     {
         // 逐级上溯到根
         var chain = new List<Category>();
+        var seen = new HashSet<int>();
         var current = await _categoryService.GetByIdAsync(categoryId);
         while (current is not null)
         {
+            if (!seen.Add(current.Id)) throw new OperationException("分类结构存在循环。");
             chain.Insert(0, current);
             current = current.ParentId is null
                 ? null
@@ -102,6 +99,18 @@ public partial class NavigationViewModel : ObservableObject
     {
         var pinned = await _categoryService.GetPinnedAsync();
         PinnedCategories = new ObservableCollection<Category>(pinned);
+        foreach (var c in PinnedCategories) c.IsSelected = c.Id == SelectedCategory?.Id;
+    }
+
+    public async Task RefreshAfterTreeChangeAsync()
+    {
+        var selectedId = SelectedCategory?.Id;
+        await RefreshPinnedAsync();
+        var selected = selectedId is null ? null : await _categoryService.GetByIdAsync(selectedId.Value);
+        Breadcrumb = selected is null ? new() : new(await GetAncestorChainAsync(selected.Id));
+        if (_main.CurrentFile is not null)
+            CurrentPathText = await _categoryService.GetCategoryPathAsync(_main.CurrentFile.CategoryId);
+        await RefreshChildrenAsync();
     }
 
     /// <summary>钉/取消钉后由 UI 调用:刷新钉层并保持选中态。</summary>
@@ -114,8 +123,10 @@ public partial class NavigationViewModel : ObservableObject
     /// <summary>点击快捷分类:选中它(与导航层选中互斥,共用绿勾)。</summary>
     public async Task SelectPinnedAsync(Category category)
     {
+        var version = Interlocked.Increment(ref _version);
         // 快捷分类可能位于任意层级;面包屑同步展开到它的链(与导航层一致)
         var chain = await GetAncestorChainAsync(category.Id);
+        if (version != Interlocked.Read(ref _version)) return;
         Breadcrumb = new ObservableCollection<Category>(chain);
         await RefreshChildrenAsync();
     }
@@ -123,8 +134,10 @@ public partial class NavigationViewModel : ObservableObject
     /// <summary>刷新当前层的子分类列表。</summary>
     public async Task RefreshChildrenAsync()
     {
+        var version = Interlocked.Read(ref _version);
         int? parentId = Breadcrumb.Count == 0 ? null : Breadcrumb[^1].Id;
         var children = await _categoryService.GetChildrenAsync(parentId);
+        if (version != Interlocked.Read(ref _version)) return;
         Children = new ObservableCollection<Category>(children);
         IsAtRoot = Breadcrumb.Count == 0;
         UpdateSelectionState();
@@ -133,6 +146,7 @@ public partial class NavigationViewModel : ObservableObject
     /// <summary>点击分类:纯导航,下钻一层显示其子分类;同时作为选中分类。</summary>
     public async Task NavigateToAsync(Category category)
     {
+        Interlocked.Increment(ref _version);
         // 同级切换:替换面包屑末级;否则下钻
         if (Breadcrumb.Count > 0 && Breadcrumb[^1].ParentId == category.ParentId)
             Breadcrumb[^1] = category;
@@ -146,6 +160,7 @@ public partial class NavigationViewModel : ObservableObject
     /// <summary>面包屑回退到某层(index = 0..n-1);-1 表示回到根层。</summary>
     public async Task NavigateBackToAsync(int index)
     {
+        Interlocked.Increment(ref _version);
         if (index < 0)
         {
             Breadcrumb = new ObservableCollection<Category>();
@@ -165,6 +180,7 @@ public partial class NavigationViewModel : ObservableObject
         SelectedCategory = Breadcrumb.Count > 0 ? Breadcrumb[^1] : null;
         IsSelectedCategoryCurrent = SelectedCategory is not null
             && _currentFileCategoryId == SelectedCategory.Id;
+        foreach (var c in PinnedCategories) c.IsSelected = c.Id == SelectedCategory?.Id;
     }
 
     /// <summary>打勾按钮:把当前文件归入选中的分类。</summary>
@@ -187,8 +203,7 @@ public partial class NavigationViewModel : ObservableObject
 
         try
         {
-            await _fileService.RecategorizeAsync(_main.CurrentFile.Id, SelectedCategory.Id);
-            await _main.OnFileRecategorizedAsync();
+            await _main.FileList.RecategorizeManyAsync(new[] { _main.CurrentFile }, SelectedCategory);
         }
         catch (OperationException ex)
         {
