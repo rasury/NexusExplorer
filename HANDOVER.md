@@ -43,6 +43,8 @@ MutationGate 串行修改；未恢复日志阻止继续修改。同卷分类改�
 
 ## 媒体
 
+软件图标使用用户提供的完整图片：Assets/AppIcon.png 保留原图，AppIcon.ico 包含 16/24/32/48/64/128/256 像素尺寸。ApplicationIcon 嵌入 EXE，WPF MainWindow.Icon 引用同一 ICO 的内嵌资源，窗口和任务栏统一。
+
 已移除 WPF 像素缓冲回调。一个 VLC 原生播放器串行执行 Play/Stop/Seek/初始化/退出，Stop 在工作线程同步完成；VLC 回调只向 Dispatcher 投递，旧会话事件按版本丢弃。默认音量 100、速率 1，没有主动启用均衡器或音效。
 
 音轨按钮可查看、选择实际音轨并记录音轨、声道、采样率、码率与设备。将 Logging.MinimumLevel 改为 Debug 可记录 VLC 模块日志。问题 1～3 的最终根因和实际音质不能由合成素材测试证明，需同文件、同轨、同音量与官方 VLC 比较。

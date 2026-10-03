@@ -57,3 +57,7 @@
 后续固定更新 artifacts/NexusExplorer-2.0.4-preview-win-x64，既有版本目录作为历史保留。只运行更新脚本的两项直接相关检查：模拟发布文件中混入 Storage、DB、配置、日志，并把自定义数据库和 Storage 设置到 libvlc 内，验证更新 EXE/依赖/发布元数据后所有数据文件的内容哈希和时间戳不变；独占锁定依赖文件时，验证替换任何文件前即停止。结果见 artifacts/fixed-update-tests.txt，未执行完整应用回归。
 
 固定目录已实际执行更新：对比前后 data、配置、日志的内容哈希与时间戳，以及 Storage 文件／目录长度和时间戳，快照一致。未启动程序或执行数据库迁移。证据在 artifacts/fixed-update-actual.txt 及 fixed-directory-before/after.json。用户数据未复制或重定位。
+
+## 用户图片作为软件图标
+
+2026-10-04：保留用户提供图片的完整画面，将 ICO 的 16/24/32/48/64/128/256 像素尺寸嵌入 EXE，并在主窗口引用同一 WPF 图标资源。仅执行资源相关的 1 项测试，通过且无跳过，实际 WPF 解码验证了小／大尺寸帧，输出在 artifacts/app-icon-related-tests.txt。从固定目录已发布 EXE 提取的 32×32 图标，与 ICO 对应帧逐像素一致。通过保护脚本原地更新，用户 data/Storage/logs/配置快照一致；未执行完整回归，也未启动软件或迁移真实数据库。更新输出在 artifacts/app-icon-fixed-update.txt。
