@@ -87,3 +87,9 @@
 只运行直接相关的原生输出测试，音频 WAV 和含音轨 AVI 两项均通过，0 失败、0 跳过。素材音轨全零，无实际出声；测试核对 VLC 原生日志确实选中 directsound 模块、实际解码、音量修改、跳转、暂停恢复以及停止后独占文件读取，结果在 artifacts/directsound-tests/directsound-related.trx。未运行完整套件。
 
 已通过保护脚本更新固定目录 artifacts/NexusExplorer-2.0.4-preview-win-x64。data/配置/日志的内容哈希与时间戳、Storage 文件和目录长度/时间戳前后快照一致，未启动主软件或执行数据库迁移，输出在 artifacts/directsound-fixed-update.txt。正式软件的 MP3、WAV/FLAC 与实际视频音轨听感仍需用户更新后复验。
+
+## 原生 SDK 排查警示
+
+2026-10-04：将本次经验记录为 SDK-INTEGRATION-LESSONS.md，并在根目录 AGENTS.md 固化后续 AI 的排查规则。区分实际模块/输出验证与功能成功，强调同库最小可编辑实验、单变量对比和证据边界。README 与 HANDOVER 已关联；更新脚本增加警示文档的发布清单。
+
+本次只核对文档内容、13 个本地 Markdown 链接和 Git 差异，并运行两项直接相关的更新脚本检查：警示文档正确复制，默认/自定义用户数据保持，文件占用时停止替换。结果见 artifacts/sdk-warning-update-tests.txt。检查在独立模拟目录执行，未更新正在运行的真实软件、修改播放器或执行完整应用测试。

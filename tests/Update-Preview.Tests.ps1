@@ -56,6 +56,8 @@ function Assert-Protected {
 Assert-Equal 'NEW EXE' ([IO.File]::ReadAllText((Join-Path $taskOutput 'NexusExplorer.exe'))) 'EXE 未更新'
 Assert-Equal 'NEW DLL' ([IO.File]::ReadAllText((Join-Path $taskOutput 'native.dll'))) '依赖未更新'
 Assert-Equal 'NEW' ((Get-Content -Raw -LiteralPath (Join-Path $taskOutput 'release.json') | ConvertFrom-Json).version) '发布元数据未更新'
+Assert-Equal (Get-FileHash -LiteralPath (Join-Path $taskRepository 'docs/SDK-INTEGRATION-LESSONS.md')).Hash `
+    (Get-FileHash -LiteralPath (Join-Path $taskOutput 'docs/SDK-INTEGRATION-LESSONS.md')).Hash 'SDK 警示文档未随更新发布'
 Assert-Protected
 Write-Output 'PASS: 程序和依赖更新；默认及自定义 Storage、DB/WAL/SHM、配置、日志、界面状态内容和时间戳均保留。'
 

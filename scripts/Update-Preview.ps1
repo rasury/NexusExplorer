@@ -89,7 +89,7 @@ foreach ($taskFile in Get-ChildItem -LiteralPath $taskSource -File) {
 foreach ($taskFile in Get-ChildItem -LiteralPath (Join-Path $taskSource 'libvlc') -File -Recurse) {
     Add-ProgramCopy $taskFile.FullName ([IO.Path]::GetRelativePath($taskSource, $taskFile.FullName))
 }
-foreach ($taskDocument in @('docs/ACCEPTANCE.md', 'docs/VERIFICATION.md', 'docs/FEEDBACK-2.0.1.md', 'docs/ORGANIZATION-STATUS-2.0.2.md', 'README.md', 'HANDOVER.md')) {
+foreach ($taskDocument in @('docs/ACCEPTANCE.md', 'docs/VERIFICATION.md', 'docs/FEEDBACK-2.0.1.md', 'docs/ORGANIZATION-STATUS-2.0.2.md', 'docs/SDK-INTEGRATION-LESSONS.md', 'README.md', 'HANDOVER.md')) {
     Add-ProgramCopy (Join-Path $taskRepository $taskDocument) $taskDocument
 }
 if (-not ($taskCopies | Where-Object { $_.Destination -eq $taskExecutable })) {
