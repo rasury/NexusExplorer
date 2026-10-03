@@ -43,6 +43,16 @@
     <Message Text="已复制 VLC 原生库: @(LibVlcFiles->Count()) 个文件" Importance="high" />
   </Target>
 
+  <!-- Generate the cache from this exact native SDK after copying it; verify in a fresh process. -->
+  <Target Name="PrepareLibVlcPluginCache" AfterTargets="RestoreLibVlcNative" Condition="'$(OS)' == 'Windows_NT'">
+    <PropertyGroup>
+      <VlcCacheScript>$(MSBuildProjectDirectory)\..\..\scripts\Prepare-VlcCache.ps1</VlcCacheScript>
+      <VlcPublishedNativeDirectory>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(PublishDir)', 'libvlc', 'win-x64'))</VlcPublishedNativeDirectory>
+    </PropertyGroup>
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(VlcCacheScript)&quot; -NativeDirectory &quot;$(VlcPublishedNativeDirectory)&quot;" />
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(VlcCacheScript)&quot; -NativeDirectory &quot;$(VlcPublishedNativeDirectory)&quot; -VerifyOnly" />
+  </Target>
+
   <!-- 发布后清理:VLC win-x86 目录(x64 目标用不到)与 createdump.exe -->
   <Target Name="CleanPublishOutput" AfterTargets="Publish">
     <RemoveDir Directories="$(PublishDir)libvlc\win-x86" Condition="Exists('$(PublishDir)libvlc\win-x86')" />

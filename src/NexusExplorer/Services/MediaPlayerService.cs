@@ -62,6 +62,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
         // DirectSound improved playback; the user then confirmed Speex removes the remaining noise.
         // Apply both tested choices to the shared audio/video path.
         _vlc = new LibVLC(true, "--no-osd", "--aout=directsound", "--audio-resampler=speex_resampler");
+        Log.Information("VLC 实例创建结束;耗时 {ElapsedMs:F1} ms", timing.Elapsed.TotalMilliseconds);
         _vlc.Log += (_, e) =>
         {
             if (e.Message.Contains("using audio output module", StringComparison.Ordinal)
@@ -69,7 +70,9 @@ public sealed class MediaPlayerService : IPlaybackEngine
                 Log.Information("VLC 实际音频模块;请求 {Request};{Module}: {Message}", Interlocked.Read(ref _activeGeneration), e.Module, e.Message);
             else Log.Debug("VLC {Module}: {Message}", e.Module, e.Message);
         };
+        var playerTiming = Stopwatch.StartNew();
         _player = new NativePlayer(_vlc) { EnableHardwareDecoding = HardwareDecoding };
+        Log.Information("VLC 播放器创建结束;耗时 {ElapsedMs:F1} ms", playerTiming.Elapsed.TotalMilliseconds);
         _player.EndReached += OnEnded;
         _player.EncounteredError += OnError;
         _player.Playing += OnPlaying;

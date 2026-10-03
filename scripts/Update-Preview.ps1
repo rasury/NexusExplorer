@@ -46,7 +46,7 @@ if (-not $PublishedDirectory) {
 }
 $taskSource = Resolve-UpdatePath $PublishedDirectory $taskRepository
 Assert-NoJunction $taskSource
-foreach ($taskRequired in @('NexusExplorer.exe', 'libvlc/win-x64/libvlc.dll', 'libvlc/win-x64/libvlccore.dll')) {
+foreach ($taskRequired in @('NexusExplorer.exe', 'libvlc/win-x64/libvlc.dll', 'libvlc/win-x64/libvlccore.dll', 'libvlc/win-x64/plugins/plugins.dat')) {
     if (-not (Test-Path -LiteralPath (Join-Path $taskSource $taskRequired) -PathType Leaf)) {
         throw "发布文件不完整，固定目录未修改：$taskRequired"
     }
