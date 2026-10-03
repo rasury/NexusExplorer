@@ -69,3 +69,11 @@
 提供 tools/AudioDiagnostic 独立 WPF 工具，直接链接生产 MediaPlayerService 源码与接口，加载固定便携目录内同一套 VLC 3.0.21 库，只读硬件解码配置，不使用分类、数据库或主软件界面。A 调用 PlayAsync(path, true)，B 仅改为 PlayAsync(path, false)，比较 Music 与 Video 角色。默认不自动播放，独立日志记录引擎源码 SHA256、VLC 模块输出与音轨信息；操作说明见该工具 README。
 
 只执行直接相关的 Release 发布与静音原生输出自检：生成工具自有 WAV，两种角色均实际解码成功，暂停、恢复、停止、独占读取通过，退出码 0；结果在 artifacts/audio-diagnostic/verification.json。未执行完整应用测试，未启动主软件或打开真实数据库。此检查不验证听感，A/B 是否破音待用户确认。
+
+## 可编辑 Python 音频实验
+
+2026-10-04：用户明确需要随时修改源码的实验方式，选择 Python 脚本，当前使用 tools/AudioLab。直接通过标准库 ctypes 加载固定程序目录中的 LibVLC 3.0.21，无需 Python 依赖安装或 EXE 编译。每次 play() 重读可编辑参数文件，也支持关键字临时改变角色、输出参数等；播放代码可直接编辑后重启 Python。记录写入 artifacts/audio-lab，正式程序、配置、Storage、数据库未修改。
+
+仅执行脚本相关的 1 项原生集成测试，覆盖 Music/Video/None 三种角色、同一参数文件的保存重读、中文路径、实际音频解码、播放后音量设置、暂停恢复、跳转、独占读取释放，以及错误路径不打断当前播放；通过。使用全零静音 WAV，不进行完整应用回归，不验证破音听感。
+
+实验暴露调用时序细节：执行 Stop() 后、播放开始前设音量的 VLC API 返回 -1，播放后调用可成功。脚本保留正式软件调用顺序并记录此返回值，没有自动补调用；实际音量由 info() 查询，可用 volume() 在播放中改变。原生停止和音量实现的依据见 AudioLab/README.md 中 VLC 3 源码链接。此细节尚不能证明是破音原因，正式音频修复仍待实验反馈。

@@ -14,3 +14,5 @@ testmedia/
 local-documents/
 artifacts/
 /oldtest/
+__pycache__/
+*.py[cod]
