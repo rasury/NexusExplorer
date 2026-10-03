@@ -1,6 +1,6 @@
 # NexusExplorer 2.0 预览版
 
-Windows x64 分类文件管理与媒体查看软件，保留 WPF、SQLite、EF Core、LibVLC 与三区布局。此版本正在验收，已完成 oldtest 旧库副本升级与真实异常视频跳转回归；实际试听与完整鼠标交互仍待用户验收。
+Windows x64 分类文件管理与媒体查看软件，使用 WPF、SQLite、EF Core、LibVLC 与三区布局。当前为预览版；本次音频播放与音轨切换修正已通过用户验收。
 
 ## 使用
 
@@ -14,9 +14,18 @@ Windows x64 分类文件管理与媒体查看软件，保留 WPF、SQLite、EF C
 - 快捷分类自动换行，可跨行拖动排序，顺序独立保存。
 - 左侧分类树名称前的文件夹图标显示整理状态：橙色表示待整理，绿色表示已整理，悬停可查看说明。底栏导览和快捷分类按钮只显示名称；状态持久保存，显示时不遍历绑定文件地址。
 - 视频由 VLC 原生窗口输出，控制条在画面下方。默认硬件解码，可关闭并重新打开媒体；选项保存到配置。
-- 音频文件与视频音轨统一使用 VLC 的 DirectSound 输出及 Speex 重采样，按用户实测处理破音与残余电流声；保留现有解码、媒体角色与播放控制。
+- 音频文件与视频音轨统一使用 VLC 的 MMDevice／WASAPI 输出及 Speex 重采样。Disable 真正取消底层音轨选择，恢复时重新建立音频链路。
 - 图片默认适合窗口，支持缩放、平移、原始尺寸与前后切换；GIF、APNG（包括以 .png 保存的动画）按帧延时及循环设置播放，支持透明局部帧。拖文件或分类进入分类树后可用滚轮滚动寻找目标。
-- 软件使用用户提供的图片作为 EXE、窗口和任务栏图标，保留完整画面；原图及 Windows 多尺寸 ICO 位于 src/NexusExplorer/Assets。
+- 软件使用用户提供的图片作为 EXE、窗口和任务栏图标，保留完整画面；原图及 Windows 多尺寸 ICO 位于 [src/NexusExplorer/Assets](src/NexusExplorer/Assets)。
+
+## 仓库内容
+
+- [src/NexusExplorer](src/NexusExplorer)：应用源码、配置模板及图标。
+- [tests](tests)：自动化检查及随仓库提供的测试素材。
+- [scripts](scripts)：固定目录更新与 VLC 插件缓存生成脚本，发布时需要保留。
+- `NexusExplorer.sln`、`README.md` 和 `.gitignore`：解决方案、使用说明及忽略规则。
+
+以下内容仅保留在本地，不随 Git 仓库分发：`docs/`、`outputs/user-visible-text/`、`tools/`、`AGENTS.md`、`HANDOVER.md` 和 `NexusExplorer V1.0 开发文档.md`。重新克隆仓库不会包含这些开发资料、文案清单或诊断工具；需要时单独保存、传递。运行数据、日志、旧程序和发布产物同样不提交到仓库，具体规则见 [.gitignore](.gitignore)。
 
 ## 构建、测试和发布
 
@@ -30,7 +39,9 @@ dotnet test NexusExplorer.sln -c Release --no-restore --filter "FullyQualifiedNa
 .\scripts\Update-Preview.ps1
 ```
 
-后续固定沿用 `artifacts/NexusExplorer-2.0.4-preview-win-x64`，目录名不随版本变化。更新脚本先发布到固定临时目录 `artifacts/publish-staging`，检查程序是否关闭及文件是否可替换，再只复制 EXE、依赖库、发布元数据和文档。保留原位置的 Storage、数据库（含 WAL/SHM/备份）、界面状态、appsettings.json 和日志；也识别配置中显式指定的数据位置。不会复制、搬迁、重绑定或清空用户数据，不再逐次创建版本目录。便携包含自包含 EXE、WPF/SQLite 原生 DLL 与完整 libvlc/win-x64 插件目录，须保留整个目录。
+后续固定沿用 `artifacts/NexusExplorer-2.0.4-preview-win-x64`，目录名不随版本变化。[更新脚本](scripts/Update-Preview.ps1)先发布到固定临时目录 `artifacts/publish-staging`，检查程序是否关闭及文件是否可替换，再只复制 EXE、依赖库、发布元数据和本地存在的说明文档。已忽略的文档不存在时跳过，不影响更新。保留原位置的 Storage、数据库（含 WAL/SHM/备份）、界面状态、appsettings.json 和日志；也识别配置中显式指定的数据位置。不会复制、搬迁、重绑定或清空用户数据，不再逐次创建版本目录。便携包含自包含 EXE、WPF/SQLite 原生 DLL 与完整 libvlc/win-x64 插件目录，须保留整个目录。
+
+发布流程会调用 [Prepare-VlcCache.ps1](scripts/Prepare-VlcCache.ps1)，从本次发布的 VLC 原生库生成插件缓存，并在独立进程验证缓存可用，以减少首次播放的初始化等待。
 
 更新脚本的最小验证：`.\tests\Update-Preview.Tests.ps1`。已有发布产物可通过 `-PublishedDirectory` 复用。更新前先关闭固定目录中的程序；脚本不会自动结束用户进程。
 
@@ -40,17 +51,3 @@ dotnet test NexusExplorer.sln -c Release --no-restore --filter "FullyQualifiedNa
 ```
 
 结果写入 startup-verification.json，失败返回退出码 1。首次运行在 EXE 旁创建 data、logs、Storage，配置允许显式指定其他位置。
-
-## 资料
-
-- [用户可见文案清单（含可编辑 Excel）](docs/USER-VISIBLE-TEXT.md)
-- [重构评估与实现说明](docs/REFACTOR.md)
-- [18 项验收步骤](docs/ACCEPTANCE.md)
-- [2.0.1 第一轮反馈修正与验证](docs/FEEDBACK-2.0.1.md)
-- [2.0.2 分类整理状态与验收](docs/ORGANIZATION-STATUS-2.0.2.md)
-- [构建、旧库与真实媒体验证记录](docs/VERIFICATION.md)
-- [原生第三方 SDK 默认配置的警示与排查规则](docs/SDK-INTEGRATION-LESSONS.md)
-- [可编辑 Python 音频实验脚本（当前测试方式）](tools/AudioLab/README.md)
-- [独立音频诊断与 A/B 对比](tools/AudioDiagnostic/README.md)
-- [当前移交说明](HANDOVER.md)
-- 第一版开发文档保留为历史需求；本次明确要求和已确认行为优先。

@@ -16,6 +16,7 @@ Write-Fixture 'published/native.dll' 'NEW DLL'
 Write-Fixture 'published/release.json' '{"version":"NEW"}'
 Write-Fixture 'published/libvlc/win-x64/libvlc.dll' 'NEW VLC'
 Write-Fixture 'published/libvlc/win-x64/libvlccore.dll' 'NEW VLC CORE'
+Write-Fixture 'published/libvlc/win-x64/plugins/plugins.dat' 'PLUGIN CACHE'
 Write-Fixture 'published/Storage/keep.txt' 'POISON'
 Write-Fixture 'published/data/nexus.db' 'POISON'
 Write-Fixture 'published/logs/keep.log' 'POISON'
@@ -56,8 +57,10 @@ function Assert-Protected {
 Assert-Equal 'NEW EXE' ([IO.File]::ReadAllText((Join-Path $taskOutput 'NexusExplorer.exe'))) 'EXE 未更新'
 Assert-Equal 'NEW DLL' ([IO.File]::ReadAllText((Join-Path $taskOutput 'native.dll'))) '依赖未更新'
 Assert-Equal 'NEW' ((Get-Content -Raw -LiteralPath (Join-Path $taskOutput 'release.json') | ConvertFrom-Json).version) '发布元数据未更新'
-Assert-Equal (Get-FileHash -LiteralPath (Join-Path $taskRepository 'docs/SDK-INTEGRATION-LESSONS.md')).Hash `
-    (Get-FileHash -LiteralPath (Join-Path $taskOutput 'docs/SDK-INTEGRATION-LESSONS.md')).Hash 'SDK 警示文档未随更新发布'
+if (Test-Path -LiteralPath (Join-Path $taskRepository 'docs/SDK-INTEGRATION-LESSONS.md') -PathType Leaf) {
+    Assert-Equal (Get-FileHash -LiteralPath (Join-Path $taskRepository 'docs/SDK-INTEGRATION-LESSONS.md')).Hash `
+        (Get-FileHash -LiteralPath (Join-Path $taskOutput 'docs/SDK-INTEGRATION-LESSONS.md')).Hash '本地存在的 SDK 警示文档未随更新发布'
+}
 Assert-Protected
 Write-Output 'PASS: 程序和依赖更新；默认及自定义 Storage、DB/WAL/SHM、配置、日志、界面状态内容和时间戳均保留。'
 
@@ -73,3 +76,13 @@ try {
 }
 finally { $taskLocked.Dispose() }
 Write-Output 'PASS: 程序文件占用时，在替换任何文件之前停止，数据和现有程序保留。'
+
+# Simulate a fresh checkout containing the tracked script and README only.
+Write-Fixture 'checkout/scripts/Update-Preview.ps1' ([IO.File]::ReadAllText((Join-Path $taskRepository 'scripts/Update-Preview.ps1')))
+Write-Fixture 'checkout/README.md' 'CHECKOUT README'
+$taskCheckout = Join-Path $taskFixture 'checkout'
+& (Join-Path $taskCheckout 'scripts/Update-Preview.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput
+Assert-Equal 'NEXT EXE' ([IO.File]::ReadAllText((Join-Path $taskOutput 'NexusExplorer.exe'))) '缺少本地资料时 EXE 未更新'
+Assert-Equal 'CHECKOUT README' ([IO.File]::ReadAllText((Join-Path $taskOutput 'README.md'))) '仓库 README 未发布'
+Assert-Protected
+Write-Output 'PASS: 不含 docs、tools、HANDOVER 的检出仍可更新，用户数据保持不变。'

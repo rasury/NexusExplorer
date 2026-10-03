@@ -90,7 +90,11 @@ foreach ($taskFile in Get-ChildItem -LiteralPath (Join-Path $taskSource 'libvlc'
     Add-ProgramCopy $taskFile.FullName ([IO.Path]::GetRelativePath($taskSource, $taskFile.FullName))
 }
 foreach ($taskDocument in @('docs/ACCEPTANCE.md', 'docs/VERIFICATION.md', 'docs/FEEDBACK-2.0.1.md', 'docs/ORGANIZATION-STATUS-2.0.2.md', 'docs/SDK-INTEGRATION-LESSONS.md', 'docs/AUDIO-TRACK-RESTORE.md', 'README.md', 'HANDOVER.md')) {
-    Add-ProgramCopy (Join-Path $taskRepository $taskDocument) $taskDocument
+    $taskDocumentSource = Join-Path $taskRepository $taskDocument
+    # Ignored local documents are optional in a fresh Git checkout.
+    if (Test-Path -LiteralPath $taskDocumentSource -PathType Leaf) {
+        Add-ProgramCopy $taskDocumentSource $taskDocument
+    }
 }
 if (-not ($taskCopies | Where-Object { $_.Destination -eq $taskExecutable })) {
     throw '程序目标与受保护数据路径冲突，固定目录未修改。'
