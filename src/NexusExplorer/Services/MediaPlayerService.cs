@@ -19,6 +19,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
     private long _activeGeneration;
     private bool _disposed;
     private int _volume = 100;
+    private bool _audioDisabled;
     private PlaybackTiming? _playbackTiming;
     private sealed class PlaybackTiming(long generation, long startedAt, string path)
     {
@@ -30,6 +31,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
     }
     public bool HardwareDecoding { get; set; } = true;
     public NativePlayer? NativePlayer => _player;
+    public int SelectedAudioTrack => Volatile.Read(ref _audioDisabled) ? -1 : _player?.AudioTrack ?? -1;
     public bool IsVlcReady => _player is not null;
     public string? VlcVersion => _vlc?.Version;
     public string? CurrentPath { get; private set; }
@@ -113,6 +115,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
                 step.Restart();
                 Interlocked.Exchange(ref _activeGeneration, 0);
                 _player!.Stop(); _player.Media = null;
+                ResetAudioSelection();
                 Log.Information("VLC 清理旧媒体结束;请求 {Request};耗时 {ElapsedMs:F1} ms", generation, step.Elapsed.TotalMilliseconds);
                 if (generation != Interlocked.Read(ref _generation) || cancellationToken.IsCancellationRequested) return;
                 step.Restart();
@@ -147,7 +150,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
             await Task.Run(() =>
             {
                 Interlocked.Exchange(ref _activeGeneration, 0);
-                if (_player is not null && !_disposed) { _player.Stop(); _player.Media = null; }
+                if (_player is not null && !_disposed) { _player.Stop(); _player.Media = null; ResetAudioSelection(); }
                 CurrentPath = null;
             });
             Log.Information("VLC 停止释放结束;耗时 {ElapsedMs:F1} ms", timing.Elapsed.TotalMilliseconds);
@@ -155,20 +158,88 @@ public sealed class MediaPlayerService : IPlaybackEngine
         finally { _commands.Release(); }
     }
     public Task TogglePauseAsync() => CommandAsync(p => p.Pause());
-    public Task SetAudioTrackAsync(int id) => CommandAsync(p => p.SetAudioTrack(id));
+    public Task SetAudioTrackAsync(int id) => CommandAsync(async p =>
+    {
+        var timing = Stopwatch.StartNew();
+        var previous = SelectedAudioTrack;
+        if (!p.AudioTrackDescription.Any(t => t.Id == id))
+            throw new OperationException("所选音轨不可用，请重新打开音轨菜单。");
+        // Disabling a VLC 3 track destroys its decoder and DirectSound stream. Restoring
+        // it can insert ~1s silence for clock alignment. Keep the stream running muted.
+        if (id == -1)
+        {
+            await SetMuteAndConfirmAsync(p, true);
+            Volatile.Write(ref _audioDisabled, true);
+        }
+        else
+        {
+            if (p.AudioTrack != id && !p.SetAudioTrack(id))
+                throw new OperationException("播放器未能切换音轨。");
+            if (Volatile.Read(ref _audioDisabled))
+            {
+                await SetMuteAndConfirmAsync(p, false);
+                Volatile.Write(ref _audioDisabled, false);
+            }
+        }
+        Log.Information("音轨选择 {Previous} -> {Selected};原生音轨 {NativeTrack};静音 {Muted};媒体时间 {MediaTimeMs} ms;耗时 {ElapsedMs:F1} ms",
+            previous, SelectedAudioTrack, p.AudioTrack, p.Mute, p.Time, timing.Elapsed.TotalMilliseconds);
+    });
+    private static async Task SetMuteAndConfirmAsync(NativePlayer player, bool mute)
+    {
+        if (player.Mute == mute) return;
+        var confirmed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnChanged(object? sender, EventArgs args) => confirmed.TrySetResult();
+        if (mute) player.Muted += OnChanged; else player.Unmuted += OnChanged;
+        try
+        {
+            // VLC may queue the request under its aout lock. An immediate getter
+            // can still report the old value; wait for the actual state change.
+            player.Mute = mute;
+            if (player.Mute != mute) await confirmed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            if (player.Mute != mute) throw new TimeoutException();
+        }
+        catch (TimeoutException)
+        {
+            throw new OperationException(mute ? "播放器未能关闭声音。" : "播放器未能恢复声音。");
+        }
+        finally
+        {
+            if (mute) player.Muted -= OnChanged; else player.Unmuted -= OnChanged;
+        }
+    }
+    private void ResetAudioSelection()
+    {
+        if (Volatile.Read(ref _audioDisabled))
+        {
+            // Stop terminates VLC's aout. Mute=false without an aout is ignored and
+            // leaves the inherited mute flag set for the next media. Recreate only
+            // the stopped output so resetting mute succeeds without an audible blip.
+            if (!_player!.SetAudioOutput("directsound"))
+                throw new OperationException("播放器未能重置音频输出。");
+            _player.Mute = false;
+            if (_player.Mute) throw new OperationException("播放器未能恢复声音。");
+            _player.Volume = _volume;
+        }
+        Volatile.Write(ref _audioDisabled, false);
+    }
     public Task SeekAsync(float fraction) => CommandAsync(p =>
     {
         if (p.Length > 0) p.SeekTo(TimeSpan.FromMilliseconds(p.Length * Math.Clamp(fraction, 0, 1)));
     });
     public Task SetVolumeAsync(int volume)
     { _volume = Math.Clamp(volume, 0, 100); return CommandAsync(p => p.Volume = _volume); }
-    private async Task CommandAsync(Action<NativePlayer> command)
+    private Task CommandAsync(Action<NativePlayer> command) => CommandAsync(player =>
+    {
+        command(player);
+        return Task.CompletedTask;
+    });
+    private async Task CommandAsync(Func<NativePlayer, Task> command)
     {
         var generation = Interlocked.Read(ref _generation);
         await _commands.WaitAsync();
         try
         {
-            await Task.Run(() => { if (!_disposed && _player is not null && generation == Interlocked.Read(ref _generation)) command(_player); });
+            await Task.Run(async () => { if (!_disposed && _player is not null && generation == Interlocked.Read(ref _generation)) await command(_player); });
         }
         finally { _commands.Release(); }
     }
@@ -201,8 +272,8 @@ public sealed class MediaPlayerService : IPlaybackEngine
     public void LogAudioDiagnostics()
     {
         if (_player is null) return;
-        Log.Information("音轨 {Track};音轨描述 {Descriptions}",
-            _player.AudioTrack, string.Join(", ", _player.AudioTrackDescription.Select(t => $"{t.Id}:{t.Name}")));
+        Log.Information("音轨 {Track};原生音轨 {NativeTrack};静音 {Muted};音轨描述 {Descriptions}",
+            SelectedAudioTrack, _player.AudioTrack, _player.Mute, string.Join(", ", _player.AudioTrackDescription.Select(t => $"{t.Id}:{t.Name}")));
         using var media = _player.Media;
         if (media is not null)
             foreach (var track in media.Tracks.Where(t => t.TrackType == TrackType.Audio))

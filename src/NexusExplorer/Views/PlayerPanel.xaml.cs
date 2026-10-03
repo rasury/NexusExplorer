@@ -116,7 +116,7 @@ public partial class PlayerPanel : UserControl
         var menu = new ContextMenu();
         foreach (var track in native.AudioTrackDescription)
         {
-            var id = track.Id; var item = new MenuItem { Header = track.Name, IsCheckable = true, IsChecked = id == native.AudioTrack };
+            var id = track.Id; var item = new MenuItem { Header = track.Name, IsCheckable = true, IsChecked = id == Native.SelectedAudioTrack };
             item.Click += async (_, _) => await RunAsync(() => Native.SetAudioTrackAsync(id));
             menu.Items.Add(item);
         }
