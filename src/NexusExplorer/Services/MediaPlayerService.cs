@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using NexusExplorer.ApplicationLayer;
 using System.Windows.Threading;
 using LibVLCSharp.Shared;
@@ -18,6 +19,15 @@ public sealed class MediaPlayerService : IPlaybackEngine
     private long _activeGeneration;
     private bool _disposed;
     private int _volume = 100;
+    private PlaybackTiming? _playbackTiming;
+    private sealed class PlaybackTiming(long generation, long startedAt, string path)
+    {
+        public long Generation { get; } = generation;
+        public long StartedAt { get; } = startedAt;
+        public string Path { get; } = path;
+        public int PlayingLogged;
+        public int TimeLogged;
+    }
     public bool HardwareDecoding { get; set; } = true;
     public NativePlayer? NativePlayer => _player;
     public bool IsVlcReady => _player is not null;
@@ -47,13 +57,33 @@ public sealed class MediaPlayerService : IPlaybackEngine
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_player is not null) return;
+        var timing = Stopwatch.StartNew();
+        Log.Information("VLC 初始化开始;封装版本 {WrapperVersion}", typeof(LibVLC).Assembly.GetName().Version);
         // DirectSound improved playback; the user then confirmed Speex removes the remaining noise.
         // Apply both tested choices to the shared audio/video path.
         _vlc = new LibVLC(true, "--no-osd", "--aout=directsound", "--audio-resampler=speex_resampler");
-        _vlc.Log += (_, e) => Log.Debug("VLC {Module}: {Message}", e.Module, e.Message);
+        _vlc.Log += (_, e) =>
+        {
+            if (e.Message.Contains("using audio output module", StringComparison.Ordinal)
+                || e.Message.Contains("using audio resampler module", StringComparison.Ordinal))
+                Log.Information("VLC 实际音频模块;请求 {Request};{Module}: {Message}", Interlocked.Read(ref _activeGeneration), e.Module, e.Message);
+            else Log.Debug("VLC {Module}: {Message}", e.Module, e.Message);
+        };
         _player = new NativePlayer(_vlc) { EnableHardwareDecoding = HardwareDecoding };
         _player.EndReached += OnEnded;
         _player.EncounteredError += OnError;
+        _player.Playing += OnPlaying;
+        _player.TimeChanged += OnTimeChanged;
+        Log.Information("VLC 初始化结束;原生版本 {NativeVersion};耗时 {ElapsedMs:F1} ms", _vlc.Version, timing.Elapsed.TotalMilliseconds);
+        try
+        {
+            using var process = Process.GetCurrentProcess();
+            foreach (ProcessModule module in process.Modules)
+                if (module.ModuleName.Equals("libvlc.dll", StringComparison.OrdinalIgnoreCase)
+                    || module.ModuleName.Equals("libvlccore.dll", StringComparison.OrdinalIgnoreCase))
+                    Log.Information("VLC 实际原生库 {NativePath}", module.FileName);
+        }
+        catch (Exception ex) { Log.Debug(ex, "读取已加载 VLC 库路径失败"); }
         Post(() => PlayerReady?.Invoke());
     }
     private void Post(Action action)
@@ -63,17 +93,26 @@ public sealed class MediaPlayerService : IPlaybackEngine
     }
     public async Task PlayAsync(string path, bool audio, CancellationToken cancellationToken = default)
     {
+        var timing = Stopwatch.StartNew();
+        var startedAt = Stopwatch.GetTimestamp();
         var generation = Interlocked.Increment(ref _generation);
+        Log.Information("VLC 播放请求开始;请求 {Request};路径 {Path};播放器已初始化 {Ready}", generation, path, IsVlcReady);
         await _commands.WaitAsync(cancellationToken);
         try
         {
+            Log.Information("VLC 播放命令就绪;请求 {Request};排队 {ElapsedMs:F1} ms", generation, timing.Elapsed.TotalMilliseconds);
             if (generation != Interlocked.Read(ref _generation)) return;
             await Task.Run(() =>
             {
+                var step = Stopwatch.StartNew();
                 EnsurePlayer();
+                Log.Information("VLC 播放初始化检查结束;请求 {Request};耗时 {ElapsedMs:F1} ms", generation, step.Elapsed.TotalMilliseconds);
+                step.Restart();
                 Interlocked.Exchange(ref _activeGeneration, 0);
                 _player!.Stop(); _player.Media = null;
+                Log.Information("VLC 清理旧媒体结束;请求 {Request};耗时 {ElapsedMs:F1} ms", generation, step.Elapsed.TotalMilliseconds);
                 if (generation != Interlocked.Read(ref _generation) || cancellationToken.IsCancellationRequested) return;
+                step.Restart();
                 if (!File.Exists(path)) throw new FileNotFoundException("媒体文件不存在。", path);
                 CurrentPath = path;
                 using var media = new Media(_vlc!, new Uri(path));
@@ -86,8 +125,10 @@ public sealed class MediaPlayerService : IPlaybackEngine
                 _player.EnableHardwareDecoding = HardwareDecoding;
                 _player.SetRole(audio ? MediaPlayerRole.Music : MediaPlayerRole.Video);
                 _player.Volume = _volume; _player.SetRate(1);
+                Volatile.Write(ref _playbackTiming, new PlaybackTiming(generation, startedAt, path));
                 Interlocked.Exchange(ref _activeGeneration, generation);
                 if (!_player.Play(media)) throw new OperationException("播放器拒绝打开该媒体。");
+                Log.Information("VLC 打开调用返回;请求 {Request};打开步骤 {StepMs:F1} ms;请求累计 {ElapsedMs:F1} ms", generation, step.Elapsed.TotalMilliseconds, timing.Elapsed.TotalMilliseconds);
                 Log.Information("播放 {Path};硬件解码 {Hardware};音量 {Volume};角色 {Role};请求音频输出 DirectSound;请求重采样 Speex", path, HardwareDecoding, _volume, audio ? "Music" : "Video");
             }, cancellationToken);
         }
@@ -95,6 +136,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
     }
     public async Task StopAndReleaseAsync()
     {
+        var timing = Stopwatch.StartNew();
         Interlocked.Increment(ref _generation);
         await _commands.WaitAsync();
         try
@@ -105,6 +147,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
                 if (_player is not null && !_disposed) { _player.Stop(); _player.Media = null; }
                 CurrentPath = null;
             });
+            Log.Information("VLC 停止释放结束;耗时 {ElapsedMs:F1} ms", timing.Elapsed.TotalMilliseconds);
         }
         finally { _commands.Release(); }
     }
@@ -136,6 +179,22 @@ public sealed class MediaPlayerService : IPlaybackEngine
         var generation = Interlocked.Read(ref _activeGeneration); var path = CurrentPath ?? "";
         Post(() => { if (generation != 0 && generation == Interlocked.Read(ref _generation)) PlaybackError?.Invoke(path, "无法播放该媒体，请查看日志并尝试关闭硬件解码。"); });
     }
+    private PlaybackTiming? ActiveTiming()
+    {
+        var timing = Volatile.Read(ref _playbackTiming);
+        return timing is not null && timing.Generation == Interlocked.Read(ref _activeGeneration)
+            && timing.Generation == Interlocked.Read(ref _generation) ? timing : null;
+    }
+    private void OnPlaying(object? sender, EventArgs args)
+    {
+        if (ActiveTiming() is { } timing && Interlocked.Exchange(ref timing.PlayingLogged, 1) == 0)
+            Log.Information("VLC Playing 事件;请求 {Request};路径 {Path};请求后 {ElapsedMs:F1} ms", timing.Generation, timing.Path, Stopwatch.GetElapsedTime(timing.StartedAt).TotalMilliseconds);
+    }
+    private void OnTimeChanged(object? sender, MediaPlayerTimeChangedEventArgs args)
+    {
+        if (args.Time > 0 && ActiveTiming() is { } timing && Interlocked.Exchange(ref timing.TimeLogged, 1) == 0)
+            Log.Information("VLC 首次播放时钟推进;请求 {Request};媒体时间 {MediaTimeMs} ms;请求后 {ElapsedMs:F1} ms", timing.Generation, args.Time, Stopwatch.GetElapsedTime(timing.StartedAt).TotalMilliseconds);
+    }
     public void LogAudioDiagnostics()
     {
         if (_player is null) return;
@@ -154,7 +213,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
         try
         {
             if (_disposed) return; _disposed = true; Interlocked.Increment(ref _generation);
-            if (_player is not null) { _player.EndReached -= OnEnded; _player.EncounteredError -= OnError; _player.Stop(); _player.Media = null; _player.Dispose(); }
+            if (_player is not null) { _player.EndReached -= OnEnded; _player.EncounteredError -= OnError; _player.Playing -= OnPlaying; _player.TimeChanged -= OnTimeChanged; _player.Stop(); _player.Media = null; _player.Dispose(); }
             _vlc?.Dispose(); _player = null; _vlc = null;
         }
         finally { _commands.Release(); }

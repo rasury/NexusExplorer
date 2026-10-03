@@ -163,6 +163,7 @@ public partial class CategoryFilePanel : UserControl
     {
         if (IsControlChrome(e.OriginalSource as DependencyObject)) return;
         if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject)?.DataContext is not FileItem file) return;
+        Log.Information("文件双击播放;文件 {FileId};名称 {FileName}", file.Id, file.FileName);
         e.Handled = true; await RunAsync(() => FileListVm.ActivateFileAsync(file));
     }
     private void OnCategoryTreeContextMenuOpening(object sender, ContextMenuEventArgs e)

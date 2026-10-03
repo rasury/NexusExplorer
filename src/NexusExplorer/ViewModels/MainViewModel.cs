@@ -101,14 +101,18 @@ public partial class MainViewModel : ObservableObject
     }
     private async Task ActivateQueuedAsync(FileItem? file)
     {
+        var timing = Stopwatch.StartNew();
         var version = Interlocked.Increment(ref _activationVersion);
+        Serilog.Log.Information("播放激活开始;请求 {Request};文件 {FileId}", version, file?.Id);
         CurrentFile = file; if (file is not null) Session.SetCurrent(file.Id);
         foreach (var f in CurrentFiles) f.IsCurrent = f.Id == file?.Id;
         var category = file is null ? null : await Categories.GetByIdAsync(file.CategoryId);
         if (version != Interlocked.Read(ref _activationVersion)) return;
         await Navigation.OnCurrentFileChangedAsync(category);
         if (version != Interlocked.Read(ref _activationVersion)) return;
+        Serilog.Log.Information("播放导览就绪;请求 {Request};文件 {FileId};耗时 {ElapsedMs:F1} ms", version, file?.Id, timing.Elapsed.TotalMilliseconds);
         await Player.PlayFileAsync(file);
+        Serilog.Log.Information("播放激活调用结束;请求 {Request};文件 {FileId};耗时 {ElapsedMs:F1} ms", version, file?.Id, timing.Elapsed.TotalMilliseconds);
         if (version == Interlocked.Read(ref _activationVersion)) CurrentFileChanged?.Invoke(file);
     }
     public async Task OnFileRecategorizedAsync() => await OnFilesRecategorizedAsync(CurrentFile is null ? Array.Empty<int>() : new[] { CurrentFile.Id });
