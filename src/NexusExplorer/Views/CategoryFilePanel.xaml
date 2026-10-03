@@ -9,9 +9,8 @@
         <!-- 分类树节点模板 -->
         <HierarchicalDataTemplate DataType="{x:Type models:Category}" ItemsSource="{Binding Children}">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="📁" FontSize="13" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <Path Style="{StaticResource CategoryFolderIcon}" />
                 <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
-                <TextBlock Style="{StaticResource CategoryOrganizationBadge}" />
             </StackPanel>
         </HierarchicalDataTemplate>
 

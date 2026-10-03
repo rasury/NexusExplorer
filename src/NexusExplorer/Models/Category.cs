@@ -32,16 +32,13 @@ public class Category : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
         set
         {
             if (!SetProperty(ref _isOrganized, value)) return;
-            OnPropertyChanged(nameof(OrganizationStatusText));
             OnPropertyChanged(nameof(OrganizationStatusHint));
         }
     }
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
-    public string OrganizationStatusText => IsOrganized ? "✓ 已整理" : "↗ 待整理";
-    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public string OrganizationStatusHint => IsOrganized
-        ? "上次整理全部成功，本分类绑定文件已位于分类目录。软件外部的移动或删除不自动检测。"
-        : "尚未确认，或绑定文件、分类目录已变动；可能有文件位于其他目录。完整整理成功后更新标识。";
+        ? "已整理：上次整理全部成功，本分类绑定文件已位于分类目录。软件外部的移动或删除不自动检测。"
+        : "待整理：尚未确认，或绑定文件、分类目录已变动；可能有文件位于其他目录。完整整理成功后更新标识。";
     public int? DirectoryLocationId { get; set; }
     public DirectoryLocation? Location { get; set; }
 

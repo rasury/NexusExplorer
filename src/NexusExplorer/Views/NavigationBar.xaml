@@ -8,10 +8,10 @@
 
     <UserControl.Resources>
         <DataTemplate x:Key="CategoryNavigationContent" DataType="{x:Type models:Category}">
-            <WrapPanel>
+            <DockPanel>
+                <Path DockPanel.Dock="Left" Style="{StaticResource CategoryFolderIcon}" />
                 <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
-                <TextBlock Style="{StaticResource CategoryOrganizationBadge}" />
-            </WrapPanel>
+            </DockPanel>
         </DataTemplate>
         <!-- 导航分类按钮:点击=导航下钻 -->
         <Style x:Key="NavCategoryButton" TargetType="Button">
