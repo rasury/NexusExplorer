@@ -53,7 +53,7 @@ APNG 使用同一 ImageAnimation 计时、显示和释放流程；.apng 加入�
 
 已移除 WPF 像素缓冲回调。一个 VLC 原生播放器串行执行 Play/Stop/Seek/初始化/退出，Stop 在工作线程同步完成；VLC 回调只向 Dispatcher 投递，旧会话事件按版本丢弃。默认音量 100、速率 1，没有主动启用均衡器或音效。
 
-用户通过 Python 调用同一 VLC 库对比，确认加上 --aout=directsound 后音频完全正常，且与 Music/None 角色无关；并纠正此前反馈，视频音轨同样有破音。正式播放器初始化统一指定 DirectSound，覆盖音频文件与视频音轨，解码、媒体角色、MP4 avformat 与控制顺序保留。最小原生测试确认两种媒体实际选择 directsound 模块，而非只检查参数字符串；更新固定目录后仍需用户听实际文件验收。用户编辑的 Python 实验参数保留，不由此次正式修复重置。
+用户通过 Python 调用同一 VLC 库对比，最初反馈加上 --aout=directsound 后音频正常，且与 Music/None 角色无关；并纠正此前反馈，视频音轨同样有破音。后续更仔细复验发现仍有轻微电流声，用户确认再启用 --audio-resampler=speex_resampler 后实验听感完全正常。正式播放器初始化统一指定 DirectSound＋Speex，覆盖音频文件与视频音轨，解码、媒体角色、MP4 avformat 与控制顺序保留。两项最小原生测试确认两种媒体实际选择 directsound 输出及 speex_resampler 重采样模块，而非只检查参数字符串；正式软件实际听感仍需用户复验。用户编辑的 Python 实验参数保留，不纳入此次正式修复。
 
 音轨按钮可查看、选择实际音轨并记录音轨、声道、采样率、码率与设备。将 Logging.MinimumLevel 改为 Debug 可记录 VLC 模块日志。问题 1～3 的最终根因和实际音质不能由合成素材测试证明，需同文件、同轨、同音量与官方 VLC 比较。
 

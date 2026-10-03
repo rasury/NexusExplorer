@@ -114,4 +114,12 @@
 
 固定目录保护更新输出 artifacts/apng-drag-fixed-update.txt。更新只替换程序、依赖和文档，data/Storage/logs/配置前后快照一致；没有启动主程序或迁移用户数据库，没有运行完整应用测试。
 
+## Speex 重采样修正残余电流声
+
+2026-10-04：用户后续复验发现 DirectSound 尚未完全解决问题，仍有轻微电流声；在同一 Python 实验中再启用 --audio-resampler=speex_resampler 后反馈完全正常。正式 MediaPlayerService 的共用 LibVLC 初始化加入该参数，覆盖音频文件和视频音轨，保留 DirectSound、媒体角色、音量／速度、解码及串行控制。记录的是有效组合，不据此断言默认重采样器的具体缺陷。用户 audio_settings.py 中包括 Speex 在内的个人实验修改保留且不提交。
+
+仅运行原生共享音频路径的两项直接相关检查，2 通过、0 失败、0 跳过，结果 artifacts/speex-tests/speex-related.trx。使用全零 PCM WAV 和带全零音轨的 AVI，确认 VLC 原生日志实际选中 directsound 输出及 speex_resampler 重采样模块，并验证实际解码、音量设置、跳转、暂停恢复及停止后文件独占打开。没有替换输出为 PCM 回调，没有运行完整套件；静音检查不验证真实听感。
+
+运行版本沿用固定目录 artifacts/NexusExplorer-2.0.4-preview-win-x64，通过原有保护脚本更新，仅替换程序、依赖及文档；更新检查输出 artifacts/speex-fixed-update.txt，要求 data/Storage/logs/配置前后快照一致，不启动主程序或执行真实数据库迁移。更新后的实际音频及视频音轨请用户继续听感复验。
+
 本次只核对文档内容、13 个本地 Markdown 链接和 Git 差异，并运行两项直接相关的更新脚本检查：警示文档正确复制，默认/自定义用户数据保持，文件占用时停止替换。结果见 artifacts/sdk-warning-update-tests.txt。检查在独立模拟目录执行，未更新正在运行的真实软件、修改播放器或执行完整应用测试。

@@ -23,7 +23,7 @@ public class VideoPlaybackSmokeTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task DirectSound_IsActuallySelectedForAudioAndVideoAsync(bool video)
+    public async Task DirectSoundAndSpeex_AreActuallySelectedForAudioAndVideoAsync(bool video)
     {
         var path = video
             ? SyntheticMedia.WriteAvi(Path.Combine(_host.RootDir, "silent.avi"), audio: true, silentAudio: true)
@@ -52,6 +52,7 @@ public class VideoPlaybackSmokeTests : IDisposable
                     && media.Statistics.DecodedAudio > 0 && (!video || media.Statistics.DecodedVideo > 0);
             });
             Assert.Contains(messages.Messages, message => message.Contains("using audio output module \"directsound\"", StringComparison.Ordinal));
+            Assert.Contains(messages.Messages, message => message.Contains("using audio resampler module \"speex_resampler\"", StringComparison.Ordinal));
             await engine.SetVolumeAsync(50);
             Assert.Equal(50, engine.NativePlayer!.Volume);
             await engine.SeekAsync(.5f);

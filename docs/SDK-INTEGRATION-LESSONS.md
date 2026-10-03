@@ -10,10 +10,11 @@
 
 - 相同音频在系统播放器和官方 VLC 正常，在 NexusExplorer 中从头到尾破音；调低音量减轻但未消除。用户后来补充，视频音轨也有破音。
 - 前期截获的前十秒解码 PCM 与独立解码器结果接近，未发现削波。但该回调替代了系统输出，未验证真正听到的声音。
-- 用户使用 Python 直接加载软件目录内同一份 LibVLC，单独实验参数，确认启用 `--aout=directsound` 后完全正常，并确认与 Music/None 角色无关。
+- 用户使用 Python 直接加载软件目录内同一份 LibVLC，单独实验参数，最初报告启用 `--aout=directsound` 后完全正常，并确认与 Music/None 角色无关。后续更仔细复验发现仍有轻微电流声，用户确认再启用 `--audio-resampler=speex_resampler` 后实验听感完全正常。
 - 正式播放器随后为音频与视频统一选择 DirectSound。两项最小原生测试验证实际选中该模块，且解码、音量、跳转、暂停恢复和停止释放正常。正式应用的实际听感另行验收。
+- 收到残余电流声反馈后，正式播放器共用初始化再显式选择 Speex 重采样。两项直接相关检查确认音频与视频音轨均实际选择 directsound 和 speex_resampler；素材静音，仅验证模块、播放控制与资源释放，不能替代真实文件听感。
 
-这些证据支持更换音频输出路径。它们还没有定位 MMDevice/WASAPI、格式协商、驱动或其他内部环节中的具体缺陷，也不能证明“为了兼容 Win7/XP 留下的参数”就是本次原因。DirectSound 是本项目当前经过用户对比的方案，不是其他项目和 SDK 的通用答案。
+这些证据支持本项目采用 DirectSound＋Speex 的组合。它们还没有定位默认重采样器、MMDevice/WASAPI、格式协商、驱动或其他内部环节中的具体缺陷，也不能证明“为了兼容 Win7/XP 留下的参数”就是本次原因。这是本项目当前经过用户对比的方案，不是其他项目和 SDK 的通用答案；初次认为正常后仍发现残余噪声，也说明最终质量需要持续复验。
 
 相关证据：[验证记录](VERIFICATION.md)、[可编辑音频实验](../tools/AudioLab/README.md)、[正式播放实现](../src/NexusExplorer/Services/MediaPlayerService.cs)。
 
