@@ -43,6 +43,7 @@ dotnet test NexusExplorer.sln -c Release --no-restore --filter "FullyQualifiedNa
 
 ## 资料
 
+- [用户可见文案清单（含可编辑 Excel）](docs/USER-VISIBLE-TEXT.md)
 - [重构评估与实现说明](docs/REFACTOR.md)
 - [18 项验收步骤](docs/ACCEPTANCE.md)
 - [2.0.1 第一轮反馈修正与验证](docs/FEEDBACK-2.0.1.md)
