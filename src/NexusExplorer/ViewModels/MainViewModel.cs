@@ -37,7 +37,8 @@ public partial class MainViewModel : ObservableObject
         Task StopOnUiAsync(IReadOnlyCollection<string> paths) => Infrastructure.UiDispatch.RunAsync(uiContext, () => StopForPathsAsync(paths));
         categories.BeforePhysicalOperationAsync = StopOnUiAsync;
         files.BeforePhysicalOperationAsync = StopOnUiAsync;
-        organization.BeforePhysicalOperationAsync = StopOnUiAsync;
+        organization.BeforePhysicalOperationAsync = paths => Infrastructure.UiDispatch.RunAsync(uiContext, async () =>
+        { await RefreshOrganizationStatesAsync(); await StopForPathsAsync(paths); });
     }
     public async Task SelectCategoryAsync(Category? category)
     {
@@ -64,6 +65,14 @@ public partial class MainViewModel : ObservableObject
         }
         await Navigation.RefreshAfterTreeChangeAsync();
         CategoryTreeChanged?.Invoke();
+    }
+    public async Task RefreshOrganizationStatesAsync()
+    {
+        var states = await Categories.GetOrganizationStatesAsync();
+        var visible = Category.FlatCategories.Concat(Navigation.Breadcrumb).Concat(Navigation.Children)
+            .Concat(Navigation.PinnedCategories).Concat(new[] { CurrentCategory, Navigation.SelectedCategory }.OfType<Category>());
+        foreach (var category in visible)
+            if (states.TryGetValue(category.Id, out var organized)) category.IsOrganized = organized;
     }
     public async Task SelectFileAsync(FileItem? file)
     {
@@ -99,6 +108,7 @@ public partial class MainViewModel : ObservableObject
             var file = await Files.GetByIdAsync(playingId);
             if (version == Interlocked.Read(ref _activationVersion)) CurrentFile = file;
         }
+        await RefreshOrganizationStatesAsync();
         await RefreshFilesAsync();
         if (advance && version == Interlocked.Read(ref _activationVersion) && !await PlayAdjacentAsync(1, classification: true)) await ActivateQueuedAsync(null);
     }

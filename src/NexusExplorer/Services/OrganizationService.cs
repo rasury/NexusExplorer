@@ -82,10 +82,13 @@ public class OrganizationService
         var ids = new HashSet<int>(); var stack = new Stack<int>(); stack.Push(categoryId);
         while (stack.TryPop(out var id))
         { if (!ids.Add(id)) throw new OperationException("分类结构存在循环。"); foreach (var child in categories.Where(c => c.ParentId == id)) stack.Push(child.Id); }
+        // Persist uncertainty before any work, so cancellation, failure or process exit
+        // cannot leave a previous green badge on an incomplete organization task.
+        await db.Categories.Where(c => ids.Contains(c.Id)).ExecuteUpdateAsync(s => s.SetProperty(c => c.IsOrganized, false));
         var files = await db.Files.Where(f => ids.Contains(f.CategoryId)).OrderBy(f => f.CategoryId).ThenBy(f => f.FileName).ThenBy(f => f.Id).ToListAsync();
         await LocationService.ResolveAsync(db, files: files);
         if (BeforePhysicalOperationAsync is not null) await BeforePhysicalOperationAsync(files.Select(f => f.AbsolutePath).ToList());
-        var results = new List<OrganizeFileResult>();
+        var results = new List<OrganizeFileResult>(); var stoppedByConflict = false;
         foreach (var file in files)
         {
             if (cancellationToken.IsCancellationRequested) break;
@@ -100,7 +103,7 @@ public class OrganizationService
                 if (File.Exists(target))
                 {
                     resolution = conflictHandler is null ? ConflictResolution.Skip : await conflictHandler(file.FileName, target);
-                    if (resolution == ConflictResolution.Ask) break;
+                    if (resolution == ConflictResolution.Ask) { stoppedByConflict = true; break; }
                     if (resolution == ConflictResolution.Skip)
                     {
                         // Skip physical movement, but use the category's existing file.
@@ -115,6 +118,8 @@ public class OrganizationService
             catch (Exception ex) { Log.Error(ex, "整理文件失败 {Path}", source); results.Add(OrganizeFileResult.Failed(file.FileName, source, ex.Message)); }
             finally { progress?.Report(new OrganizeProgress(results.Count, files.Count, file.FileName)); }
         }
+        if (!stoppedByConflict && !cancellationToken.IsCancellationRequested && results.Count == files.Count && results.All(r => r.Success))
+            await db.Categories.Where(c => ids.Contains(c.Id)).ExecuteUpdateAsync(s => s.SetProperty(c => c.IsOrganized, true));
         Log.Information("递归整理完成 {CategoryId}:已处理 {Count}/{Total}", categoryId, results.Count, files.Count);
         return results;
     }

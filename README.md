@@ -11,6 +11,7 @@ Windows x64 分类文件管理与媒体查看软件，保留 WPF、SQLite、EF C
 - 分类可重命名、移动、拖回顶层、重新定位与迁移目录。重新定位只重绑定已有目录；迁移搬整个物理目录。
 - 删除分类只回收该子树所属的已登记文件，保留其他分类文件、未登记文件及非空目录。
 - 快捷分类自动换行，可跨行拖动排序，顺序独立保存。
+- 分类树和快捷分类显示整理状态：橙色“↗ 待整理”表示尚未确认或数据已变动，绿色“✓ 已整理”表示上次完整整理成功。状态持久保存，显示时不遍历绑定文件地址。
 - 视频由 VLC 原生窗口输出，控制条在画面下方。默认硬件解码，可关闭并重新打开媒体；选项保存到配置。
 - 图片默认适合窗口，支持缩放、平移、原始尺寸与前后切换。
 
@@ -22,7 +23,7 @@ Windows x64 分类文件管理与媒体查看软件，保留 WPF、SQLite、EF C
 dotnet restore NexusExplorer.sln -r win-x64
 dotnet build NexusExplorer.sln -c Release --no-restore
 dotnet test NexusExplorer.sln -c Release --no-restore
-dotnet publish src/NexusExplorer/NexusExplorer.csproj -c Release -r win-x64 --self-contained true --no-restore -o artifacts/NexusExplorer-2.0-preview-win-x64
+dotnet publish src/NexusExplorer/NexusExplorer.csproj -c Release -r win-x64 --self-contained true --no-restore -o artifacts/NexusExplorer-2.0.2-preview-win-x64
 ```
 
 发布到新版本目录，保留旧软件的配置、数据库、日志与 Storage。禁止清空或覆盖旧运行目录。便携包含自包含 EXE、WPF/SQLite 原生 DLL 与完整 libvlc/win-x64 插件目录，须保留整个目录。
@@ -39,6 +40,7 @@ dotnet publish src/NexusExplorer/NexusExplorer.csproj -c Release -r win-x64 --se
 - [重构评估与实现说明](docs/REFACTOR.md)
 - [18 项验收步骤](docs/ACCEPTANCE.md)
 - [2.0.1 第一轮反馈修正与验证](docs/FEEDBACK-2.0.1.md)
+- [2.0.2 分类整理状态与验收](docs/ORGANIZATION-STATUS-2.0.2.md)
 - [构建、旧库与真实媒体验证记录](docs/VERIFICATION.md)
 - [当前移交说明](HANDOVER.md)
 - 第一版开发文档保留为历史需求；本次明确要求和已确认行为优先。

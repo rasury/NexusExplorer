@@ -8,7 +8,7 @@ namespace NexusExplorer.Data;
 /// <summary>Versioned, transactional adoption of the original EnsureCreated database.</summary>
 public static class DatabaseInitializer
 {
-    public const int SchemaVersion = 2;
+    public const int SchemaVersion = 3;
     public static async Task InitializeAsync(AppDbContext db, string path)
     {
         var connection = (SqliteConnection)db.Database.GetDbConnection();
@@ -20,7 +20,7 @@ public static class DatabaseInitializer
         var count = Convert.ToInt64(await query.ExecuteScalarAsync());
         if (version >= SchemaVersion || count == 0) { await InitializeCoreAsync(db, path); return; }
 
-        var backupPath = path + ".before-v2-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + "-" + Guid.NewGuid().ToString("N") + ".bak";
+        var backupPath = path + $".before-v{SchemaVersion}-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + "-" + Guid.NewGuid().ToString("N") + ".bak";
         var workingPath = path + ".upgrade-" + Guid.NewGuid().ToString("N");
         using (var backup = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = backupPath, Pooling = false }.ToString()))
         { backup.Open(); connection.BackupDatabase(backup); }
@@ -58,6 +58,7 @@ public static class DatabaseInitializer
         if (count == 0)
         {
             await db.Database.EnsureCreatedAsync();
+            await InstallOrganizationTriggersAsync(db);
             await db.Database.ExecuteSqlRawAsync($"PRAGMA user_version = {SchemaVersion}");
             return;
         }
@@ -79,6 +80,7 @@ public static class DatabaseInitializer
             ("Categories", categoryColumns, "IsPinned", "INTEGER NOT NULL DEFAULT 0"),
             ("Categories", categoryColumns, "PinnedOrder", "INTEGER NOT NULL DEFAULT 0"),
             ("Categories", categoryColumns, "DirectoryLocationId", "INTEGER NULL"),
+            ("Categories", categoryColumns, "IsOrganized", "INTEGER NOT NULL DEFAULT 0"),
             ("Files", fileColumns, "DirectoryLocationId", "INTEGER NULL"),
             ("Files", fileColumns, "RelativePath", "TEXT NULL"),
             ("Files", fileColumns, "ExternalAbsolutePath", "TEXT NULL")
@@ -92,11 +94,37 @@ public static class DatabaseInitializer
         await db.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS DirectoryLocations (Id INTEGER PRIMARY KEY AUTOINCREMENT, ParentId INTEGER NULL REFERENCES DirectoryLocations(Id), Segment TEXT NOT NULL, RootPath TEXT NULL)");
         await db.Database.ExecuteSqlRawAsync("CREATE TABLE IF NOT EXISTS FileOperations (Id INTEGER PRIMARY KEY AUTOINCREMENT, Kind TEXT NOT NULL, FileId INTEGER NULL, Source TEXT NOT NULL, Target TEXT NOT NULL, Backup TEXT NULL, State TEXT NOT NULL, Error TEXT NULL, Payload TEXT NULL, Digest TEXT NULL, CreatedAt TEXT NOT NULL)");
         await db.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_Files_PathNoCase ON Files (AbsolutePath COLLATE NOCASE)");
-        await LocationService.InitializeLegacyLocationsAsync(db);
-        var pinned = await db.Categories.Where(c => c.IsPinned).OrderBy(c => c.SortOrder).ThenBy(c => c.Id).ToListAsync();
-        for (var i = 0; i < pinned.Count; i++) pinned[i].PinnedOrder = i + 1;
-        await db.SaveChangesAsync();
+        if (version < 2)
+        {
+            await LocationService.InitializeLegacyLocationsAsync(db);
+            var pinned = await db.Categories.Where(c => c.IsPinned).OrderBy(c => c.SortOrder).ThenBy(c => c.Id).ToListAsync();
+            for (var i = 0; i < pinned.Count; i++) pinned[i].PinnedOrder = i + 1;
+            await db.SaveChangesAsync();
+        }
+        await InstallOrganizationTriggersAsync(db);
         await db.Database.ExecuteSqlRawAsync($"PRAGMA user_version = {SchemaVersion}");
         await transaction.CommitAsync();
+    }
+
+    private static async Task InstallOrganizationTriggersAsync(AppDbContext db)
+    {
+        // Invalidate by category primary key in the same transaction as the mutation.
+        // No bound-file query or filesystem check is needed to display this state.
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TRIGGER IF NOT EXISTS OrganizationFileInsert AFTER INSERT ON Files
+            BEGIN UPDATE Categories SET IsOrganized = 0 WHERE Id = NEW.CategoryId AND IsOrganized <> 0; END;
+            CREATE TRIGGER IF NOT EXISTS OrganizationFileUpdate AFTER UPDATE ON Files
+            BEGIN UPDATE Categories SET IsOrganized = 0 WHERE Id IN (OLD.CategoryId, NEW.CategoryId) AND IsOrganized <> 0; END;
+            CREATE TRIGGER IF NOT EXISTS OrganizationFileDelete AFTER DELETE ON Files
+            BEGIN UPDATE Categories SET IsOrganized = 0 WHERE Id = OLD.CategoryId AND IsOrganized <> 0; END;
+            CREATE TRIGGER IF NOT EXISTS OrganizationCategoryInsert AFTER INSERT ON Categories
+            BEGIN UPDATE Categories SET IsOrganized = 0 WHERE Id = NEW.ParentId AND IsOrganized <> 0; END;
+            CREATE TRIGGER IF NOT EXISTS OrganizationCategoryDelete AFTER DELETE ON Categories
+            BEGIN UPDATE Categories SET IsOrganized = 0 WHERE Id = OLD.ParentId AND IsOrganized <> 0; END;
+            CREATE TRIGGER IF NOT EXISTS OrganizationCategoryUpdate AFTER UPDATE OF Name, ParentId, PhysicalPath, DirectoryLocationId ON Categories
+            WHEN OLD.Name IS NOT NEW.Name OR OLD.ParentId IS NOT NEW.ParentId
+              OR OLD.PhysicalPath IS NOT NEW.PhysicalPath OR OLD.DirectoryLocationId IS NOT NEW.DirectoryLocationId
+            BEGIN UPDATE Categories SET IsOrganized = 0 WHERE Id IN (NEW.Id, OLD.ParentId, NEW.ParentId) AND IsOrganized <> 0; END;
+            """);
     }
 }

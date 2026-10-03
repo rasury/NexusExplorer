@@ -7,6 +7,12 @@
              BorderThickness="0,1,0,0">
 
     <UserControl.Resources>
+        <DataTemplate x:Key="CategoryNavigationContent" DataType="{x:Type models:Category}">
+            <WrapPanel>
+                <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <TextBlock Style="{StaticResource CategoryOrganizationBadge}" />
+            </WrapPanel>
+        </DataTemplate>
         <!-- 导航分类按钮:点击=导航下钻 -->
         <Style x:Key="NavCategoryButton" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource BrushAccentBlueLight}" />
@@ -138,7 +144,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:Category}">
                                 <StackPanel Orientation="Horizontal">
-                                    <Button Content="{Binding Name}"
+                                    <Button Content="{Binding}" ContentTemplate="{StaticResource CategoryNavigationContent}"
                                             Style="{StaticResource NavCategoryButton}"
                                             Click="OnBreadcrumbClick"
                                             Tag="{Binding}" />
@@ -167,7 +173,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:Category}">
-                                <Button Content="{Binding Name}"
+                                <Button Content="{Binding}" ContentTemplate="{StaticResource CategoryNavigationContent}"
                                         Style="{StaticResource NavCategoryButton}"
                                         Click="OnCategoryClick"
                                         Tag="{Binding}" />
@@ -220,7 +226,8 @@
                                     Click="OnPinnedClick"
                                     Tag="{Binding}"
                                     ToolTip="点击选中此分类,然后按 ✔ 归类">
-                                <Button.Content><TextBlock Text="{Binding Name}" TextWrapping="Wrap" /></Button.Content>
+                                <Button.ContentTemplate><StaticResource ResourceKey="CategoryNavigationContent" /></Button.ContentTemplate>
+                                <Button.Content><Binding /></Button.Content>
                                 <Button.ContextMenu>
                                     <ContextMenu>
                                         <MenuItem Header="✖ 取消钉住" Click="OnUnpinCategory" />

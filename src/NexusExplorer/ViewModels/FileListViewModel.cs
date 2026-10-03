@@ -78,6 +78,7 @@ public partial class FileListViewModel : ObservableObject
         if (paths.Count == 0) return;
 
         var result = await _fileService.AddRangeAsync(paths, _main.CurrentCategory.Id);
+        await _main.RefreshOrganizationStatesAsync();
         await _main.RefreshFilesAsync();
         ReportBatchResult(result);
     }
@@ -154,6 +155,7 @@ public partial class FileListViewModel : ObservableObject
         try
         {
             await _fileService.RelocateAsync(file.Id, newPath);
+            await _main.RefreshOrganizationStatesAsync();
             await _main.RefreshFilesAsync();
             ShowInfo?.Invoke($"已重新定位「{file.FileName}」。");
         }
@@ -195,6 +197,7 @@ public partial class FileListViewModel : ObservableObject
             }
             catch (Exception ex) { failures.Add($"{file.FileName}: {ex.Message}"); Serilog.Log.Error(ex, "批量文件操作失败"); }
         }
+        await _main.RefreshOrganizationStatesAsync();
         await _main.RefreshFilesAsync();
         if (failures.Count > 0) ShowError?.Invoke($"成功 {succeeded}，失败 {failures.Count}\n" + string.Join("\n", failures));
     }

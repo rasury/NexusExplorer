@@ -29,7 +29,7 @@ public sealed class TestHost : IDisposable
         DbFactory = new NexusExplorer.Infrastructure.DbContextFactoryStub(dbPath);
 
         using (var db = DbFactory.CreateDbContext())
-            db.Database.EnsureCreated();
+            DatabaseInitializer.InitializeAsync(db, dbPath).GetAwaiter().GetResult();
 
         Categories = new CategoryService(DbFactory) { StorageRoot = StorageRoot };
         Files = new FileService(DbFactory);

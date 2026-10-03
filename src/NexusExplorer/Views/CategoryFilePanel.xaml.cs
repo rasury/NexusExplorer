@@ -202,7 +202,8 @@ public partial class CategoryFilePanel : UserControl
     private async Task OrganizeAsync()
     {
         var category = _main.CurrentCategory; if (category is null || _organizing is not null) return;
-        _organizing = new(); CancelOrganizeButton.Visibility = Visibility.Visible; _organizeCommand?.NotifyCanExecuteChanged();
+        _organizing = new(); var statusRefreshed = false;
+        CancelOrganizeButton.Visibility = Visibility.Visible; _organizeCommand?.NotifyCanExecuteChanged();
         try
         {
             Dialogs.ConflictDecision? policy = null; var cancelledByDialog = false;
@@ -214,12 +215,17 @@ public partial class CategoryFilePanel : UserControl
                 if (decision.ApplyToAll && decision.Resolution != ConflictResolution.Ask) policy = decision;
                 return Task.FromResult(decision.Resolution);
             }, _organizing.Token, progress);
+            await _main.RefreshOrganizationStatesAsync(); statusRefreshed = true;
             await _main.RefreshFilesAsync();
             OperationStatus.Text = _organizing.IsCancellationRequested || cancelledByDialog ? $"整理已取消，已处理 {result.Count} 项" : $"整理完成，已处理 {result.Count} 项";
             if (!_shuttingDown) Dialogs.OrganizeResultDialog.Show(category.Name, result);
         }
         catch (Exception ex) { Log.Error(ex, "整理失败"); ShowError(ex.Message); OperationStatus.Text = "整理失败，请查看日志"; }
-        finally { _organizing.Dispose(); _organizing = null; CancelOrganizeButton.Visibility = Visibility.Collapsed; _organizeCommand?.NotifyCanExecuteChanged(); }
+        finally
+        {
+            _organizing.Dispose(); _organizing = null; CancelOrganizeButton.Visibility = Visibility.Collapsed; _organizeCommand?.NotifyCanExecuteChanged();
+            if (!statusRefreshed) await _main.RefreshOrganizationStatesAsync();
+        }
     }
     private void OnCancelOrganize(object sender, RoutedEventArgs e) => _organizing?.Cancel();
     private void OnFilesDragOver(object sender, DragEventArgs e)

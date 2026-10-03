@@ -21,6 +21,11 @@ public sealed class CategoryService
         await LocationService.ResolveAsync(db, categories: all); return all;
     }
     public Task<List<Category>> GetTreeAsync() => Task.Run(() => GetTreeAsyncCore());
+    public Task<Dictionary<int, bool>> GetOrganizationStatesAsync() => Task.Run(async () =>
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        return await db.Categories.AsNoTracking().Select(c => new { c.Id, c.IsOrganized }).ToDictionaryAsync(c => c.Id, c => c.IsOrganized);
+    });
     private async Task<List<Category>> GetTreeAsyncCore()
     {
         await using var db = await _factory.CreateDbContextAsync(); var all = await AllAsync(db);

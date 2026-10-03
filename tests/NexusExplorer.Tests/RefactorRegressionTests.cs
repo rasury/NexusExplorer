@@ -292,9 +292,9 @@ public sealed class RefactorRegressionTests : IDisposable
         Assert.NotNull(adopted.DirectoryLocationId);
         await categories.RenameAsync(10, "Renamed");
         Assert.True((await files.GetByIdAsync(77))!.ExistsOnDisk);
-        Assert.Single(Directory.GetFiles(_host.RootDir, "legacy.db.before-v2-*.bak"));
+        Assert.Single(Directory.GetFiles(_host.RootDir, $"legacy.db.before-v{DatabaseInitializer.SchemaVersion}-*.bak"));
         await using (var db = factory.CreateDbContext()) await DatabaseInitializer.InitializeAsync(db, path);
-        Assert.Single(Directory.GetFiles(_host.RootDir, "legacy.db.before-v2-*.bak"));
+        Assert.Single(Directory.GetFiles(_host.RootDir, $"legacy.db.before-v{DatabaseInitializer.SchemaVersion}-*.bak"));
     }
 
     [Fact]
