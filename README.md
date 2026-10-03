@@ -38,6 +38,7 @@ dotnet publish src/NexusExplorer/NexusExplorer.csproj -c Release -r win-x64 --se
 
 - [重构评估与实现说明](docs/REFACTOR.md)
 - [18 项验收步骤](docs/ACCEPTANCE.md)
+- [2.0.1 第一轮反馈修正与验证](docs/FEEDBACK-2.0.1.md)
 - [构建、旧库与真实媒体验证记录](docs/VERIFICATION.md)
 - [当前移交说明](HANDOVER.md)
 - 第一版开发文档保留为历史需求；本次明确要求和已确认行为优先。

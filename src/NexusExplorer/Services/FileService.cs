@@ -22,7 +22,8 @@ public class FileService
 
     // ---------- 查询 ----------
 
-    public async Task<List<FileItem>> GetByCategoryAsync(int categoryId)
+    public Task<List<FileItem>> GetByCategoryAsync(int categoryId) => Task.Run(() => GetByCategoryAsyncCore(categoryId));
+    private async Task<List<FileItem>> GetByCategoryAsyncCore(int categoryId)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
         var files = await db.Files
@@ -34,7 +35,8 @@ public class FileService
         return files;
     }
 
-    public async Task<FileItem?> GetByIdAsync(int id)
+    public Task<FileItem?> GetByIdAsync(int id) => Task.Run(() => GetByIdAsyncCore(id));
+    private async Task<FileItem?> GetByIdAsyncCore(int id)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
         var file = await db.Files.AsNoTracking().FirstOrDefaultAsync(f => f.Id == id);
@@ -43,7 +45,8 @@ public class FileService
     }
 
     /// <summary>检查绝对路径是否已在数据库中(同一文件只允许属于一个分类)。</summary>
-    public async Task<FileItem?> FindByPathAsync(string absolutePath)
+    public Task<FileItem?> FindByPathAsync(string absolutePath) => Task.Run(() => FindByPathAsyncCore(absolutePath));
+    private async Task<FileItem?> FindByPathAsyncCore(string absolutePath)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
         var normalized = LocationService.Normalize(absolutePath);
@@ -58,7 +61,8 @@ public class FileService
     /// 添加文件到分类。只写数据库,不移动物理文件。
     /// 若同一绝对路径已存在记录,则视为重新归类(更新 CategoryId)。
     /// </summary>
-    public async Task<FileItem> AddAsync(string absolutePath, int categoryId)
+    public Task<FileItem> AddAsync(string absolutePath, int categoryId) => Task.Run(() => AddAsyncCore(absolutePath, categoryId));
+    private async Task<FileItem> AddAsyncCore(string absolutePath, int categoryId)
     {
         using var lease = await MutationGate.AcquireAsync(_dbFactory);
         if (!File.Exists(absolutePath))
@@ -99,7 +103,8 @@ public class FileService
     }
 
     /// <summary>添加多个文件(拖入/多选)。逐个处理,失败的记入结果。</summary>
-    public async Task<BatchAddResult> AddRangeAsync(IEnumerable<string> paths, int categoryId)
+    public Task<BatchAddResult> AddRangeAsync(IEnumerable<string> paths, int categoryId) => Task.Run(() => AddRangeAsyncCore(paths, categoryId));
+    private async Task<BatchAddResult> AddRangeAsyncCore(IEnumerable<string> paths, int categoryId)
     {
         var result = new BatchAddResult();
         foreach (var path in paths)
@@ -123,7 +128,8 @@ public class FileService
     /// (文件夹本身 → 同名子分类,子文件夹 → 再下一层,依此类推),
     /// 每个文件登记到其所在目录对应的分类。不移动任何物理文件。
     /// </summary>
-    public async Task<BatchAddResult> ImportDirectoryAsync(string directory, int categoryId, CategoryService categoryService)
+    public Task<BatchAddResult> ImportDirectoryAsync(string directory, int categoryId, CategoryService categoryService) => Task.Run(() => ImportDirectoryAsyncCore(directory, categoryId, categoryService));
+    private async Task<BatchAddResult> ImportDirectoryAsyncCore(string directory, int categoryId, CategoryService categoryService)
     {
         if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
             throw new OperationException("不递归导入目录联接点或符号链接。");
@@ -174,7 +180,8 @@ public class FileService
     // ---------- 重新分类 ----------
 
     /// <summary>修改文件所属分类。物理文件不动,待整理时移动。</summary>
-    public async Task RecategorizeAsync(int fileId, int targetCategoryId)
+    public Task RecategorizeAsync(int fileId, int targetCategoryId) => Task.Run(() => RecategorizeAsyncCore(fileId, targetCategoryId));
+    private async Task RecategorizeAsyncCore(int fileId, int targetCategoryId)
     {
         using var lease = await MutationGate.AcquireAsync(_dbFactory);
         await using var db = await _dbFactory.CreateDbContextAsync();
@@ -198,7 +205,8 @@ public class FileService
     // ---------- 重新定位 ----------
 
     /// <summary>外部移动/改名导致文件失效时,由用户手动指定新位置。</summary>
-    public async Task RelocateAsync(int fileId, string newAbsolutePath)
+    public Task RelocateAsync(int fileId, string newAbsolutePath) => Task.Run(() => RelocateAsyncCore(fileId, newAbsolutePath));
+    private async Task RelocateAsyncCore(int fileId, string newAbsolutePath)
     {
         using var lease = await MutationGate.AcquireAsync(_dbFactory);
         if (!File.Exists(newAbsolutePath))
@@ -227,7 +235,8 @@ public class FileService
     // ---------- 失效检测 ----------
 
     /// <summary>检测某分类下失效的文件。</summary>
-    public async Task<List<FileItem>> GetMissingFilesAsync(int categoryId)
+    public Task<List<FileItem>> GetMissingFilesAsync(int categoryId) => Task.Run(() => GetMissingFilesAsyncCore(categoryId));
+    private async Task<List<FileItem>> GetMissingFilesAsyncCore(int categoryId)
     {
         var files = await GetByCategoryAsync(categoryId);
         return files.Where(f => !f.ExistsOnDisk).ToList();
@@ -239,7 +248,8 @@ public class FileService
     /// 移除文件:只删数据库记录,磁盘上的源文件保持原位不动,
     /// 也不进回收站。用于"不想再管理这个文件但保留文件本身"。
     /// </summary>
-    public async Task RemoveAsync(int fileId)
+    public Task RemoveAsync(int fileId) => Task.Run(() => RemoveAsyncCore(fileId));
+    private async Task RemoveAsyncCore(int fileId)
     {
         using var lease = await MutationGate.AcquireAsync(_dbFactory);
         await using var db = await _dbFactory.CreateDbContextAsync();
@@ -252,7 +262,8 @@ public class FileService
     }
 
     /// <summary>删除文件:确认后送回收站,再删数据库记录。</summary>
-    public async Task DeleteAsync(int fileId, IRecycleBinService recycleBin)
+    public Task DeleteAsync(int fileId, IRecycleBinService recycleBin) => Task.Run(() => DeleteAsyncCore(fileId, recycleBin));
+    private async Task DeleteAsyncCore(int fileId, IRecycleBinService recycleBin)
     {
         using var lease = await MutationGate.AcquireAsync(_dbFactory);
         var file = await GetByIdAsync(fileId) ?? throw new OperationException("文件不存在。");

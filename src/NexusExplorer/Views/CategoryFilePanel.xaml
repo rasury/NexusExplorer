@@ -57,21 +57,22 @@
                         Content="＋ 新建分类"
                         Padding="10,6"
                         Command="{Binding CategoryVmBinding.CreateRootCommand}"
-                        Margin="0,0,6,0" />
+                        Margin="0,0,6,6" />
                 <Button Style="{StaticResource ButtonGhost}"
                         Content="添加文件"
                         Padding="10,6"
                         Command="{Binding FileListVmBinding.AddFilesCommand}"
-                        Margin="0,0,6,0" />
+                        Margin="0,0,6,6" />
                 <Button Style="{StaticResource ButtonGhost}"
                         Content="添加文件夹"
                         Padding="10,6"
                         Command="{Binding FileListVmBinding.AddFolderCommand}"
-                        Margin="0,0,6,0" />
+                        Margin="0,0,6,6" />
                 <Button Style="{StaticResource ButtonSecondary}"
                         Content="⚡ 整理"
                         Padding="10,6"
                         Command="{Binding OrganizeCommand}"
+                        Margin="0,0,6,6"
                          ToolTip="整理当前打开分类及全部子分类" />
             </WrapPanel>
             <DockPanel Margin="0,4,0,0">

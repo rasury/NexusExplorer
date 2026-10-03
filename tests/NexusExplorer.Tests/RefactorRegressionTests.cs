@@ -147,9 +147,10 @@ public sealed class RefactorRegressionTests : IDisposable
         { Fault = stage => stage == faultStage ? Task.FromException(new IOException("injected")) : Task.CompletedTask };
         var service = new CategoryService(_host.DbFactory, executor) { StorageRoot = _host.StorageRoot };
         var a = await service.CreateAsync("A", null); var path = Path.Combine(a.PhysicalPath, "user.txt"); File.WriteAllText(path, "USER");
-        await Assert.ThrowsAsync<IOException>(() => service.RenameAsync(a.Id, "B"));
+        var parent = Path.Combine(_host.RootDir, "migration"); Directory.CreateDirectory(parent);
+        await Assert.ThrowsAsync<IOException>(() => service.MigrateDirectoryAsync(a.Id, parent));
         Assert.Equal("USER", File.ReadAllText(path)); Assert.Equal(a.PhysicalPath, (await service.GetByIdAsync(a.Id))!.PhysicalPath);
-        Assert.False(Directory.Exists(Path.Combine(_host.StorageRoot, "B")));
+        Assert.False(Directory.Exists(Path.Combine(parent, "A")));
         Assert.Empty(await executor.RecoverAsync());
     }
 

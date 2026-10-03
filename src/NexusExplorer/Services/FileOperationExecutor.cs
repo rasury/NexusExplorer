@@ -136,7 +136,7 @@ public sealed class FileOperationExecutor
     public record Manifest(string RelativePath, string Digest);
     public record DirectoryPayload(string Stage, List<Manifest> Files, List<string> Directories);
 
-    public async Task ChangeDirectoryAsync(string source, string target, bool relocateOnly, Func<AppDbContext, Task> commit)
+    public async Task ChangeDirectoryAsync(string source, string target, bool relocateOnly, Func<AppDbContext, Task> commit, bool preferRename = false)
     {
         source = LocationService.Normalize(source); target = LocationService.Normalize(target);
         if (string.Equals(source, target, StringComparison.OrdinalIgnoreCase))
@@ -146,6 +146,8 @@ public sealed class FileOperationExecutor
         if (relocateOnly && !Directory.Exists(target)) throw new OperationException("目标目录不存在。");
         if (!relocateOnly && (!Directory.Exists(source) || Directory.Exists(target)))
             throw new OperationException("源目录不存在或目标目录已存在。");
+        if (!relocateOnly && preferRename && Infrastructure.WindowsVolume.SameVolume(source, target))
+        { await RenameDirectoryAsync(source, target, commit); return; }
         var stage = target + ".nexus-stage-" + Guid.NewGuid().ToString("N");
         var manifest = new List<Manifest>(); var dirs = new List<string>();
         if (!relocateOnly)
@@ -200,6 +202,53 @@ public sealed class FileOperationExecutor
             }
             operation.Error = ex.Message; await db.SaveChangesAsync(); throw;
         }
+    }
+    private async Task RenameDirectoryAsync(string source, string target, Func<AppDbContext, Task> commit)
+    {
+        // Enumerate links, never read/hash/copy file contents on this same-volume path.
+        var pending = new Stack<string>(); pending.Push(source);
+        while (pending.TryPop(out var directory))
+        {
+            RejectLink(directory);
+            foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+            { RejectLink(entry); if (Directory.Exists(entry)) pending.Push(entry); }
+        }
+        await using var db = await _factory.CreateDbContextAsync(); await EnsureReadyAsync(db);
+        var operation = new FileOperation { Kind = "DirectoryRename", Source = source, Target = target };
+        db.FileOperations.Add(operation); await db.SaveChangesAsync();
+        var committed = false;
+        var renamed = false;
+        try
+        {
+            operation.State = "Promoting"; await db.SaveChangesAsync();
+            await ProbeAsync("BeforeRename");
+            Directory.Move(source, target); renamed = true;
+            await ProbeAsync("Promoted");
+            await commit(db); operation.State = "Committed";
+            await ProbeAsync("BeforeCommit"); await db.SaveChangesAsync(); committed = true;
+            await ProbeAsync("Committed");
+            operation.State = "Completed"; await db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            db.ChangeTracker.Clear(); operation = await db.FileOperations.FirstAsync(o => o.Id == operation.Id);
+            if (!committed)
+            {
+                try { if (renamed) RestoreRenamedDirectory(operation); operation.State = "Failed"; }
+                catch (Exception rollback) { operation.State = "RecoveryRequired"; Log.Error(rollback, "目录直接移动补偿失败"); }
+            }
+            operation.Error = ex.Message; await db.SaveChangesAsync(); throw;
+        }
+    }
+    private static void RestoreRenamedDirectory(FileOperation operation)
+    {
+        if (Directory.Exists(operation.Source))
+        {
+            if (Directory.Exists(operation.Target)) throw new IOException("源和目标目录均存在，保留现场等待检查。");
+            return;
+        }
+        if (!Directory.Exists(operation.Target)) throw new IOException("源和目标目录均不存在，无法恢复。");
+        Directory.Move(operation.Target, operation.Source);
     }
     private static async Task RemoveManifestAsync(string root, DirectoryPayload payload)
     {
@@ -279,6 +328,18 @@ public sealed class FileOperationExecutor
                     {
                         var file = await db.Files.FirstOrDefaultAsync(f => f.Id == operation.FileId);
                         if (file is not null) db.Files.Remove(file); operation.State = "Completed";
+                    }
+                }
+                else if (operation.Kind == "DirectoryRename")
+                {
+                    if (operation.State == "Committed")
+                    {
+                        if (!Directory.Exists(operation.Target)) throw new IOException("已提交目录位置缺失，保留现场。");
+                        operation.State = "Completed";
+                    }
+                    else
+                    {
+                        RestoreRenamedDirectory(operation); operation.State = "Failed";
                     }
                 }
                 else if (operation.Kind is "Directory" or "Relocate")

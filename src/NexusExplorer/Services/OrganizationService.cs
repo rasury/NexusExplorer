@@ -34,8 +34,8 @@ public record OrganizeFileResult
     public static OrganizeFileResult Missing(string name, string path) =>
         new() { FileName = name, OldPath = path, Success = false, Error = "源文件不存在", Outcome = OrganizeOutcome.Missing };
 
-    public static OrganizeFileResult Skipped(string name, string path) =>
-        new() { FileName = name, OldPath = path, Success = true, Outcome = OrganizeOutcome.Skipped };
+    public static OrganizeFileResult Skipped(string name, string path, string target) =>
+        new() { FileName = name, OldPath = path, NewPath = target, Success = true, Outcome = OrganizeOutcome.Skipped };
 
     public static OrganizeFileResult Renamed(string name, string oldPath, string newPath) =>
         new() { FileName = name, OldPath = oldPath, NewPath = newPath, Success = true, Outcome = OrganizeOutcome.Renamed };
@@ -63,9 +63,17 @@ public class OrganizationService
     public OrganizationService(IDbContextFactory<AppDbContext> factory, FileOperationExecutor? operations = null)
     { _factory = factory; _operations = operations ?? new FileOperationExecutor(factory); }
 
-    public async Task<List<OrganizeFileResult>> OrganizeAsync(int categoryId,
+    public Task<List<OrganizeFileResult>> OrganizeAsync(int categoryId,
         Func<string, string, Task<ConflictResolution>>? conflictHandler = null,
         CancellationToken cancellationToken = default, IProgress<OrganizeProgress>? progress = null)
+    {
+        var context = SynchronizationContext.Current;
+        return Task.Run(() => OrganizeCoreAsync(categoryId,
+            conflictHandler is null ? null : (name, path) => Infrastructure.UiDispatch.RunAsync(context, () => conflictHandler(name, path)), cancellationToken, progress));
+    }
+    private async Task<List<OrganizeFileResult>> OrganizeCoreAsync(int categoryId,
+        Func<string, string, Task<ConflictResolution>>? conflictHandler,
+        CancellationToken cancellationToken, IProgress<OrganizeProgress>? progress)
     {
         using var lease = await MutationGate.AcquireAsync(_factory);
         await using var db = await _factory.CreateDbContextAsync();
@@ -93,7 +101,12 @@ public class OrganizationService
                 {
                     resolution = conflictHandler is null ? ConflictResolution.Skip : await conflictHandler(file.FileName, target);
                     if (resolution == ConflictResolution.Ask) break;
-                    if (resolution == ConflictResolution.Skip) { results.Add(OrganizeFileResult.Skipped(file.FileName, source)); continue; }
+                    if (resolution == ConflictResolution.Skip)
+                    {
+                        // Skip physical movement, but use the category's existing file.
+                        await UseExistingFileAsync(file.Id, target);
+                        results.Add(OrganizeFileResult.Skipped(file.FileName, source, target)); continue;
+                    }
                     if (resolution == ConflictResolution.KeepBoth) target = UniquePath(target);
                 }
                 await _operations.MoveFileAsync(file.Id, target, resolution == ConflictResolution.Replace);
@@ -104,6 +117,16 @@ public class OrganizationService
         }
         Log.Information("递归整理完成 {CategoryId}:已处理 {Count}/{Total}", categoryId, results.Count, files.Count);
         return results;
+    }
+    private async Task UseExistingFileAsync(int id, string target)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        if (await db.Files.AnyAsync(f => f.Id != id && EF.Functions.Collate(f.AbsolutePath, "NOCASE") == target))
+            throw new OperationException("目标文件已有分类记录，无法跳过并改用它。请选择保留两个文件或处理已有记录。");
+        if (!File.Exists(target)) throw new IOException("目标文件已不存在，原记录保留。");
+        var file = await db.Files.FirstAsync(f => f.Id == id);
+        file.AbsolutePath = target; file.UpdatedAt = DateTime.Now;
+        await LocationService.BindFileAsync(db, file); await db.SaveChangesAsync();
     }
     private static string UniquePath(string path)
     {

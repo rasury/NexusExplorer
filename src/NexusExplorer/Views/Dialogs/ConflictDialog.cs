@@ -49,6 +49,7 @@ public static class ConflictDialog
             Margin = new Thickness(0, 4, 0, 16),
             TextWrapping = TextWrapping.Wrap
         });
+        panel.Children.Add(new TextBlock { Text = "跳过：使用目标目录已有文件，保留外部源文件；若目标已有分类记录则提示冲突。", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
 
         var buttons = new StackPanel
         {

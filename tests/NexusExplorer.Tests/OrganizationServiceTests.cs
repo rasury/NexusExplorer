@@ -92,11 +92,11 @@ public class OrganizationServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Organize_ConflictSkip_KeepsBothButSourceStays()
+    public async Task Organize_ConflictSkip_UsesExistingTargetAndKeepsSource()
     {
         var scifi = await _host.Categories.CreateAsync("科幻", null);
         var a = _host.CreateTestFile("A.mp4", "source-content");
-        await _host.Files.AddAsync(a, scifi.Id);
+        var added = await _host.Files.AddAsync(a, scifi.Id);
 
         // 目标目录已有同名文件
         File.WriteAllText(Path.Combine(scifi.PhysicalPath, "A.mp4"), "target-content");
@@ -109,6 +109,7 @@ public class OrganizationServiceTests : IDisposable
         // 源文件未动,目标文件未覆盖
         Assert.Equal("source-content", File.ReadAllText(a));
         Assert.Equal("target-content", File.ReadAllText(Path.Combine(scifi.PhysicalPath, "A.mp4")));
+        Assert.Equal(Path.Combine(scifi.PhysicalPath, "A.mp4"), (await _host.Files.GetByIdAsync(added.Id))!.AbsolutePath);
     }
 
     [Fact]

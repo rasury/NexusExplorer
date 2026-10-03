@@ -21,7 +21,13 @@ public partial class PlayerPanel : UserControl
     private bool _panning;
     private Point _panStart;
     private double _effectiveScale = 1;
-    public PlayerPanel() { InitializeComponent(); }
+    private readonly NativeVideoBackground _nativeBackground = new();
+    public PlayerPanel()
+    {
+        InitializeComponent();
+        VideoView.Loaded += (_, _) => ApplyNativeBackground();
+        VideoView.SizeChanged += (_, _) => ApplyNativeBackground();
+    }
     public void Initialize(MainViewModel main)
     {
         _main = main; Vm.ShowError = m => MessageBox.Show(m, "播放", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -35,9 +41,11 @@ public partial class PlayerPanel : UserControl
     }
     private async void OnLoaded(object sender, RoutedEventArgs e)
     { if (Native is not null) await RunAsync(async () => { await Native.InitializeAsync(); AttachNativePlayer(); }); }
-    private void AttachNativePlayer() => VideoView.MediaPlayer = Native?.NativePlayer;
+    private void AttachNativePlayer()
+    { VideoView.MediaPlayer = Native?.NativePlayer; ApplyNativeBackground(); }
+    private void ApplyNativeBackground() => _nativeBackground.Attach(VideoView.MediaPlayer?.Hwnd ?? IntPtr.Zero);
     public void Detach()
-    { _timer.Stop(); VideoView.MediaPlayer = null; }
+    { _timer.Stop(); _nativeBackground.Dispose(); VideoView.MediaPlayer = null; }
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         Detach(); Vm.StateChanged -= UpdateUi;
@@ -60,6 +68,7 @@ public partial class PlayerPanel : UserControl
     {
         var media = Vm.Kind is MediaKind.Video or MediaKind.Audio;
         VideoView.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Collapsed;
+        if (Vm.Kind == MediaKind.Video) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)ApplyNativeBackground);
         ImageScroll.Visibility = Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         AudioLayer.Visibility = Vm.Kind == MediaKind.Audio ? Visibility.Visible : Visibility.Collapsed;
         AudioTitle.Text = Vm.MediaTitle ?? "";

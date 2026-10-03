@@ -36,6 +36,7 @@ public partial class FileListViewModel : ObservableObject
     public Action<string>? ShowError { get; set; }
     public Func<string, Task<bool>>? ShowConfirmDialog { get; set; }
     public Action<string>? ShowInfo { get; set; }
+    public Action<string>? ShowImportStatus { get; set; }
 
     public FileListViewModel(MainViewModel main, CategoryService categoryService, FileService fileService)
     {
@@ -118,21 +119,21 @@ public partial class FileListViewModel : ObservableObject
     {
         var coordinator = new NexusExplorer.ApplicationLayer.ImportCoordinator(_fileService, _categoryService);
         var result = await coordinator.ImportAsync(paths, target.Id);
-        await _main.RefreshTreeAsync(); ReportBatchResult(result);
+        await _main.RefreshTreeAsync(); ReportBatchResult(result, nonBlocking: true);
     }
 
-    private void ReportBatchResult(BatchAddResult result)
+    private void ReportBatchResult(BatchAddResult result, bool nonBlocking = false)
     {
         if (result.Failed.Count == 0)
         {
-            ShowInfo?.Invoke($"已添加 {result.Added.Count} 个文件到当前分类。");
+            (nonBlocking ? ShowImportStatus : ShowInfo)?.Invoke($"已添加 {result.Added.Count} 个文件。");
         }
         else
         {
             var errors = string.Join("\n", result.Failed.Take(5).Select(f => $"• {f.FileName}: {f.Error}"));
             if (result.Failed.Count > 5)
                 errors += $"\n… 以及另外 {result.Failed.Count - 5} 个失败";
-            ShowError?.Invoke($"成功添加 {result.Added.Count} 个,失败 {result.Failed.Count} 个:\n{errors}");
+            (nonBlocking ? ShowImportStatus : ShowError)?.Invoke($"成功添加 {result.Added.Count} 个,失败 {result.Failed.Count} 个:\n{errors}");
         }
     }
 

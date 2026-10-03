@@ -44,7 +44,8 @@ public partial class CategoryFilePanel : UserControl
         CategoryVm.ShowInputDialog = (title, value) => Task.FromResult(Dialogs.InputDialog.Show(title, "分类名称:", value));
         CategoryVm.ShowConfirmDialog = ConfirmAsync; FileListVm.ShowConfirmDialog = ConfirmAsync;
         CategoryVm.ShowError = ShowError; FileListVm.ShowError = ShowError;
-        FileListVm.ShowInfo = message => MessageBox.Show(message, "提示");
+        FileListVm.ShowInfo = message => OperationStatus.Text = message;
+        FileListVm.ShowImportStatus = message => OperationStatus.Text = message;
         FileListVm.PickFiles = () =>
         {
             var dialog = new OpenFileDialog { Title = "选择文件", Multiselect = true };
@@ -223,8 +224,24 @@ public partial class CategoryFilePanel : UserControl
     private void OnCancelOrganize(object sender, RoutedEventArgs e) => _organizing?.Cancel();
     private void OnFilesDragOver(object sender, DragEventArgs e)
     { e.Effects = _main.CurrentCategory is not null && e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; }
-    private async void OnFilesDrop(object sender, DragEventArgs e)
-    { e.Handled = true; if (e.Data.GetData(DataFormats.FileDrop) is string[] paths) await RunAsync(() => FileListVm.ImportDroppedPathsAsync(paths)); }
+    private void OnFilesDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths) return;
+        if (_main.CurrentCategory is { } target) QueueExternalImport(paths, target);
+        else OperationStatus.Text = "请先双击打开分类，再拖入文件。";
+    }
+    private void QueueExternalImport(string[] paths, Category target)
+    {
+        // Copy OLE data before returning Drop; never keep Explorer's drag loop in a dialog.
+        var copiedPaths = paths.ToArray();
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(async () =>
+        {
+            OperationStatus.Text = $"正在导入到「{target.Name}」…";
+            try { await FileListVm.ImportIntoAsync(copiedPaths, target); }
+            catch (Exception ex) { Log.Error(ex, "外部拖入失败"); OperationStatus.Text = $"导入失败：{ex.Message}"; }
+        }));
+    }
     private Category? DropTarget(DragEventArgs e) => IsControlChrome(e.OriginalSource as DependencyObject) ? null : FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.Header as Category;
     private void OnTreeDragOver(object sender, DragEventArgs e)
     {
@@ -236,6 +253,7 @@ public partial class CategoryFilePanel : UserControl
     private async void OnTreeDrop(object sender, DragEventArgs e)
     {
         e.Handled = true; var target = DropTarget(e); if (target is null) return;
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] externalPaths) { QueueExternalImport(externalPaths, target); return; }
         await RunAsync(async () =>
         {
             if (e.Data.GetData(CategoryFormat) is int id && await _main.Categories.GetByIdAsync(id) is { } c) await CategoryVm.MoveAsync(c, target);
@@ -244,8 +262,6 @@ public partial class CategoryFilePanel : UserControl
                 var files = new List<FileItem>(); foreach (var fileId in ids) if (await _main.Files.GetByIdAsync(fileId) is { } f) files.Add(f);
                 await FileListVm.RecategorizeManyAsync(files, target);
             }
-            else if (e.Data.GetData(DataFormats.FileDrop) is string[] paths)
-                await FileListVm.ImportIntoAsync(paths, target);
         });
     }
     private void OnRootDragOver(object sender, DragEventArgs e)

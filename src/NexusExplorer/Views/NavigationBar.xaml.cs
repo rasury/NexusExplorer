@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
 using NexusExplorer.Models;
 using NexusExplorer.ViewModels;
 
@@ -17,6 +19,28 @@ public partial class NavigationBar : UserControl
     private Point _pinStart;
     private Category? _pressedPin;
     private bool _reordering;
+    private PinnedInsertionAdorner? _insertion;
+    private AdornerLayer? _insertionLayer;
+    private List<Rect> PinnedBounds() => Enumerable.Range(0, PinnedHost.Items.Count)
+        .Select(i => PinnedHost.ItemContainerGenerator.ContainerFromIndex(i) as FrameworkElement)
+        .Where(c => c is not null).Select(c => new Rect(c!.TranslatePoint(new Point(), PinnedHost), c.RenderSize)).ToList();
+    internal static int InsertionIndex(IReadOnlyList<Rect> bounds, Point point)
+    {
+        if (bounds.Count == 0 || point.Y < bounds[0].Top) return 0;
+        if (point.Y > bounds.Max(b => b.Bottom)) return bounds.Count;
+        var rowTop = bounds.Where(b => b.Top <= point.Y).Max(b => b.Top);
+        var row = Enumerable.Range(0, bounds.Count).Where(i => Math.Abs(bounds[i].Top - rowTop) < 1).ToList();
+        foreach (var index in row) if (point.X < bounds[index].Left + bounds[index].Width / 2) return index;
+        return row[^1] + 1;
+    }
+    private void ClearInsertion()
+    { if (_insertion is not null) _insertionLayer?.Remove(_insertion); _insertion = null; _insertionLayer = null; }
+    private sealed class PinnedInsertionAdorner(UIElement element) : Adorner(element)
+    {
+        public Point Start { get; set; }
+        public double StrokeHeight { get; set; }
+        protected override void OnRender(DrawingContext drawing) => drawing.DrawLine(new Pen(Brushes.DodgerBlue, 3), Start, new Point(Start.X, Start.Y + StrokeHeight));
+    }
     private void OnPinnedMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         _pressedPin = CategoryFilePanel.FindAncestor<Button>(e.OriginalSource as DependencyObject)?.Tag as Category;
@@ -29,25 +53,35 @@ public partial class NavigationBar : UserControl
         if (Math.Abs(p.X - _pinStart.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(p.Y - _pinStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
         var id = _pressedPin.Id; _pressedPin = null; _reordering = true;
         try { DragDrop.DoDragDrop(PinnedHost, new DataObject(PinnedFormat, id), DragDropEffects.Move); }
-        finally { _reordering = false; }
+        finally { _reordering = false; ClearInsertion(); }
     }
     private void OnPinnedDragOver(object sender, DragEventArgs e)
-    { e.Effects = e.Data.GetDataPresent(PinnedFormat) ? DragDropEffects.Move : DragDropEffects.None; e.Handled = true; }
+    {
+        e.Effects = e.Data.GetDataPresent(PinnedFormat) && CategoryFilePanel.FindAncestor<System.Windows.Controls.Primitives.ScrollBar>(e.OriginalSource as DependencyObject) is null
+            ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+        if (e.Effects == DragDropEffects.None) { ClearInsertion(); return; }
+        var bounds = PinnedBounds(); if (bounds.Count == 0) return;
+        var index = InsertionIndex(bounds, e.GetPosition(PinnedHost));
+        _insertionLayer ??= AdornerLayer.GetAdornerLayer(PinnedHost);
+        if (_insertionLayer is null) return;
+        if (_insertion is null) { _insertion = new(PinnedHost) { IsHitTestVisible = false }; _insertionLayer.Add(_insertion); }
+        var rect = bounds[Math.Min(index, bounds.Count - 1)];
+        _insertion.Start = new Point(index == bounds.Count ? rect.Right - 4 : rect.Left, rect.Top);
+        _insertion.StrokeHeight = Math.Max(8, rect.Height - 6); _insertion.InvalidateVisual();
+    }
     private async void OnPinnedDrop(object sender, DragEventArgs e)
     {
         e.Handled = true;
+        ClearInsertion();
         if (e.Data.GetData(PinnedFormat) is not int id) return;
+        if (CategoryFilePanel.FindAncestor<System.Windows.Controls.Primitives.ScrollBar>(e.OriginalSource as DependencyObject) is not null) return;
         try
         {
-            var button = CategoryFilePanel.FindAncestor<Button>(e.OriginalSource as DependencyObject);
-            var remaining = Vm.PinnedCategories.Where(c => c.Id != id).ToList();
-            var index = remaining.Count;
-            if (button?.Tag is Category target)
-            {
-                if (target.Id == id) return;
-                index = remaining.FindIndex(c => c.Id == target.Id);
-                if (e.GetPosition(button).X > button.ActualWidth / 2) index++;
-            }
+            var from = Vm.PinnedCategories.ToList().FindIndex(c => c.Id == id);
+            if (from < 0) return;
+            var index = InsertionIndex(PinnedBounds(), e.GetPosition(PinnedHost));
+            if (index > from) index--;
             await _main.Categories.ReorderPinnedAsync(id, index); await Vm.OnPinsChangedAsync();
         }
         catch (Exception ex) { Serilog.Log.Error(ex, "快捷分类排序失败"); MessageBox.Show(ex.Message, "排序失败"); }

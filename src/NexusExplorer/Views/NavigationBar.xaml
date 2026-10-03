@@ -14,7 +14,7 @@
             <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Padding" Value="14,6" />
-            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Margin" Value="0,0,8,6" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Template">
@@ -200,16 +200,17 @@
                        VerticalAlignment="Center"
                        Margin="0,0,8,0" />
 
-            <ScrollViewer Grid.Column="1"
+            <ScrollViewer x:Name="PinnedScroll" Grid.Column="1" Background="Transparent" AllowDrop="True" DragOver="OnPinnedDragOver" Drop="OnPinnedDrop"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto" MaxHeight="140"
                           VerticalAlignment="Center">
                 <ItemsControl x:Name="PinnedHost" AllowDrop="True" PreviewMouseLeftButtonDown="OnPinnedMouseDown" PreviewMouseMove="OnPinnedMouseMove" DragOver="OnPinnedDragOver" Drop="OnPinnedDrop"
+                              Background="Transparent" HorizontalAlignment="Stretch"
                               ItemsSource="{Binding PinnedCategories}"
                               Visibility="Visible">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel />
+                            <WrapPanel Background="Transparent" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>

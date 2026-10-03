@@ -33,9 +33,11 @@ public partial class MainViewModel : ObservableObject
         FileList = new FileListViewModel(this, categories, files);
         Player = new PlayerViewModel(this, files, media);
         Navigation = new NavigationViewModel(this, categories, files);
-        categories.BeforePhysicalOperationAsync = StopForPathsAsync;
-        files.BeforePhysicalOperationAsync = StopForPathsAsync;
-        organization.BeforePhysicalOperationAsync = StopForPathsAsync;
+        var uiContext = SynchronizationContext.Current;
+        Task StopOnUiAsync(IReadOnlyCollection<string> paths) => Infrastructure.UiDispatch.RunAsync(uiContext, () => StopForPathsAsync(paths));
+        categories.BeforePhysicalOperationAsync = StopOnUiAsync;
+        files.BeforePhysicalOperationAsync = StopOnUiAsync;
+        organization.BeforePhysicalOperationAsync = StopOnUiAsync;
     }
     public async Task SelectCategoryAsync(Category? category)
     {

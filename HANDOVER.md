@@ -27,9 +27,11 @@ CategoryId 表示逻辑归属，DirectoryLocationId 表示实际目录身份；�
 
 ## 文件操作与退出
 
-MutationGate 串行修改；未恢复日志阻止继续修改。移动文件及完整目录均先复制到唯一暂存位置、SHA-256 验证、提交位置、再清理源。既有冲突目标暂存为备份，提交成功后才回收。跨盘使用相同协议，实际跨盘设备仍待验收。
+MutationGate 串行修改；未恢复日志阻止继续修改。同卷分类改名和树内移动使用 DirectoryRename 日志保护的原子目录移动，提交失败移回，启动时按提交状态恢复。显式目录迁移、跨盘及文件整理仍先复制到暂存位置、SHA-256 验证、提交位置、再清理源。既有冲突目标暂存为备份，提交成功后才回收。实际跨盘设备仍待验收。
 
-状态包括 Prepared、Promoting、Committed、Completed、Failed、RecoveryRequired。崩溃时已完成项保持登记一致；启动回滚未提交项或清理已提交项。不明内容变化保留现场并提示人工检查。不得把未恢复状态改成 Completed 或删除日志来绕过检查。
+状态包括 Prepared、Promoting、Committed、Completed、Failed、RecoveryRequired。崩溃时已完成项保持登记一致；启动回滚未提交项或清理已提交项。DirectoryRename 源和目标都存在时保留两者并要求检查，不自动删除。不明内容变化保留现场并提示人工检查。不得把未恢复状态改成 Completed 或删除日志来绕过检查。
+
+2.0.1 中“跳过”使用未登记的已有目标并保留外部源；已登记目标拒绝改绑，双方记录保留。参见 docs/FEEDBACK-2.0.1.md。
 
 取消在每个文件完成后停止后续项，复制提交中的单项先完成一致性处理。退出取消整理并等待当前修改结束、保存界面状态、等待 StopAndReleaseAsync，再由容器释放播放器。
 
