@@ -13,7 +13,7 @@ public class FileIconConverter : IValueConverter
         { ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".ape", ".opus" };
 
     private static readonly HashSet<string> Image = new(StringComparer.OrdinalIgnoreCase)
-        { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".ico", ".svg" };
+        { ".jpg", ".jpeg", ".png", ".apng", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".ico", ".svg" };
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {

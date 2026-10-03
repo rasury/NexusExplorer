@@ -43,7 +43,11 @@ MutationGate 串行修改；未恢复日志阻止继续修改。同卷分类改�
 
 ## 媒体
 
-GIF 不再走静态 BitmapImage 的首帧加载。GifAnimation 在后台用现有 ImageSharp 识别尺寸及帧控制信息，用 WPF/WIC 解码原始局部帧，显式合成透明像素、背景恢复与前一画面恢复。没有新增或升级依赖；避开了 ImageSharp 3.1.11 在 disposal=2 后接 3 时的旧背景残影（独立 Pillow 参考图验证）。按 GIF 延时驱动 DispatcherTimer，缺失／零延时用 100ms；循环扩展为首次播放后的重复次数，0 无限，没有扩展只播放一次。界面更新同一 WriteableBitmap，不反复重置缩放和平移。切换、停止及面板卸载取消加载并停止动画、释放帧缓存，文件流在后台解码结束时关闭。解码前按原始帧、合成帧及缓冲区保守估算内存，超过 256MiB 时提示而不分配全部画布。
+GIF 不再走静态 BitmapImage 的首帧加载。ImageAnimation 在后台用现有 ImageSharp 识别尺寸及帧控制信息，用 WPF/WIC 解码原始局部帧，显式合成透明像素、背景恢复与前一画面恢复。没有新增或升级依赖；避开了 ImageSharp 3.1.11 在 disposal=2 后接 3 时的旧背景残影（独立 Pillow 参考图验证）。按 GIF 延时驱动 DispatcherTimer，缺失／零延时用 100ms；循环扩展为首次播放后的重复次数，0 无限，没有扩展只播放一次。界面更新同一 WriteableBitmap，不反复重置缩放和平移。切换、停止及面板卸载取消加载并停止动画、释放帧缓存，文件流在后台解码结束时关闭。GIF 解码前按原始帧、合成帧及缓冲区保守估算内存，超过 256MiB 时提示而不分配全部画布。
+
+APNG 使用同一 ImageAnimation 计时、显示和释放流程；.apng 加入媒体识别、播放队列和文件图标，以 .png 保存的 APNG 也按 acTL 识别。普通 PNG 检查到 IDAT 即结束动画探测，继续原有静态显示。ImageSharp 3.1.11 解码 APNG 合成帧，保留一套帧缓存并复用一个 BGRA 输出缓冲，不额外复制全部帧；像素缓存估算上限为 384MiB，解码帧数也按声明限制。默认封面不属于动画时跳过封面；APNG 循环次数为总播放轮数，延时为分数秒。用户当前样本每帧声明 5 秒，应保留文件自身速度。透明 OVER、SOURCE 及恢复策略的规则参见 [PNG 第三版规范](https://www.w3.org/TR/png-3/#11fcTL)，真实帧输出另外对比，不以库文档替代画面检查。
+
+分类树拖放期间启用 DragWheelScroller，通过 WH_MOUSE_LL 捕获 OLE 拖动时未送入 WPF 的滚轮输入，支持外部资源管理器及内部文件／分类拖动。仅鼠标位于本窗口分类树滚动区时异步投递滚动，其他区域／其他窗口放行，按 Windows 的行数／翻页设置并累积小滚轮增量。DragLeave（包含指针仍在树内的 Escape 取消）、Drop、内部拖拽 finally、关闭及卸载均解除挂钩并丢弃旧投递任务。实现依据为 [微软 LowLevelMouseProc](https://learn.microsoft.com/en-us/windows/win32/winmsg/lowlevelmouseproc)；真实鼠标与外部 OLE 拖动仍需人工复验。
 
 软件图标使用用户提供的完整图片：Assets/AppIcon.png 保留原图，AppIcon.ico 包含 16/24/32/48/64/128/256 像素尺寸。ApplicationIcon 嵌入 EXE，WPF MainWindow.Icon 引用同一 ICO 的内嵌资源，窗口和任务栏统一。
 

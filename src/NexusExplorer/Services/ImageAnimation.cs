@@ -7,34 +7,52 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace NexusExplorer.Services;
 
-/// <summary>Composited GIF frames, rendered into one reusable WPF bitmap.</summary>
-internal sealed class GifAnimation : IDisposable
+/// <summary>Composited image animation frames, rendered into one reusable WPF bitmap.</summary>
+internal sealed class ImageAnimation : IDisposable
 {
     private const long MaxDecodedBytes = 256L * 1024 * 1024;
-    private readonly DecodedGif _image;
+    private const long MaxDecodedPngBytes = 384L * 1024 * 1024;
+    private readonly DecodedAnimation _image;
     private readonly DispatcherTimer _timer;
-    private readonly int _repeatCount;
-    private int _completedLoops;
+    private readonly long _repeatCount;
+    private long _completedLoops;
     private bool _disposed;
     public WriteableBitmap Bitmap { get; }
     internal int FrameIndex { get; private set; }
-    internal int FrameCount => _image.Frames.Length;
+    internal int FrameCount => _image.FrameCount;
     internal bool IsRunning => _timer.IsEnabled;
 
-    internal sealed class DecodedGif(int width, int height, int repeatCount, byte[][] frames, TimeSpan[] delays) : IDisposable
+    internal sealed class DecodedAnimation(int width, int height, long repeatCount, byte[][] frames, TimeSpan[] delays) : IDisposable
     {
+        private Image<Bgra32>? _png;
+        private byte[]? _scratch;
+        private int _first;
         public int Width { get; } = width;
         public int Height { get; } = height;
-        public int RepeatCount { get; } = repeatCount;
+        public long RepeatCount { get; } = repeatCount;
         public byte[][] Frames { get; private set; } = frames;
+        public int FrameCount => _png is null ? Frames.Length : _png.Frames.Count - _first;
         public TimeSpan[] Delays { get; } = delays;
-        public void Dispose() => Frames = [];
+        public DecodedAnimation(Image<Bgra32> png, int first, long repeats, TimeSpan[] delays)
+            : this(png.Width, png.Height, repeats, [], delays)
+        { _png = png; _first = first; }
+        public byte[] Pixels(int index)
+        {
+            if (_png is null) return Frames[index];
+            _scratch ??= new byte[checked(Width * Height * 4)];
+            _png.Frames[index + _first].CopyPixelDataTo(_scratch);
+            return _scratch;
+        }
+        public void Dispose() { _png?.Dispose(); _png = null; _scratch = null; Frames = []; }
     }
 
-    public static async Task<DecodedGif> DecodeAsync(string path, CancellationToken token)
+    public static async Task<DecodedAnimation> DecodeGifAsync(string path, CancellationToken token)
     {
         // Close the input before returning: animation must not keep moved/deleted files open.
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
@@ -97,7 +115,71 @@ internal sealed class GifAnimation : IDisposable
                 FillRectangle(canvas, info.Width, left, top, width, height, control.HasTransparency ? new byte[4] : background);
         }
         token.ThrowIfCancellationRequested();
-        return new DecodedGif(info.Width, info.Height, ReadTotalIterations((BitmapMetadata)decoder.Metadata), composed, delays);
+        return new DecodedAnimation(info.Width, info.Height, ReadTotalIterations((BitmapMetadata)decoder.Metadata), composed, delays);
+    }
+
+    public static async Task<DecodedAnimation?> TryDecodePngAsync(string path, CancellationToken token)
+    {
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+            65536, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        // acTL must precede IDAT. Static PNGs only read their header here, not their pixel data twice.
+        var header = await ReadPngAnimationHeaderAsync(stream, token);
+        if (header is null) return null;
+        var (width, height, count) = header.Value;
+        var bytesPerPixelSet = 4 * (count + 4L); // decoder frames, possible poster, scratch and display
+        if (width <= 0 || height <= 0 || (long)width * height > MaxDecodedPngBytes / bytesPerPixelSet)
+            throw new OperationException("APNG 解码后需要过多内存，请缩小尺寸或减少帧数后预览。");
+        stream.Position = 0;
+        var image = await Image.LoadAsync<Bgra32>(new DecoderOptions { MaxFrames = count + 1 }, stream, token);
+        try
+        {
+            var metadata = image.Metadata.GetPngMetadata();
+            // A separate default image is a poster only: it must not appear in the animation or its canvas.
+            var first = metadata.AnimateRootFrame ? 0 : 1;
+            var frameCount = image.Frames.Count - first;
+            if (frameCount != count || frameCount <= 0) throw new OperationException("APNG 帧信息不完整，无法播放。");
+            var delays = new TimeSpan[frameCount];
+            for (var index = 0; index < frameCount; index++)
+            {
+                token.ThrowIfCancellationRequested();
+                var delay = image.Frames[first + index].Metadata.GetPngMetadata().FrameDelay.ToDouble() * 1000;
+                delays[index] = TimeSpan.FromMilliseconds(delay <= 0 || !double.IsFinite(delay) ? 100 : Math.Max(1, delay));
+            }
+            return new DecodedAnimation(image, first, metadata.RepeatCount, delays);
+        }
+        catch { image.Dispose(); throw; }
+    }
+
+    private static async Task<(int Width, int Height, uint Frames)?> ReadPngAnimationHeaderAsync(Stream stream, CancellationToken token)
+    {
+        var buffer = new byte[13];
+        await stream.ReadExactlyAsync(buffer.AsMemory(0, 8), token);
+        if (!buffer.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })) return null;
+        var width = 0; var height = 0;
+        while (stream.Position + 8 <= stream.Length)
+        {
+            await stream.ReadExactlyAsync(buffer.AsMemory(0, 8), token);
+            var length = BinaryPrimitives.ReadUInt32BigEndian(buffer);
+            var type = Encoding.ASCII.GetString(buffer, 4, 4);
+            if (length + 4L > stream.Length - stream.Position) throw new OperationException("PNG 文件不完整。");
+            if (type is "IDAT" or "IEND") return null;
+            if (type == "IHDR" && length == 13)
+            {
+                await stream.ReadExactlyAsync(buffer, token);
+                width = checked((int)BinaryPrimitives.ReadUInt32BigEndian(buffer));
+                height = checked((int)BinaryPrimitives.ReadUInt32BigEndian(buffer.AsSpan(4)));
+                stream.Position += 4;
+            }
+            else if (type == "acTL" && length == 8)
+            {
+                await stream.ReadExactlyAsync(buffer.AsMemory(0, 8), token);
+                var frames = BinaryPrimitives.ReadUInt32BigEndian(buffer);
+                if (frames == 0) throw new OperationException("APNG 未包含动画帧。");
+                return (width, height, frames);
+            }
+            else stream.Position += length + 4L;
+        }
+        return null;
     }
 
     private static int ReadTotalIterations(BitmapMetadata metadata)
@@ -127,7 +209,7 @@ internal sealed class GifAnimation : IDisposable
     }
 
     // Ownership of image transfers to this instance after successful construction.
-    public GifAnimation(DecodedGif image, Dispatcher dispatcher)
+    public ImageAnimation(DecodedAnimation image, Dispatcher dispatcher)
     {
         dispatcher.VerifyAccess();
         _image = image;
@@ -165,7 +247,7 @@ internal sealed class GifAnimation : IDisposable
     }
     private void RenderFrame()
     {
-        Bitmap.WritePixels(new Int32Rect(0, 0, _image.Width, _image.Height), _image.Frames[FrameIndex], _image.Width * 4, 0);
+        Bitmap.WritePixels(new Int32Rect(0, 0, _image.Width, _image.Height), _image.Pixels(FrameIndex), _image.Width * 4, 0);
     }
     public void Dispose()
     {

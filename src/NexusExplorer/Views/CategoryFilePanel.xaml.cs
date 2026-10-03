@@ -33,6 +33,7 @@ public partial class CategoryFilePanel : UserControl
     private bool _shuttingDown;
     private UiStateStore _state = new();
     private CancellationTokenSource? _organizing;
+    private readonly DragWheelScroller _dragWheel = new();
     private AsyncRelayCommand? _organizeCommand;
     public ICommand OrganizeCommand => _organizeCommand ??= new AsyncRelayCommand(OrganizeAsync, () => _main?.CurrentCategory is not null && _organizing is null);
 
@@ -125,12 +126,14 @@ public partial class CategoryFilePanel : UserControl
     }
     public async Task PrepareForCloseAsync()
     {
+        _dragWheel.Dispose();
         _shuttingDown = true; _organizing?.Cancel();
         if (_organizeCommand?.ExecutionTask is { } task) await task;
         using var lease = await MutationGate.AcquireAsync();
     }
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
+        _dragWheel.Dispose();
         SaveUiState();
         _main.CategoryTreeChanged -= RefreshTree; _main.FileListChanged -= RefreshFileList; _main.CurrentFileChanged -= OnCurrentFileChanged;
         Unloaded -= OnUnloaded;
@@ -249,8 +252,21 @@ public partial class CategoryFilePanel : UserControl
         }));
     }
     private Category? DropTarget(DragEventArgs e) => IsControlChrome(e.OriginalSource as DependencyObject) ? null : FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.Header as Category;
+    private void OnTreeDragEnter(object sender, DragEventArgs e) => BeginTreeDragScroll(e.Data);
+    private void BeginTreeDragScroll(IDataObject data)
+    {
+        if (data.GetDataPresent(DataFormats.FileDrop) || data.GetDataPresent(FilesFormat) || data.GetDataPresent(CategoryFormat))
+            if (FindChild<ScrollViewer>(CategoryTree) is { } viewer) _dragWheel.Start(viewer);
+    }
+    private void OnTreeDragLeave(object sender, DragEventArgs e)
+    {
+        // OLE also sends DragLeave on Escape while the pointer is still over the tree.
+        // Moving between child targets is harmless: the next DragEnter/DragOver reattaches.
+        _dragWheel.Dispose();
+    }
     private void OnTreeDragOver(object sender, DragEventArgs e)
     {
+        BeginTreeDragScroll(e.Data);
         e.Effects = DropTarget(e) is null ? DragDropEffects.None :
             e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy :
             e.Data.GetDataPresent(FilesFormat) || e.Data.GetDataPresent(CategoryFormat) ? DragDropEffects.Move : DragDropEffects.None;
@@ -258,6 +274,7 @@ public partial class CategoryFilePanel : UserControl
     }
     private async void OnTreeDrop(object sender, DragEventArgs e)
     {
+        _dragWheel.Dispose();
         e.Handled = true; var target = DropTarget(e); if (target is null) return;
         if (e.Data.GetData(DataFormats.FileDrop) is string[] externalPaths) { QueueExternalImport(externalPaths, target); return; }
         await RunAsync(async () =>
@@ -309,6 +326,6 @@ public partial class CategoryFilePanel : UserControl
             }
             else if (_pressedCategory is not null) DragDrop.DoDragDrop(CategoryTree, new DataObject(CategoryFormat, _pressedCategory.Id), DragDropEffects.Move);
         }
-        finally { _pressedFile = null; _pressedCategory = null; _deferSelection = false; }
+        finally { _dragWheel.Dispose(); _pressedFile = null; _pressedCategory = null; _deferSelection = false; }
     }
 }

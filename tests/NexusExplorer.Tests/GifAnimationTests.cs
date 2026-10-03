@@ -69,8 +69,8 @@ public class GifAnimationTests
     {
         await WpfTestHost.RunAsync(async () =>
         {
-            var decoded = await GifAnimation.DecodeAsync(Asset(name), CancellationToken.None);
-            using var animation = new GifAnimation(decoded, Dispatcher.CurrentDispatcher);
+            var decoded = await ImageAnimation.DecodeGifAsync(Asset(name), CancellationToken.None);
+            using var animation = new ImageAnimation(decoded, Dispatcher.CurrentDispatcher);
             Assert.Equal(frameCount, animation.FrameCount);
             if (frameCount == 2)
             {
@@ -96,7 +96,7 @@ public class GifAnimationTests
         // A tiny encoded file can declare a huge logical screen. Do not allocate its frame canvases.
         bytes[6] = bytes[8] = 0; bytes[7] = bytes[9] = 128;
         await File.WriteAllBytesAsync(path, bytes);
-        var error = await Assert.ThrowsAsync<OperationException>(() => GifAnimation.DecodeAsync(path, CancellationToken.None));
+        var error = await Assert.ThrowsAsync<OperationException>(() => ImageAnimation.DecodeGifAsync(path, CancellationToken.None));
         Assert.Contains("过多内存", error.Message);
         using (File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
     }
@@ -106,8 +106,8 @@ public class GifAnimationTests
     {
         await WpfTestHost.RunAsync(async () =>
         {
-            var decoded = await GifAnimation.DecodeAsync(Asset("disposal.gif"), CancellationToken.None);
-            using var animation = new GifAnimation(decoded, Dispatcher.CurrentDispatcher);
+            var decoded = await ImageAnimation.DecodeGifAsync(Asset("disposal.gif"), CancellationToken.None);
+            using var animation = new ImageAnimation(decoded, Dispatcher.CurrentDispatcher);
             Assert.Equal(4, animation.FrameCount);
             animation.Start();
             for (var index = 0; index < 4; index++)

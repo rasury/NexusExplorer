@@ -96,6 +96,8 @@
                    MouseDoubleClick="OnCategoryDoubleClick"
                   ContextMenuOpening="OnCategoryTreeContextMenuOpening"
                   Drop="OnTreeDrop"
+                  DragEnter="OnTreeDragEnter"
+                  DragLeave="OnTreeDragLeave"
                   DragOver="OnTreeDragOver">
             <TreeView.ContextMenu>
                 <ContextMenu>

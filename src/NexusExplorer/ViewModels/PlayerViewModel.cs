@@ -20,7 +20,7 @@ public partial class PlayerViewModel : ObservableObject
     private long _version;
     private readonly Random _random = new();
     private readonly SemaphoreSlim _ended = new(1, 1);
-    private GifAnimation? _gif;
+    private ImageAnimation? _animation;
     [ObservableProperty] private MediaKind _kind;
     [ObservableProperty] private string? _mediaTitle;
     [ObservableProperty] private string? _mediaPath;
@@ -43,14 +43,14 @@ public partial class PlayerViewModel : ObservableObject
         var ext = Path.GetExtension(name).ToLowerInvariant();
         if (new[] { ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts", ".3gp" }.Contains(ext)) return MediaKind.Video;
         if (new[] { ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".ape", ".opus" }.Contains(ext)) return MediaKind.Audio;
-        if (new[] { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".ico" }.Contains(ext)) return MediaKind.Image;
+        if (new[] { ".jpg", ".jpeg", ".png", ".apng", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".ico" }.Contains(ext)) return MediaKind.Image;
         return MediaKind.Unsupported;
     }
     public async Task PlayFileAsync(FileItem? file)
     {
         var version = Interlocked.Increment(ref _version);
         _opening?.Cancel(); _opening?.Dispose(); _opening = new CancellationTokenSource(); var token = _opening.Token;
-        ClearGifAnimation();
+        ClearImageAnimation();
         await Engine.StopAndReleaseAsync();
         if (version != Interlocked.Read(ref _version)) return;
         ImageSource = null; ImageScale = 0; Position = TimeSpan.Zero; Duration = TimeSpan.Zero; IsPlaying = false;
@@ -61,15 +61,20 @@ public partial class PlayerViewModel : ObservableObject
         {
             if (Kind == MediaKind.Image)
             {
-                if (Path.GetExtension(file.FileName).Equals(".gif", StringComparison.OrdinalIgnoreCase))
+                var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                var decoded = extension == ".gif"
+                    ? await Task.Run(() => ImageAnimation.DecodeGifAsync(file.AbsolutePath, token), token)
+                    : extension is ".png" or ".apng"
+                        ? await Task.Run(() => ImageAnimation.TryDecodePngAsync(file.AbsolutePath, token), token)
+                        : null;
+                if (version != Interlocked.Read(ref _version) || token.IsCancellationRequested)
+                { decoded?.Dispose(); return; }
+                if (decoded is not null)
                 {
-                    var decoded = await Task.Run(() => GifAnimation.DecodeAsync(file.AbsolutePath, token), token);
-                    if (version != Interlocked.Read(ref _version) || token.IsCancellationRequested)
-                    { decoded.Dispose(); return; }
-                    try { _gif = new GifAnimation(decoded, Dispatcher.CurrentDispatcher); }
+                    try { _animation = new ImageAnimation(decoded, Dispatcher.CurrentDispatcher); }
                     catch { decoded.Dispose(); throw; }
-                    ImageSource = _gif.Bitmap;
-                    _gif.Start();
+                    ImageSource = _animation.Bitmap;
+                    _animation.Start();
                 }
                 else
                 {
@@ -88,11 +93,11 @@ public partial class PlayerViewModel : ObservableObject
         catch (Exception ex) { if (version == Interlocked.Read(ref _version)) OnPlaybackError(file.AbsolutePath, ex.Message); }
         if (version == Interlocked.Read(ref _version)) StateChanged?.Invoke();
     }
-    private void ClearGifAnimation() { _gif?.Dispose(); _gif = null; }
+    private void ClearImageAnimation() { _animation?.Dispose(); _animation = null; }
     internal void ReleaseImagePreview()
     {
         Interlocked.Increment(ref _version); _opening?.Cancel();
-        ClearGifAnimation(); ImageSource = null;
+        ClearImageAnimation(); ImageSource = null;
     }
     private static BitmapSource? LoadBitmap(string path)
     {

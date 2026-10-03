@@ -100,4 +100,18 @@
 
 2026-10-04：将本次经验记录为 SDK-INTEGRATION-LESSONS.md，并在根目录 AGENTS.md 固化后续 AI 的排查规则。区分实际模块/输出验证与功能成功，强调同库最小可编辑实验、单变量对比和证据边界。README 与 HANDOVER 已关联；更新脚本增加警示文档的发布清单。
 
+## APNG 与拖放滚轮
+
+2026-10-04：用户报告 APNG 不支持、拖文件进分类树时滚轮无效；启动后首次打开的等待后来无法复现，按用户要求本轮不修改启动或 VLC 初始化逻辑。
+
+图片仍由 WPF 显示。GIF 动画服务扩展为 ImageAnimation，APNG 使用现有 ImageSharp 3.1.11 的解码和合成结果，支持 .apng/.png、分数帧延时、总循环次数、独立默认封面及透明帧。保留一套 ImageSharp 帧缓存及一个复用输出缓冲，APNG 像素缓存估算限 384MiB；GIF 原有估算限 256MiB。没有升级／新增图片 SDK，也没有改变 DirectSound。
+
+只运行直接相关最小检查：APNG 新增 6 项、共享动画路径的 GIF 7 项及已有图片控件 1 项，共 14 通过、0 失败／跳过，结果 artifacts/apng-tests/apng-related.trx。覆盖 .apng/.PNG 实际 PlayerViewModel/PlayerPanel 动画、静态 PNG、循环与帧时间、封面排除、透明 SOURCE/OVER、背景／前帧恢复、切换及卸载后旧帧停止、独占读取释放和过大画布拒绝。8×8 素材与独立参考在 tests/NexusExplorer.Tests/Assets/Apng。
+
+只读核对用户导入的真实 APNG（约 22.6MB、1024×1364、48 帧）：首／中／末帧（0/23/47）与 Pillow 独立解码参考在 alpha 上一致，可见 RGB 误差不超过 1 级；实际 Dispatcher 动画推进，加载／停止后均可独占读文件。该次解码约 1.16 秒，不作为所有机器的性能保证。样本每帧声明 5000ms，首次推进需等待约 5 秒，最初 3 秒的诊断等待不足已纠正。结果 artifacts/apng-sample-result.txt，样本及参考仅在忽略的本地 artifacts 内，未上传 Git。
+
+拖放滚轮新增 2 项及已有命中／滚动条隔离 1 项，共 3 通过、0 失败／跳过，结果 artifacts/drag-wheel-tests/drag-wheel-related.trx。验证实际分类树 ScrollViewer 上下滚动、小增量累积、区域限制、真实 Win32 挂钩安装／释放，以及结束后旧异步投递不影响下一次拖动。未自动注入全局鼠标输入或控制资源管理器；外部拖入、内部拖动时的真实滚轮与 Escape 取消还请用户复验。
+
+固定目录保护更新输出 artifacts/apng-drag-fixed-update.txt。更新只替换程序、依赖和文档，data/Storage/logs/配置前后快照一致；没有启动主程序或迁移用户数据库，没有运行完整应用测试。
+
 本次只核对文档内容、13 个本地 Markdown 链接和 Git 差异，并运行两项直接相关的更新脚本检查：警示文档正确复制，默认/自定义用户数据保持，文件占用时停止替换。结果见 artifacts/sdk-warning-update-tests.txt。检查在独立模拟目录执行，未更新正在运行的真实软件、修改播放器或执行完整应用测试。
