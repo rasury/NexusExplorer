@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using NexusExplorer.Data;
 using NexusExplorer.Models;
@@ -75,6 +76,8 @@ public class OrganizationService
         Func<string, string, Task<ConflictResolution>>? conflictHandler,
         CancellationToken cancellationToken, IProgress<OrganizeProgress>? progress)
     {
+        var timing = Stopwatch.StartNew();
+        Log.Information("递归整理开始;分类 {CategoryId}", categoryId);
         using var lease = await MutationGate.AcquireAsync(_factory);
         await using var db = await _factory.CreateDbContextAsync();
         var categories = await db.Categories.ToListAsync(); await LocationService.ResolveAsync(db, categories: categories);
@@ -87,6 +90,7 @@ public class OrganizationService
         await db.Categories.Where(c => ids.Contains(c.Id)).ExecuteUpdateAsync(s => s.SetProperty(c => c.IsOrganized, false));
         var files = await db.Files.Where(f => ids.Contains(f.CategoryId)).OrderBy(f => f.CategoryId).ThenBy(f => f.FileName).ThenBy(f => f.Id).ToListAsync();
         await LocationService.ResolveAsync(db, files: files);
+        Log.Information("递归整理清单就绪;分类 {CategoryId};文件 {Count};耗时 {ElapsedMs:F1} ms", categoryId, files.Count, timing.Elapsed.TotalMilliseconds);
         if (BeforePhysicalOperationAsync is not null) await BeforePhysicalOperationAsync(files.Select(f => f.AbsolutePath).ToList());
         var results = new List<OrganizeFileResult>(); var stoppedByConflict = false;
         foreach (var file in files)
@@ -120,7 +124,7 @@ public class OrganizationService
         }
         if (!stoppedByConflict && !cancellationToken.IsCancellationRequested && results.Count == files.Count && results.All(r => r.Success))
             await db.Categories.Where(c => ids.Contains(c.Id)).ExecuteUpdateAsync(s => s.SetProperty(c => c.IsOrganized, true));
-        Log.Information("递归整理完成 {CategoryId}:已处理 {Count}/{Total}", categoryId, results.Count, files.Count);
+        Log.Information("递归整理完成 {CategoryId}:已处理 {Count}/{Total};失败 {Failed};耗时 {ElapsedMs:F1} ms", categoryId, results.Count, files.Count, results.Count(r => !r.Success), timing.Elapsed.TotalMilliseconds);
         return results;
     }
     private async Task UseExistingFileAsync(int id, string target)

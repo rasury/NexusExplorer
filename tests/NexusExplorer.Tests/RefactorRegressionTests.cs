@@ -113,7 +113,7 @@ public sealed class RefactorRegressionTests : IDisposable
         var file = await _host.Files.AddAsync(source, a.Id);
         var target = Path.Combine(a.PhysicalPath, "clip.mp4"); File.WriteAllText(target, "TARGET");
         var executor = new FileOperationExecutor(_host.DbFactory, _host.RecycleBin)
-        { Fault = stage => stage == faultStage ? Task.FromException(new IOException("injected")) : Task.CompletedTask };
+        { SameVolume = (_, _) => false, Fault = stage => stage == faultStage ? Task.FromException(new IOException("injected")) : Task.CompletedTask };
         await Assert.ThrowsAsync<IOException>(() => executor.MoveFileAsync(file.Id, target, true));
         Assert.Equal("SOURCE", File.ReadAllText(source)); Assert.Equal("TARGET", File.ReadAllText(target));
         Assert.Equal(source, (await _host.Files.GetByIdAsync(file.Id))!.AbsolutePath);
@@ -128,7 +128,7 @@ public sealed class RefactorRegressionTests : IDisposable
         var source = _host.CreateTestFile("clip.mp4", "SOURCE"); var file = await _host.Files.AddAsync(source, a.Id);
         var target = Path.Combine(a.PhysicalPath, "clip.mp4"); File.WriteAllText(target, "TARGET");
         var executor = new FileOperationExecutor(_host.DbFactory, _host.RecycleBin)
-        { Fault = stage => stage == "Committed" ? Task.FromException(new IOException("process exit")) : Task.CompletedTask };
+        { SameVolume = (_, _) => false, Fault = stage => stage == "Committed" ? Task.FromException(new IOException("process exit")) : Task.CompletedTask };
         await Assert.ThrowsAsync<IOException>(() => executor.MoveFileAsync(file.Id, target, true));
         Assert.True(File.Exists(source)); Assert.Equal(target, (await _host.Files.GetByIdAsync(file.Id))!.AbsolutePath);
         await Assert.ThrowsAsync<OperationException>(() => executor.DeleteFileAsync(file.Id));

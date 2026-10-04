@@ -1,19 +1,22 @@
 using System.IO;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using NexusExplorer.Data;
 using NexusExplorer.Models;
+using NexusExplorer.Infrastructure;
 using Serilog;
 
 namespace NexusExplorer.Services;
 
-/// <summary>Durable copy/verify/commit/cleanup protocol. Originals survive until metadata commits.</summary>
+/// <summary>Journaled same-volume rename or verified copy, with metadata commit and recovery.</summary>
 public sealed class FileOperationExecutor
 {
     private readonly IDbContextFactory<AppDbContext> _factory;
     private readonly IRecycleBinService _recycle;
     internal Func<string, Task>? Fault { get; set; }
+    internal Func<string, string, bool> SameVolume { get; set; } = WindowsVolume.SameVolume;
     public FileOperationExecutor(IDbContextFactory<AppDbContext> factory, IRecycleBinService? recycle = null)
     { _factory = factory; _recycle = recycle ?? new RecycleBinService(); }
     private Task ProbeAsync(string stage) => Fault?.Invoke(stage) ?? Task.CompletedTask;
@@ -53,6 +56,21 @@ public sealed class FileOperationExecutor
         if (await db.Files.AnyAsync(f => f.Id != fileId && EF.Functions.Collate(f.AbsolutePath, "NOCASE") == target))
             throw new OperationException("目标路径已有受管理文件，请选择保留两个文件。");
         if (File.Exists(target) && !replace) throw new IOException("目标文件已存在。");
+        var timing = Stopwatch.StartNew();
+        if (SameVolume(source, target))
+        {
+            var identity = WindowsFileIdentity.Read(source);
+            var targetIdentity = File.Exists(target) ? WindowsFileIdentity.Read(target) : (FileIdentity?)null;
+            if (identity is { } original && (!File.Exists(target) || targetIdentity is not null))
+            {
+                if (targetIdentity == original) throw new OperationException("源文件与目标指向同一物理文件，请保留原记录。");
+                Log.Information("整理文件移动开始;文件 {FileId};方式同卷直接移动;大小 {Bytes} 字节", fileId, new FileInfo(source).Length);
+                await RenameFileAsync(db, file, target, original, targetIdentity);
+                Log.Information("整理文件移动完成;文件 {FileId};方式同卷直接移动;耗时 {ElapsedMs:F1} ms", fileId, timing.Elapsed.TotalMilliseconds);
+                return;
+            }
+        }
+        Log.Information("整理文件移动开始;文件 {FileId};方式复制校验;大小 {Bytes} 字节", fileId, new FileInfo(source).Length);
         var stage = target + ".nexus-stage-" + Guid.NewGuid().ToString("N");
         var operation = new FileOperation
         {
@@ -79,6 +97,7 @@ public sealed class FileOperationExecutor
             await ProbeAsync("Committed");
             await CleanupFileAsync(operation);
             await db.SaveChangesAsync();
+            Log.Information("整理文件移动完成;文件 {FileId};方式复制校验;耗时 {ElapsedMs:F1} ms", fileId, timing.Elapsed.TotalMilliseconds);
         }
         catch (Exception ex)
         {
@@ -96,6 +115,94 @@ public sealed class FileOperationExecutor
             }
             operation.Error = ex.Message; await db.SaveChangesAsync(); throw;
         }
+    }
+
+    internal sealed record FileRenamePayload(FileIdentity SourceIdentity, FileIdentity? TargetIdentity);
+    private async Task RenameFileAsync(AppDbContext db, FileItem file, string target, FileIdentity identity, FileIdentity? targetIdentity)
+    {
+        var operation = new FileOperation
+        {
+            Kind = "FileRename", FileId = file.Id, Source = file.AbsolutePath, Target = target,
+            Backup = targetIdentity is null ? null : target + ".nexus-backup-" + Guid.NewGuid().ToString("N"),
+            Payload = JsonSerializer.Serialize(new FileRenamePayload(identity, targetIdentity))
+        };
+        var step = Stopwatch.StartNew();
+        db.FileOperations.Add(operation); await db.SaveChangesAsync();
+        var journalMs = step.Elapsed.TotalMilliseconds;
+        try
+        {
+            step.Restart();
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            await ProbeAsync("BeforeRename");
+            if (targetIdentity is { } existing)
+            {
+                if (!WindowsFileIdentity.Matches(target, existing)) throw new IOException("目标文件已改变，停止替换。");
+                RejectLink(target); WindowsFileIdentity.Move(target, operation.Backup!);
+                await ProbeAsync("TargetBackedUp");
+            }
+            if (!WindowsFileIdentity.Matches(operation.Source, identity)) throw new IOException("源文件已改变，停止移动。");
+            RejectLink(operation.Source); WindowsFileIdentity.Move(operation.Source, target);
+            await ProbeAsync("Promoted");
+            var renameMs = step.Elapsed.TotalMilliseconds; step.Restart();
+            file.AbsolutePath = target; file.FileName = Path.GetFileName(target); file.UpdatedAt = DateTime.Now;
+            await LocationService.BindFileAsync(db, file);
+            operation.State = "Committed";
+            await ProbeAsync("BeforeCommit"); await db.SaveChangesAsync();
+            var commitMs = step.Elapsed.TotalMilliseconds; step.Restart();
+            await ProbeAsync("Committed");
+            CleanupRenamedFile(operation); await db.SaveChangesAsync();
+            Log.Debug("同卷移动阶段;文件 {FileId};日志登记 {JournalMs:F1} ms;物理移动 {RenameMs:F1} ms;位置与提交 {CommitMs:F1} ms;收尾 {CleanupMs:F1} ms",
+                file.Id, journalMs, renameMs, commitMs, step.Elapsed.TotalMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            // Reload persisted state, including a possibly successful metadata commit.
+            // Never accidentally save the mutated file path during compensation.
+            db.ChangeTracker.Clear(); operation = await db.FileOperations.FirstAsync(o => o.Id == operation.Id);
+            if (operation.State != "Committed")
+            {
+                try { RestoreRenamedFile(operation); operation.State = "Failed"; }
+                catch (Exception rollback) { operation.State = "RecoveryRequired"; Log.Error(rollback, "同卷文件移动补偿失败;操作 {OperationId}", operation.Id); }
+            }
+            operation.Error = ex.Message; await db.SaveChangesAsync(); throw;
+        }
+    }
+    private static FileRenamePayload RenamePayload(FileOperation operation) =>
+        JsonSerializer.Deserialize<FileRenamePayload>(operation.Payload ?? throw new InvalidDataException("文件移动日志缺少标识。"))
+        ?? throw new InvalidDataException("文件移动日志标识无效。");
+    private static void RestoreRenamedFile(FileOperation operation)
+    {
+        var payload = RenamePayload(operation);
+        if (File.Exists(operation.Source))
+        {
+            if (!WindowsFileIdentity.Matches(operation.Source, payload.SourceIdentity)) throw new IOException("源路径被其他文件占用，保留现场。");
+            if (WindowsFileIdentity.Matches(operation.Target, payload.SourceIdentity)) throw new IOException("源和目标均包含原文件，保留现场。");
+        }
+        else
+        {
+            if (!WindowsFileIdentity.Matches(operation.Target, payload.SourceIdentity)) throw new IOException("移动后的文件标识不符，保留现场。");
+            WindowsFileIdentity.Move(operation.Target, operation.Source);
+        }
+        if (operation.Backup is not null && File.Exists(operation.Backup))
+        {
+            if (payload.TargetIdentity is not { } old || !WindowsFileIdentity.Matches(operation.Backup, old)) throw new IOException("旧目标备份标识不符，保留现场。");
+            if (File.Exists(operation.Target)) throw new IOException("目标路径被占用，保留原文件与备份。");
+            WindowsFileIdentity.Move(operation.Backup, operation.Target);
+        }
+        else if (payload.TargetIdentity is { } old && !WindowsFileIdentity.Matches(operation.Target, old))
+            throw new IOException("旧目标无法确认，保留现场等待恢复。");
+    }
+    private void CleanupRenamedFile(FileOperation operation)
+    {
+        var payload = RenamePayload(operation);
+        if (!WindowsFileIdentity.Matches(operation.Target, payload.SourceIdentity)) throw new IOException("已提交文件标识不符，保留备份等待恢复。");
+        // Source was renamed, not copied. Never delete anything recreated there.
+        if (operation.Backup is not null && File.Exists(operation.Backup))
+        {
+            if (payload.TargetIdentity is not { } old || !WindowsFileIdentity.Matches(operation.Backup, old)) throw new IOException("旧目标备份标识不符，停止清理。");
+            if (!_recycle.SendFileToRecycleBin(operation.Backup)) throw new IOException("旧目标已保留在备份位置，回收站清理失败。");
+        }
+        operation.State = "Completed"; operation.Error = null;
     }
 
     private async Task CleanupFileAsync(FileOperation operation)
@@ -329,6 +436,11 @@ public sealed class FileOperationExecutor
                         var file = await db.Files.FirstOrDefaultAsync(f => f.Id == operation.FileId);
                         if (file is not null) db.Files.Remove(file); operation.State = "Completed";
                     }
+                }
+                else if (operation.Kind == "FileRename")
+                {
+                    if (operation.State == "Committed") CleanupRenamedFile(operation);
+                    else { RestoreRenamedFile(operation); operation.State = "Failed"; }
                 }
                 else if (operation.Kind == "DirectoryRename")
                 {
