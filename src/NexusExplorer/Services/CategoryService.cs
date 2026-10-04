@@ -221,6 +221,19 @@ public sealed class CategoryService
         c.IsPinned = true; c.PinnedOrder = (await db.Categories.MaxAsync(c => (int?)c.PinnedOrder) ?? 0) + 1; await db.SaveChangesAsync();
     }
     public Task UnpinAsync(int id) => Task.Run(() => UnpinAsyncCore(id));
+    public Task UnpinManyAsync(IReadOnlyCollection<int> categoryIds)
+    {
+        var ids = categoryIds.Distinct().ToArray();
+        return Task.Run(async () =>
+        {
+            if (ids.Length == 0) return;
+            using var lease = await MutationGate.AcquireAsync(_factory);
+            await using var db = await _factory.CreateDbContextAsync();
+            // One SQL statement commits the batch atomically; no per-label refresh or disk operation.
+            await db.Categories.Where(c => ids.Contains(c.Id) && c.IsPinned)
+                .ExecuteUpdateAsync(update => update.SetProperty(c => c.IsPinned, false));
+        });
+    }
     private async Task UnpinAsyncCore(int id)
     {
         using var lease = await MutationGate.AcquireAsync(_factory); await using var db = await _factory.CreateDbContextAsync();

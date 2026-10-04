@@ -221,8 +221,9 @@
                             <Button MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                     Style="{StaticResource PinnedCategoryButton}"
                                     Click="OnPinnedClick"
+                                    ContextMenuOpening="OnPinnedContextMenuOpening"
                                     Tag="{Binding}"
-                                    ToolTip="点击选中此分类,然后按 ✔ 归类">
+                                    ToolTip="点击选择分类；Ctrl 多选，Shift 区间选择；右键取消钉住所选标签">
                                 <Button.ContentTemplate><StaticResource ResourceKey="CategoryNavigationContent" /></Button.ContentTemplate>
                                 <Button.Content><Binding /></Button.Content>
                                 <Button.ContextMenu>

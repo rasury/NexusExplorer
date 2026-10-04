@@ -49,6 +49,12 @@ public partial class NavigationViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<Category> _pinnedCategories = new();
 
+    private readonly HashSet<int> _selectedPinnedIds = new();
+    private int? _pinnedAnchorId;
+    private bool _usingPinnedSelection;
+    [ObservableProperty] private int _selectedPinnedCount;
+    public IReadOnlyCollection<int> SelectedPinnedIds => _selectedPinnedIds.ToArray();
+
     private int? _currentFileCategoryId;
     private long _version;
 
@@ -73,7 +79,7 @@ public partial class NavigationViewModel : ObservableObject
         _currentFileCategoryId = category?.Id;
         HasCurrentFile = category is not null;
         CurrentPathText = path; Breadcrumb = new(chain); Children = new(children); PinnedCategories = new(pinned);
-        IsAtRoot = chain.Count == 0; UpdateSelectionState();
+        IsAtRoot = chain.Count == 0; SelectNavigationPin(); UpdateSelectionState();
     }
 
     /// <summary>从根到指定分类的祖先链(含自身)。</summary>
@@ -98,18 +104,27 @@ public partial class NavigationViewModel : ObservableObject
     public async Task RefreshPinnedAsync()
     {
         var pinned = await _categoryService.GetPinnedAsync();
+        if (!_usingPinnedSelection)
+        {
+            _selectedPinnedIds.Clear();
+            if (SelectedCategory is { } selected && pinned.Any(c => c.Id == selected.Id)) _selectedPinnedIds.Add(selected.Id);
+        }
+        _selectedPinnedIds.IntersectWith(pinned.Select(c => c.Id));
+        if (!pinned.Any(c => c.Id == _pinnedAnchorId)) _pinnedAnchorId = null;
+        foreach (var c in pinned) c.IsSelected = _selectedPinnedIds.Contains(c.Id);
         PinnedCategories = new ObservableCollection<Category>(pinned);
-        foreach (var c in PinnedCategories) c.IsSelected = c.Id == SelectedCategory?.Id;
+        SyncPinnedSelection();
     }
 
     public async Task RefreshAfterTreeChangeAsync()
     {
-        var selectedId = SelectedCategory?.Id;
+        var selectedId = SelectedCategory?.Id ?? (_usingPinnedSelection ? Breadcrumb.LastOrDefault()?.Id : null);
         await RefreshPinnedAsync();
-        var selected = selectedId is null ? null : await _categoryService.GetByIdAsync(selectedId.Value);
-        Breadcrumb = selected is null ? new() : new(await GetAncestorChainAsync(selected.Id));
         if (_main.CurrentFile is not null)
             CurrentPathText = await _categoryService.GetCategoryPathAsync(_main.CurrentFile.CategoryId);
+        var selected = selectedId is null ? null : await _categoryService.GetByIdAsync(selectedId.Value);
+        Breadcrumb = selected is null ? new() : new(await GetAncestorChainAsync(selected.Id));
+        if (_usingPinnedSelection && SelectedPinnedCount == 1) { await ResolvePinnedDestinationAsync(); return; }
         await RefreshChildrenAsync();
     }
 
@@ -117,18 +132,68 @@ public partial class NavigationViewModel : ObservableObject
     public async Task OnPinsChangedAsync()
     {
         await RefreshPinnedAsync();
-        UpdateSelectionState();
+        if (_usingPinnedSelection) await ResolvePinnedDestinationAsync();
+        else UpdateSelectionState();
     }
 
     /// <summary>点击快捷分类:选中它(与导航层选中互斥,共用绿勾)。</summary>
-    public async Task SelectPinnedAsync(Category category)
+    public async Task SelectPinnedAsync(Category category, bool control = false, bool shift = false)
     {
-        var version = Interlocked.Increment(ref _version);
+        if (!PinnedCategories.Any(c => c.Id == category.Id)) return;
+        Interlocked.Increment(ref _version);
+        _usingPinnedSelection = true;
+        if (shift)
+        {
+            var ids = PinnedCategories.Select(c => c.Id).ToList();
+            var anchor = _pinnedAnchorId is int id ? ids.IndexOf(id) : -1;
+            var clicked = ids.IndexOf(category.Id);
+            if (anchor < 0) { anchor = clicked; _pinnedAnchorId = category.Id; }
+            if (!control) _selectedPinnedIds.Clear();
+            for (var i = Math.Min(anchor, clicked); i <= Math.Max(anchor, clicked); i++) _selectedPinnedIds.Add(ids[i]);
+        }
+        else
+        {
+            if (!control) _selectedPinnedIds.Clear();
+            if (!control || !_selectedPinnedIds.Remove(category.Id)) _selectedPinnedIds.Add(category.Id);
+            _pinnedAnchorId = category.Id;
+        }
+        SyncPinnedSelection(); UpdateSelectionState();
+        await ResolvePinnedDestinationAsync();
+    }
+
+    public async Task UnpinSelectedAsync(int contextCategoryId)
+    {
+        var ids = _selectedPinnedIds.Contains(contextCategoryId) ? _selectedPinnedIds.ToArray() : new[] { contextCategoryId };
+        Interlocked.Increment(ref _version);
+        await _categoryService.UnpinManyAsync(ids);
+        await OnPinsChangedAsync();
+    }
+
+    private async Task ResolvePinnedDestinationAsync()
+    {
+        UpdateSelectionState();
+        if (SelectedPinnedCount != 1) return;
+        var category = PinnedCategories.First(c => _selectedPinnedIds.Contains(c.Id));
+        var version = Interlocked.Read(ref _version);
         // 快捷分类可能位于任意层级;面包屑同步展开到它的链(与导航层一致)
         var chain = await GetAncestorChainAsync(category.Id);
         if (version != Interlocked.Read(ref _version)) return;
         Breadcrumb = new ObservableCollection<Category>(chain);
         await RefreshChildrenAsync();
+    }
+
+    private void SyncPinnedSelection()
+    {
+        foreach (var c in PinnedCategories) c.IsSelected = _selectedPinnedIds.Contains(c.Id);
+        SelectedPinnedCount = _selectedPinnedIds.Count;
+    }
+
+    private void SelectNavigationPin()
+    {
+        _usingPinnedSelection = false; _selectedPinnedIds.Clear();
+        var id = Breadcrumb.LastOrDefault()?.Id;
+        if (id is int selected && PinnedCategories.Any(c => c.Id == selected)) _selectedPinnedIds.Add(selected);
+        _pinnedAnchorId = id; SyncPinnedSelection();
     }
 
     /// <summary>刷新当前层的子分类列表。</summary>
@@ -154,6 +219,7 @@ public partial class NavigationViewModel : ObservableObject
             Breadcrumb.Add(category);
 
         SelectedCategory = category;
+        SelectNavigationPin();
         await RefreshChildrenAsync();
     }
 
@@ -172,15 +238,18 @@ public partial class NavigationViewModel : ObservableObject
         }
 
         SelectedCategory = Breadcrumb.Count > 0 ? Breadcrumb[^1] : null;
+        SelectNavigationPin();
         await RefreshChildrenAsync();
     }
 
     private void UpdateSelectionState()
     {
-        SelectedCategory = Breadcrumb.Count > 0 ? Breadcrumb[^1] : null;
+        SelectedCategory = _usingPinnedSelection
+            ? SelectedPinnedCount == 1 ? PinnedCategories.FirstOrDefault(c => _selectedPinnedIds.Contains(c.Id)) : null
+            : Breadcrumb.Count > 0 ? Breadcrumb[^1] : null;
         IsSelectedCategoryCurrent = SelectedCategory is not null
             && _currentFileCategoryId == SelectedCategory.Id;
-        foreach (var c in PinnedCategories) c.IsSelected = c.Id == SelectedCategory?.Id;
+        SyncPinnedSelection();
     }
 
     /// <summary>打勾按钮:把当前文件归入选中的分类。</summary>

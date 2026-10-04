@@ -113,6 +113,7 @@ public partial class NavigationBar : UserControl
             or nameof(NavigationViewModel.HasCurrentFile)
             or nameof(NavigationViewModel.IsSelectedCategoryCurrent)
             or nameof(NavigationViewModel.SelectedCategory)
+            or nameof(NavigationViewModel.SelectedPinnedCount)
             or nameof(NavigationViewModel.PinnedCategories))
         {
             UpdateActionBar();
@@ -129,7 +130,9 @@ public partial class NavigationBar : UserControl
             && Vm.SelectedCategory is not null
             && !Vm.IsSelectedCategoryCurrent;
 
-        ConfirmButton.ToolTip = Vm.IsSelectedCategoryCurrent
+        ConfirmButton.ToolTip = Vm.SelectedPinnedCount > 1
+            ? "多选用于批量取消钉住，请单选一个分类后归类"
+            : Vm.IsSelectedCategoryCurrent
             ? "文件已在此分类中"
             : Vm.SelectedCategory is null
                 ? "先点击选择一个分类"
@@ -184,7 +187,7 @@ public partial class NavigationBar : UserControl
         if (sender is not Button { Tag: Category category }) return;
         try
         {
-            await Vm.SelectPinnedAsync(category);
+            await HandlePinnedClickAsync(category, System.Windows.Input.Keyboard.Modifiers);
             UpdateActionBar();
         }
         catch (Exception ex)
@@ -195,6 +198,26 @@ public partial class NavigationBar : UserControl
         }
     }
 
+    internal Task HandlePinnedClickAsync(Category category, System.Windows.Input.ModifierKeys modifiers)
+        => Vm.SelectPinnedAsync(category, modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control), modifiers.HasFlag(System.Windows.Input.ModifierKeys.Shift));
+
+    private async void OnPinnedContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (sender is not Button button) return;
+        try { await PreparePinnedContextAsync(button); }
+        catch (Exception ex) { MessageBox.Show(ex.Message, "分类导航", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
+    internal async Task PreparePinnedContextAsync(Button button)
+    {
+        if (button is not { Tag: Category category, ContextMenu: { } menu }) return;
+        // Right-click a selected label preserves the group; an unselected label becomes the sole target.
+        var selection = !Vm.SelectedPinnedIds.Contains(category.Id) ? Vm.SelectPinnedAsync(category) : Task.CompletedTask;
+        if (menu.Items[0] is MenuItem action)
+            action.Header = Vm.SelectedPinnedCount > 1 ? $"✖ 取消钉住（{Vm.SelectedPinnedCount} 个）" : "✖ 取消钉住";
+        await selection;
+    }
+
     /// <summary>右键取消钉住(入口在快捷分类按钮上)。</summary>
     private async void OnUnpinCategory(object sender, RoutedEventArgs e)
     {
@@ -202,8 +225,7 @@ public partial class NavigationBar : UserControl
         {
             if (sender is MenuItem { Parent: ContextMenu menu } && menu.PlacementTarget is Button { Tag: Category category })
             {
-                await _main.Category.UnpinAsync(category.Id);
-                await Vm.OnPinsChangedAsync();
+                await Vm.UnpinSelectedAsync(category.Id);
                 UpdateActionBar();
             }
         }
