@@ -155,9 +155,7 @@ public partial class CategoryFilePanel : UserControl
     }
     private async void OnCategoryDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (IsControlChrome(e.OriginalSource as DependencyObject)) return;
-        if (FindAncestor<TextBlock>(e.OriginalSource as DependencyObject) is null) return;
-        if (FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.Header is not Category c) return;
+        if (e.ChangedButton != MouseButton.Left || HitCategory(e.OriginalSource as DependencyObject) is not { } c) return;
         e.Handled = true; await RunAsync(() => _main.SelectCategoryAsync(c));
     }
     private async void OnFileDoubleClick(object sender, MouseButtonEventArgs e)
