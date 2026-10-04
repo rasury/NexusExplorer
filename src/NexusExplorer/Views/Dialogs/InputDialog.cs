@@ -22,7 +22,7 @@ public static class InputDialog
             Title = title,
             Style = (Style)System.Windows.Application.Current.Resources["DialogWindow"],
             Width = 380,
-            Owner = System.Windows.Application.Current.MainWindow
+            Owner = DialogChrome.Owner
         };
         DialogChrome.Apply(dialog);
 
@@ -47,21 +47,21 @@ public static class InputDialog
         };
         cancelButton.Click += (_, _) => dialog.Close();
 
-        var dialogContent = new StackPanel { Margin = new Thickness(20) };
+        var dialogContent = new StackPanel();
         dialogContent.Children.Add(new TextBlock
         {
             Text = label,
-            Style = (Style)System.Windows.Application.Current.Resources["TextSecondary"]
+            Style = (Style)System.Windows.Application.Current.Resources["TextSecondary"],
+            TextWrapping = TextWrapping.Wrap
         });
         dialogContent.Children.Add(textBox);
-        dialogContent.Children.Add(new StackPanel
+        var buttons = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
             Children = { okButton, cancelButton }
-        });
-
-        dialog.Content = dialogContent;
+        };
+        DialogChrome.SetContent(dialog, dialogContent, buttons);
 
         textBox.Focus();
         textBox.SelectAll();

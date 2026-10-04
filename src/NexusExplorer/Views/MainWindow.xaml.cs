@@ -1,3 +1,4 @@
+using MessageBox = NexusExplorer.Views.Dialogs.MessageDialog;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using NexusExplorer.Services;

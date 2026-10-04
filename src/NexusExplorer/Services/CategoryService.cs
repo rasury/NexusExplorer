@@ -81,7 +81,9 @@ public sealed class CategoryService
             throw new OperationException("分类名称不能使用 Windows 保留名称。");
     }
     public Task<Category> CreateAsync(string name, int? parentId) => Task.Run(() => CreateAsyncCore(name, parentId));
-    private async Task<Category> CreateAsyncCore(string name, int? parentId)
+    public Task<Category> BindExistingDirectoryAsync(string name, int? parentId, string confirmedPath)
+        => Task.Run(() => CreateAsyncCore(name, parentId, confirmedPath));
+    private async Task<Category> CreateAsyncCore(string name, int? parentId, string? confirmedPath = null)
     {
         name = name.Trim(); ValidateName(name); using var lease = await MutationGate.AcquireAsync(_factory);
         await using var db = await _factory.CreateDbContextAsync(); var all = await AllAsync(db);
@@ -89,9 +91,18 @@ public sealed class CategoryService
         if (parentId is not null && parent is null) throw new OperationException("父分类不存在。");
         if (Depth(all, parent) + 1 > MaxDepth) throw new OperationException("分类最多支持 10 层。");
         if (all.Any(c => c.ParentId == parentId && string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))) throw new OperationException("分类名称已存在");
-        var path = Path.Combine(parent?.PhysicalPath ?? StorageRoot, name);
-        if (Directory.Exists(path) || File.Exists(path)) throw new OperationException("目标目录已存在，请使用重新定位关联已有目录。");
-        Directory.CreateDirectory(path);
+        var path = Path.GetFullPath(Path.Combine(parent?.PhysicalPath ?? StorageRoot, name));
+        if (confirmedPath is not null && !string.Equals(path, Path.GetFullPath(confirmedPath), StringComparison.OrdinalIgnoreCase))
+            throw new OperationException("分类目录位置已变化，请重新创建并确认绑定。");
+        if (all.Any(c => string.Equals(Path.GetFullPath(c.PhysicalPath), path, StringComparison.OrdinalIgnoreCase)))
+            throw new OperationException("此目录已绑定其他分类，不能重复绑定。");
+        if (File.Exists(path)) throw new OperationException("目标位置已有同名文件，不能创建分类目录。");
+        var existed = Directory.Exists(path);
+        if (existed && confirmedPath is null) throw new ExistingCategoryDirectoryException(path);
+        if (!existed && confirmedPath is not null) throw new OperationException("待绑定的目录已不存在，请重新创建分类。");
+        if (existed && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            throw new OperationException("不能绑定链接或联接目录，请选择实际目录。");
+        if (!existed) Directory.CreateDirectory(path);
         try
         {
             await using var transaction = await db.Database.BeginTransactionAsync();
@@ -105,7 +116,7 @@ public sealed class CategoryService
                 SortOrder = all.Where(c => c.ParentId == parentId).Select(c => c.SortOrder).DefaultIfEmpty().Max() + 1, CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now };
             db.Categories.Add(c); await db.SaveChangesAsync(); await transaction.CommitAsync(); return c;
         }
-        catch { if (Directory.Exists(path) && !Directory.EnumerateFileSystemEntries(path).Any()) Directory.Delete(path); throw; }
+        catch { if (!existed && Directory.Exists(path) && !Directory.EnumerateFileSystemEntries(path).Any()) Directory.Delete(path); throw; }
     }
     public Task<Category> EnsurePathAsync(int baseCategoryId, IReadOnlyList<string> names) => Task.Run(() => EnsurePathAsyncCore(baseCategoryId, names));
     private async Task<Category> EnsurePathAsyncCore(int baseCategoryId, IReadOnlyList<string> names)

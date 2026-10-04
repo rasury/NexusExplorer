@@ -74,7 +74,16 @@ public partial class CategoryViewModel : ObservableObject
     {
         try
         {
-            await _categoryService.CreateAsync(name.Trim(), parentId);
+            try
+            {
+                await _categoryService.CreateAsync(name.Trim(), parentId);
+            }
+            catch (ExistingCategoryDirectoryException ex)
+            {
+                var message = $"目录已存在，是否绑定？\n\n{ex.DirectoryPath}\n\n绑定只创建分类记录，保留目录和文件原样，不自动添加其中的文件。";
+                if (ShowConfirmDialog is null || !await ShowConfirmDialog(message)) return;
+                await _categoryService.BindExistingDirectoryAsync(name.Trim(), parentId, ex.DirectoryPath);
+            }
             await _main.RefreshTreeAsync();
         }
         catch (OperationException ex)

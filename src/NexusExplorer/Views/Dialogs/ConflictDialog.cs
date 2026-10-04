@@ -12,22 +12,28 @@ public static class ConflictDialog
         => ShowDecision(fileName, targetPath).Resolution;
     public static ConflictDecision ShowDecision(string fileName, string targetPath)
     {
-        ConflictResolution result = ConflictResolution.Ask;
-        bool applyToAll = false;
+        var result = new ConflictDecision(ConflictResolution.Ask, false);
+        var dialog = Create(fileName, targetPath, decision => result = decision);
+        dialog.ShowDialog();
+        return result;
+    }
+
+    internal static Window Create(string fileName, string targetPath, Action<ConflictDecision> select)
+    {
 
         var dialog = new Window
         {
             Title = "文件冲突",
             Style = (Style)System.Windows.Application.Current.Resources["DialogWindow"],
             Width = 460,
-            Owner = System.Windows.Application.Current.MainWindow,
+            Owner = DialogChrome.Owner,
             ResizeMode = ResizeMode.NoResize
         };
         DialogChrome.Apply(dialog);
 
         var applyToAllCheckBox = CreateApplyToAllCheckBox();
 
-        var panel = new StackPanel { Margin = new Thickness(20) };
+        var panel = new StackPanel();
         panel.Children.Add(new TextBlock
         {
             Text = $"目标目录已存在同名文件:",
@@ -51,7 +57,7 @@ public static class ConflictDialog
         });
         panel.Children.Add(new TextBlock { Text = "跳过：使用目标目录已有文件，保留外部源文件；若目标已有分类记录则提示冲突。", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
 
-        var buttons = new StackPanel
+        var buttons = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right
@@ -64,12 +70,11 @@ public static class ConflictDialog
                 Content = text,
                 Style = (Style)System.Windows.Application.Current.Resources[styleKey],
                 MinWidth = 88,
-                Margin = new Thickness(marginLeft, 0, 0, 0)
+                Margin = new Thickness(marginLeft, 0, 0, 6)
             };
             button.Click += (_, _) =>
             {
-                result = resolution;
-                applyToAll = applyToAllCheckBox.IsChecked == true;
+                select(new ConflictDecision(resolution, applyToAllCheckBox.IsChecked == true));
                 dialog.Close();
             };
             buttons.Children.Add(button);
@@ -81,13 +86,8 @@ public static class ConflictDialog
         AddButton("取消整理", ConflictResolution.Ask, "ButtonGhost");
 
         panel.Children.Add(applyToAllCheckBox);
-        panel.Children.Add(buttons);
-
-        dialog.Content = panel;
-        dialog.ShowDialog();
-
-        // 取消整理:返回特殊标记(Ask 表示中止)
-        return new ConflictDecision(result, applyToAll);
+        DialogChrome.SetContent(dialog, panel, buttons);
+        return dialog;
     }
     internal static CheckBox CreateApplyToAllCheckBox()
     {

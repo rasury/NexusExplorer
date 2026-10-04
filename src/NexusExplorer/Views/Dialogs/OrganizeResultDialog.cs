@@ -8,6 +8,9 @@ namespace NexusExplorer.Views.Dialogs;
 public static class OrganizeResultDialog
 {
     public static void Show(string categoryName, List<OrganizeFileResult> results)
+        => Create(categoryName, results).ShowDialog();
+
+    internal static Window Create(string categoryName, List<OrganizeFileResult> results)
     {
         var moved = results.Count(r => r.Outcome is OrganizeOutcome.Moved);
         var renamed = results.Count(r => r.Outcome is OrganizeOutcome.Renamed);
@@ -19,9 +22,9 @@ public static class OrganizeResultDialog
         var summary = $"分类「{categoryName}」整理完成:\n" +
                       $"移动 {moved + renamed} 个(重命名保留{renamed} 个)\n" +
                       $"跳过 {skipped} 个,已有 {already} 个\n" +
-                      $"  失效 {missing} 个,失败 {failed} 个";
+                      $"失效 {missing} 个,失败 {failed} 个";
 
-        var panel = new StackPanel { Margin = new Thickness(20) };
+        var panel = new StackPanel();
         panel.Children.Add(new TextBlock
         {
             Text = summary,
@@ -66,8 +69,7 @@ public static class OrganizeResultDialog
             Title = "整理结果",
             Style = (Style)System.Windows.Application.Current.Resources["DialogWindow"],
             Width = 480,
-            Owner = System.Windows.Application.Current.MainWindow,
-            Content = panel
+            Owner = DialogChrome.Owner
         };
         DialogChrome.Apply(dialog);
 
@@ -80,8 +82,9 @@ public static class OrganizeResultDialog
             Margin = new Thickness(0, 16, 0, 0)
         };
         okButton.Click += (_, _) => dialog.Close();
-        panel.Children.Add(okButton);
-
-        dialog.ShowDialog();
+        okButton.IsDefault = true;
+        okButton.IsCancel = true;
+        DialogChrome.SetContent(dialog, panel, okButton);
+        return dialog;
     }
 }
