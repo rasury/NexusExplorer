@@ -85,7 +85,7 @@
         <!-- 分类树 -->
         <Grid Grid.Row="1" Margin="8">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Border x:Name="RootDropZone" Background="{DynamicResource BrushAccentBlueLight}" CornerRadius="16" Padding="16,8" AllowDrop="True" DragOver="OnRootDragOver" Drop="OnRootDrop">
+        <Border x:Name="RootDropZone" Background="{DynamicResource BrushAccentBlueLight}" CornerRadius="16" Padding="16,8" Margin="0,0,0,8" AllowDrop="True" DragOver="OnRootDragOver" Drop="OnRootDrop">
             <TextBlock Text="⌂ 顶层" Style="{StaticResource TextCaption}" />
         </Border>
         <TreeView x:Name="CategoryTree"

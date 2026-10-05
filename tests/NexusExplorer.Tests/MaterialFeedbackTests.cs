@@ -20,6 +20,48 @@ namespace NexusExplorer.Tests;
 public class MaterialFeedbackTests
 {
     [Fact]
+    public async Task RootNavigationButtonDisplaysItsLabelAndReturnsToRoot()
+    {
+        using var host = new TestHost();
+        var category = await host.Categories.CreateAsync("父分类", null);
+        await host.Categories.CreateAsync("子分类", category.Id);
+        await WpfTestHost.RunAsync(async () =>
+        {
+            var main = new MainViewModel(host.Categories, host.Files, host.Organization, new FakePlaybackEngine());
+            var bar = new NavigationBar(); bar.Initialize(main);
+            await main.Navigation.NavigateToAsync(category);
+            bar.Measure(new Size(960, 400)); bar.Arrange(new Rect(0, 0, 960, bar.DesiredSize.Height)); bar.UpdateLayout();
+            var button = (Button)bar.FindName("RootBackButton");
+            Assert.Equal(Visibility.Visible, button.Visibility);
+            Assert.Contains(Descendants<TextBlock>(button), text => text.Text.Contains("顶层") && text.ActualWidth > 0);
+            Assert.Contains(Descendants<TextBlock>((ItemsControl)bar.FindName("ChildrenHost")), text => text.Text == "子分类");
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            await BoundedDialogTests.Until(() => main.Navigation.IsAtRoot && main.Navigation.Children.Any(c => c.Id == category.Id));
+            Assert.Empty(main.Navigation.Breadcrumb);
+            Assert.Null(main.Navigation.SelectedCategory);
+            Assert.Equal(Visibility.Collapsed, button.Visibility);
+        });
+    }
+
+    [Fact]
+    public async Task RootDropZoneHasEightPixelGapBeforeCategoryList()
+    {
+        using var host = new TestHost();
+        await WpfTestHost.RunAsync(() =>
+        {
+            var main = new MainViewModel(host.Categories, host.Files, host.Organization, new FakePlaybackEngine());
+            var panel = new CategoryFilePanel(); panel.Initialize(main, host.RecycleBin);
+            panel.Measure(new Size(400, 800)); panel.Arrange(new Rect(0, 0, 400, 800)); panel.UpdateLayout();
+            var root = (Border)panel.FindName("RootDropZone");
+            var tree = (TreeView)panel.FindName("CategoryTree");
+            var rootBottom = root.TranslatePoint(new Point(0, root.ActualHeight), panel).Y;
+            var treeTop = tree.TranslatePoint(new Point(), panel).Y;
+            Assert.InRange(treeTop - rootBottom, 8, 9);
+            Assert.True(tree.ActualHeight > 80);
+        });
+    }
+
+    [Fact]
     public async Task VolumeThumbAndIconShareTheSameVerticalCenter()
     {
         using var host=new TestHost();

@@ -16,7 +16,6 @@
         </DataTemplate>
         <Style x:Key="NavCategoryButton" TargetType="Button" BasedOn="{StaticResource ButtonText}">
             <Setter Property="MaxWidth" Value="160"/>
-            <Setter Property="ContentTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/></DataTemplate></Setter.Value></Setter>
             <Setter Property="Background" Value="{DynamicResource BrushAccentBlueLight}"/>
             <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
             <Setter Property="Margin" Value="0,0,8,8"/>
