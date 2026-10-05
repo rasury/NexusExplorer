@@ -11,7 +11,12 @@
         <DataTemplate x:Key="CategoryNavigationContent" DataType="{x:Type models:Category}">
             <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
         </DataTemplate>
+        <DataTemplate x:Key="NavigationInlineContent" DataType="{x:Type models:Category}">
+            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" VerticalAlignment="Center" />
+        </DataTemplate>
         <Style x:Key="NavCategoryButton" TargetType="Button" BasedOn="{StaticResource ButtonText}">
+            <Setter Property="MaxWidth" Value="160"/>
+            <Setter Property="ContentTemplate"><Setter.Value><DataTemplate><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}"/></DataTemplate></Setter.Value></Setter>
             <Setter Property="Background" Value="{DynamicResource BrushAccentBlueLight}"/>
             <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
             <Setter Property="Margin" Value="0,0,8,8"/>
@@ -57,23 +62,23 @@
                            VerticalAlignment="Center" />
             </StackPanel>
 
-            <ScrollViewer Grid.Column="1"
-                          HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto" MaxHeight="112"
+            <ScrollViewer x:Name="NavigationScroll" Grid.Column="1"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled" MaxHeight="64"
                           VerticalAlignment="Center">
-                <WrapPanel>
+                <StackPanel Orientation="Horizontal">
                     <!-- 面包屑(导航路径) -->
                     <ItemsControl x:Name="BreadcrumbHost"
                                   ItemsSource="{Binding Breadcrumb}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel />
+                                <StackPanel Orientation="Horizontal" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:Category}">
                                 <StackPanel Orientation="Horizontal">
-                                    <Button Content="{Binding}" ContentTemplate="{StaticResource CategoryNavigationContent}"
+                                    <Button Content="{Binding}" ContentTemplate="{StaticResource NavigationInlineContent}"
                                             Style="{StaticResource NavCategoryButton}"
                                             Click="OnBreadcrumbClick"
                                             Tag="{Binding}" />
@@ -94,31 +99,33 @@
 
                     <!-- 当前层子分类 -->
                     <ItemsControl x:Name="ChildrenHost"
-                                  ItemsSource="{Binding Children}">
+                                  >
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <WrapPanel />
+                                <StackPanel Orientation="Horizontal" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:Category}">
-                                <Button Content="{Binding}" ContentTemplate="{StaticResource CategoryNavigationContent}"
+                                <Button Content="{Binding}" ContentTemplate="{StaticResource NavigationInlineContent}"
                                         Style="{StaticResource NavCategoryButton}"
                                         Click="OnCategoryClick"
                                         Tag="{Binding}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </WrapPanel>
+                </StackPanel>
             </ScrollViewer>
 
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button x:Name="MoreChildrenButton" Style="{StaticResource ButtonGhost}" Click="OnMoreChildren" Content="更多子分类" Margin="8,0,0,8"/>
             <!-- 绿色打勾(两层共用) -->
             <Button x:Name="ConfirmButton"
                     Grid.Column="2"
                     Style="{StaticResource ConfirmButton}"
                     VerticalAlignment="Center"
                     Margin="16,0,0,0"
-                    Click="OnConfirmClick"><md:PackIcon Kind="Check" Width="24" Height="24"/></Button>
+                    Click="OnConfirmClick"><md:PackIcon Kind="Check" Width="24" Height="24"/></Button></StackPanel>
         </Grid>
 
         <!-- ===== 第二层:快捷分类(钉) ===== -->

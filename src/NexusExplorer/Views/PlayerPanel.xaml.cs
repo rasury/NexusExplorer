@@ -22,7 +22,24 @@ public partial class PlayerPanel : UserControl
     private bool _initialized;
     private bool _panning;
     private bool _dialogCovered;
-    internal void SetDialogCovered(bool covered) { _dialogCovered = covered; UpdateUi(); }
+    private Window? _suspendedForeground;
+    internal void SetDialogCovered(bool covered)
+    {
+        _dialogCovered = covered;
+        VideoClickSurface.Visibility = covered ? Visibility.Collapsed : Visibility.Visible;
+        if (covered)
+        {
+            var foreground = Window.GetWindow(VideoClickSurface);
+            if (foreground is not null && foreground != Window.GetWindow(this) && foreground.IsVisible)
+            { _suspendedForeground = foreground; foreground.Hide(); }
+        }
+        else if (_suspendedForeground is { } foreground)
+        {
+            _suspendedForeground = null;
+            if (Vm.Kind == MediaKind.Video && IsLoaded) foreground.Show();
+        }
+        UpdateUi();
+    }
     private Point _panStart;
     private double _effectiveScale = 1;
     private readonly NativeVideoBackground _nativeBackground = new();
@@ -86,7 +103,7 @@ public partial class PlayerPanel : UserControl
     private void UpdateUi()
     {
         var media = Vm.Kind is MediaKind.Video or MediaKind.Audio;
-        VideoView.Visibility = Vm.Kind == MediaKind.Video && !_dialogCovered ? Visibility.Visible : Visibility.Collapsed;
+        VideoView.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Collapsed;
         if (Vm.Kind == MediaKind.Video) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)ApplyNativeBackground);
         ImageScroll.Visibility = Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         AudioLayer.Visibility = Vm.Kind == MediaKind.Audio ? Visibility.Visible : Visibility.Collapsed;
@@ -104,7 +121,8 @@ public partial class PlayerPanel : UserControl
         RefreshPlaybackUi();
     }
     private async void OnPlayPause(object sender, RoutedEventArgs e) => await RunAsync(Vm.TogglePlayPauseAsync);
-    private async void OnVideoAreaClick(object sender, MouseButtonEventArgs e) => await RunAsync(Vm.TogglePlayPauseAsync);
+    private async void OnVideoAreaClick(object sender, MouseButtonEventArgs e)
+    { if (!_dialogCovered) await RunAsync(Vm.TogglePlayPauseAsync); }
     private async void OnStop(object sender, RoutedEventArgs e) => await RunAsync(Vm.StopPlaybackAsync);
     private async void OnPrevious(object sender, RoutedEventArgs e) => await RunAsync(Vm.PreviousAsync);
     private async void OnNext(object sender, RoutedEventArgs e) => await RunAsync(Vm.NextAsync);

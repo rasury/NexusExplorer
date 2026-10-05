@@ -113,6 +113,7 @@ public partial class NavigationBar : UserControl
             or nameof(NavigationViewModel.IsSelectedCategoryCurrent)
             or nameof(NavigationViewModel.SelectedCategory)
             or nameof(NavigationViewModel.SelectedPinnedCount)
+            or nameof(NavigationViewModel.Children)
             or nameof(NavigationViewModel.PinnedCategories))
         {
             UpdateActionBar();
@@ -121,6 +122,9 @@ public partial class NavigationBar : UserControl
 
     private void UpdateActionBar()
     {
+        ChildrenHost.ItemsSource = Vm.Children.Take(3).ToList();
+        MoreChildrenButton.Visibility = Vm.Children.Count > 3 ? Visibility.Visible : Visibility.Collapsed;
+        MoreChildrenButton.Content = $"全部子分类（{Vm.Children.Count}）";
         RootBackButton.Visibility = Vm.Breadcrumb.Count > 0
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -155,6 +159,16 @@ public partial class NavigationBar : UserControl
             await MessageDialog.ShowAsync($"导航失败: {ex.Message}", "分类导航",
                 DialogButtons.Ok, DialogSeverity.Warning);
         }
+    }
+
+    private async void OnMoreChildren(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var selected = await CategoryPickerDialog.ShowAsync(Vm.Children.ToList());
+            if (selected is not null) await Vm.NavigateToAsync(selected);
+        }
+        catch (Exception ex) { await MessageDialog.ShowAsync(ex.Message, "分类导航", severity: DialogSeverity.Warning); }
     }
 
     /// <summary>面包屑回退。</summary>

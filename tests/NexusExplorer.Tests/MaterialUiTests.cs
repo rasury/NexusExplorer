@@ -123,7 +123,7 @@ public class MaterialUiTests
                 await main.SelectCategoryAsync(category);await main.SelectFileAsync(file);await BoundedDialogTests.Until(()=>engine.Snapshot.Position.TotalMilliseconds>100);
                 var player=(PlayerPanel)window.FindName("PlayerArea");var video=(FrameworkElement)player.FindName("VideoView");
                 var prompt=MessageDialog.ShowAsync("视频播放期间的提示","提示");var root=(DialogHost)window.FindName("RootDialog");await BoundedDialogTests.Until(()=>root.IsOpen);
-                Assert.Equal(Visibility.Collapsed,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
+                Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
                 ((DialogSurface)root.DialogContent!).Complete(DialogAnswer.Ok);await prompt;
                 Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
                 await engine.StopAndReleaseAsync();using var exclusive=File.Open(path,FileMode.Open,FileAccess.ReadWrite,FileShare.None);

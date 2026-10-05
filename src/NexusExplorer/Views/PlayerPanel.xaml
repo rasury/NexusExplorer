@@ -3,7 +3,7 @@
   <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <md:Card x:Name="PreviewCard" Background="Black" UniformCornerRadius="16" md:ElevationAssist.Elevation="Dp0" ClipContent="True">
    <Grid Background="Black">
-    <vlc:VideoView x:Name="VideoView" Background="Black" Visibility="Collapsed"><Grid Background="#02000000" MouseLeftButtonUp="OnVideoAreaClick"/></vlc:VideoView>
+    <vlc:VideoView x:Name="VideoView" Background="Black" Visibility="Collapsed"><Grid x:Name="VideoClickSurface" Background="#02000000" MouseLeftButtonUp="OnVideoAreaClick"/></vlc:VideoView>
     <ScrollViewer x:Name="ImageScroll" Visibility="Collapsed" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="Black" SizeChanged="OnImageSizeChanged">
      <Image x:Name="ImageDisplay" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality" MouseWheel="OnImageWheel" MouseLeftButtonDown="OnImageMouseDown" MouseLeftButtonUp="OnImageMouseUp" MouseMove="OnImageMouseMove" Cursor="SizeAll"/>
     </ScrollViewer>
@@ -32,8 +32,11 @@
      <Button x:Name="ModeButton" Style="{StaticResource ButtonOnPlayer}" Click="OnCycleMode"><StackPanel Orientation="Horizontal"><md:PackIcon x:Name="ModeIcon" Kind="PlaylistPlay" Width="24" Height="24" Margin="0,0,8,0"/><TextBlock x:Name="ModeLabel" Text="顺序" VerticalAlignment="Center"/></StackPanel></Button>
     </WrapPanel>
     <WrapPanel x:Name="MediaSettingsRow" Grid.Row="2" HorizontalAlignment="Center">
-     <md:PackIcon Kind="VolumeHigh" Width="24" Height="24" Margin="8,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource BrushSecondaryText}"/>
-     <Slider x:Name="VolumeSlider" Width="112" Minimum="0" Maximum="100" Value="100" IsMoveToPointEnabled="True" ValueChanged="OnVolumeChanged" Margin="0,0,16,0"/>
+     <Grid Height="40" Margin="8,0,16,0">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="8"/><ColumnDefinition Width="112"/></Grid.ColumnDefinitions>
+      <md:PackIcon x:Name="VolumeIcon" Kind="VolumeHigh" Width="24" Height="24" VerticalAlignment="Center" Foreground="{DynamicResource BrushSecondaryText}"/>
+      <Slider x:Name="VolumeSlider" Grid.Column="2" Height="20" VerticalAlignment="Center" Minimum="0" Maximum="100" Value="100" IsMoveToPointEnabled="True" ValueChanged="OnVolumeChanged"/>
+     </Grid>
      <CheckBox x:Name="HardwareCheck" Content="硬件解码" Margin="0,0,16,0" VerticalAlignment="Center" ToolTip="关闭后使用软件解码；下次打开媒体生效" Checked="OnHardwareChanged" Unchecked="OnHardwareChanged"/>
      <Button Style="{StaticResource ButtonText}" Click="OnAudioTracks"><StackPanel Orientation="Horizontal"><md:PackIcon Kind="Tune" Width="24" Height="24" Margin="0,0,8,0"/><TextBlock Text="音轨" VerticalAlignment="Center"/></StackPanel></Button>
     </WrapPanel>
