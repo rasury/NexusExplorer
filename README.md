@@ -2,6 +2,8 @@
 
 Windows x64 分类文件管理与媒体查看软件，使用 WPF、SQLite、EF Core、LibVLC 与三区布局。当前为预览版；本次音频播放与音轨切换修正已通过用户验收。
 
+当前打包 LibVLC Windows 3.0.24，继续使用 LibVLCSharp.WPF 3.9.1。此次仅升级原生引擎，保留现有解复用、硬件解码和 MMDevice/WASAPI＋Speex 参数；新版本的实际听感及问题视频表现仍需复验。
+
 界面统一采用 MaterialDesignInXaml 5.3.2 与 `MaterialDesign3.Defaults`：8dp 间距、标准侧栏 DrawerHost、ColorZone 顶栏／底栏、Card 播放器、Material 控件与水波纹。默认跟随 Windows 明暗主题，右上角“外观设置”可切换浅色、深色或跟随系统；设置保存到 `Appearance.ThemeMode`。主色蓝紫、辅助色青绿；分类文件夹仍用橙色／绿色表示整理状态。
 
 提示、输入、冲突、重新定位预览、整理结果、外观和音轨选择全部通过异步 `DialogHost.Show` 展示；长内容滚动，操作按钮固定在底部。应用启动／恢复阶段也使用临时 DialogHost，退出会取消待处理对话框。文件和目录选择使用 Windows 系统选择器，右键菜单使用框架 Material 菜单样式。主窗口采用框架独立窗口式 DialogHost，弹窗期间隐藏视频控件额外的鼠标前景层，视频画面和声音继续；关闭后恢复点击层，避免原生视频遮挡或截获弹窗点击。

@@ -37,6 +37,8 @@ public class VideoPlaybackSmokeTests : IDisposable
         {
             using var engine = new MediaPlayerService(Dispatcher.CurrentDispatcher) { HardwareDecoding = false };
             await engine.InitializeAsync();
+            Assert.StartsWith("3.0.24", engine.VlcVersion);
+            Assert.Equal("3.9.1.0", typeof(LibVLC).Assembly.GetName().Version!.ToString());
             if (video)
             {
                 window = CreateWindowEx(0, "STATIC", "Nexus silent audio test", unchecked((int)0x80000000),
@@ -66,6 +68,9 @@ public class VideoPlaybackSmokeTests : IDisposable
             await WaitUntilAsync(() => engine.Snapshot.IsPlaying);
             await engine.StopAndReleaseAsync();
             using var exclusive = File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            var evidenceDirectory = Path.GetFullPath("../../../../../artifacts/vlc3024-verification", AppContext.BaseDirectory);
+            Directory.CreateDirectory(evidenceDirectory);
+            File.WriteAllLines(Path.Combine(evidenceDirectory, video ? "video-modules.log" : "audio-modules.log"), messages.Messages);
         }
         finally
         {

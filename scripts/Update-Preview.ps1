@@ -99,6 +99,33 @@ foreach ($taskDocument in @('docs/ACCEPTANCE.md', 'docs/VERIFICATION.md', 'docs/
 if (-not ($taskCopies | Where-Object { $_.Destination -eq $taskExecutable })) {
     throw '程序目标与受保护数据路径冲突，固定目录未修改。'
 }
+# An SDK upgrade must not leave removed native DLLs alongside the new plugins.
+$taskNativeOutput = Resolve-UpdatePath 'libvlc/win-x64' $taskOutput
+$taskNativeSource = Join-Path $taskSource 'libvlc/win-x64'
+$taskNativeFiles = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+foreach ($taskFile in Get-ChildItem -LiteralPath $taskNativeSource -File -Recurse) {
+    [void]$taskNativeFiles.Add([IO.Path]::GetRelativePath($taskNativeSource, $taskFile.FullName))
+}
+foreach ($taskRequired in @('libvlc.dll', 'libvlccore.dll', 'plugins/plugins.dat')) {
+    if (Test-Protected (Join-Path $taskNativeOutput $taskRequired)) {
+        throw 'VLC 必需文件与受保护数据路径冲突，固定目录未修改。'
+    }
+}
+$taskStaleNative = [Collections.Generic.List[string]]::new()
+if (Test-Path -LiteralPath $taskNativeOutput) {
+    Assert-NoJunction $taskNativeOutput
+    foreach ($taskFile in Get-ChildItem -LiteralPath $taskNativeOutput -Filter '*.dll' -File -Recurse) {
+        $taskPath = [IO.Path]::GetFullPath($taskFile.FullName)
+        if (-not (Test-Within $taskPath $taskNativeOutput) -or -not (Test-Within $taskPath $taskOutput)) {
+            throw '旧 VLC 文件越出程序目录，停止更新。'
+        }
+        if (Test-Protected $taskPath) { continue }
+        if (-not $taskNativeFiles.Contains([IO.Path]::GetRelativePath($taskNativeOutput, $taskPath))) {
+            Assert-NoJunction $taskPath
+            $taskStaleNative.Add($taskPath)
+        }
+    }
+}
 # Detect locked program files before replacing any file. Do not stop a user process.
 foreach ($taskCopy in $taskCopies) {
     if (Test-Path -LiteralPath $taskCopy.Destination -PathType Leaf) {
@@ -106,6 +133,11 @@ foreach ($taskCopy in $taskCopies) {
         $taskLock.Dispose()
     }
 }
+foreach ($taskPath in $taskStaleNative) {
+    $taskLock = [IO.File]::Open($taskPath, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    $taskLock.Dispose()
+}
+foreach ($taskPath in $taskStaleNative) { Remove-Item -LiteralPath $taskPath -Force }
 foreach ($taskCopy in $taskCopies) {
     if ($taskCopy.Source.Equals($taskCopy.Destination, [StringComparison]::OrdinalIgnoreCase)) { continue }
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($taskCopy.Destination)) | Out-Null

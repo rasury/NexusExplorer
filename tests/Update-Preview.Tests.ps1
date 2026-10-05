@@ -17,6 +17,7 @@ Write-Fixture 'published/release.json' '{"version":"NEW"}'
 Write-Fixture 'published/libvlc/win-x64/libvlc.dll' 'NEW VLC'
 Write-Fixture 'published/libvlc/win-x64/libvlccore.dll' 'NEW VLC CORE'
 Write-Fixture 'published/libvlc/win-x64/plugins/plugins.dat' 'PLUGIN CACHE'
+Write-Fixture 'published/libvlc/win-x64/plugins/new-module.dll' 'NEW MODULE'
 Write-Fixture 'published/Storage/keep.txt' 'POISON'
 Write-Fixture 'published/data/nexus.db' 'POISON'
 Write-Fixture 'published/logs/keep.log' 'POISON'
@@ -26,6 +27,8 @@ Write-Fixture 'published/libvlc/private-db.dll-wal' 'POISON'
 Write-Fixture 'published/libvlc/user-storage/keep.dll' 'POISON'
 Write-Fixture 'fixed/NexusExplorer.exe' 'OLD EXE'
 Write-Fixture 'fixed/native.dll' 'OLD DLL'
+Write-Fixture 'fixed/libvlc/win-x64/plugins/obsolete-module.dll' 'OLD MODULE'
+Write-Fixture 'fixed/libvlc/win-x64/user-storage/keep.dll' 'MY SDK-AREA STORAGE'
 Write-Fixture 'fixed/Storage/keep.txt' 'MY STORAGE'
 Write-Fixture 'fixed/data/nexus.db' 'MY DB'
 Write-Fixture 'fixed/data/nexus.db-wal' 'MY WAL'
@@ -38,9 +41,9 @@ Write-Fixture 'fixed/libvlc/user-storage/keep.dll' 'MY CUSTOM STORAGE'
 Write-Fixture 'fixed/appsettings.json' (@{
     Database = @{ Path = 'libvlc/private-db.dll' }
     Storage = @{ RootPath = 'libvlc/user-storage' }
-    Logging = @{ Directory = '' }
+    Logging = @{ Directory = 'libvlc/win-x64/user-storage' }
 } | ConvertTo-Json -Depth 4)
-$taskProtected = @('Storage/keep.txt', 'data/nexus.db', 'data/nexus.db-wal', 'data/nexus.db-shm', 'data/ui-state.json', 'logs/keep.log', 'appsettings.json', 'libvlc/private-db.dll', 'libvlc/private-db.dll-wal', 'libvlc/user-storage/keep.dll')
+$taskProtected = @('Storage/keep.txt', 'data/nexus.db', 'data/nexus.db-wal', 'data/nexus.db-shm', 'data/ui-state.json', 'logs/keep.log', 'appsettings.json', 'libvlc/private-db.dll', 'libvlc/private-db.dll-wal', 'libvlc/user-storage/keep.dll', 'libvlc/win-x64/user-storage/keep.dll')
 $taskSnapshot = @{}
 foreach ($taskRelative in $taskProtected) {
     $taskPath = Join-Path $taskOutput $taskRelative
@@ -62,6 +65,8 @@ if (Test-Path -LiteralPath (Join-Path $taskRepository 'docs/SDK-INTEGRATION-LESS
         (Get-FileHash -LiteralPath (Join-Path $taskOutput 'docs/SDK-INTEGRATION-LESSONS.md')).Hash '本地存在的 SDK 警示文档未随更新发布'
 }
 Assert-Protected
+Assert-Equal $false (Test-Path -LiteralPath (Join-Path $taskOutput 'libvlc/win-x64/plugins/obsolete-module.dll')) '旧 SDK 模块未清理'
+Assert-Equal 'NEW MODULE' ([IO.File]::ReadAllText((Join-Path $taskOutput 'libvlc/win-x64/plugins/new-module.dll'))) '新 SDK 模块未复制'
 Write-Output 'PASS: 程序和依赖更新；默认及自定义 Storage、DB/WAL/SHM、配置、日志、界面状态内容和时间戳均保留。'
 
 Write-Fixture 'published/NexusExplorer.exe' 'NEXT EXE'
@@ -76,6 +81,19 @@ try {
 }
 finally { $taskLocked.Dispose() }
 Write-Output 'PASS: 程序文件占用时，在替换任何文件之前停止，数据和现有程序保留。'
+
+Write-Fixture 'fixed/libvlc/win-x64/plugins/locked-obsolete.dll' 'LOCKED OLD MODULE'
+$taskLocked = [IO.File]::Open((Join-Path $taskOutput 'libvlc/win-x64/plugins/locked-obsolete.dll'), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+try {
+    $taskFailed = $false
+    try { & (Join-Path $taskRepository 'scripts/Update-Preview.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput }
+    catch { $taskFailed = $true }
+    Assert-Equal $true $taskFailed '旧 SDK 模块占用时未停止更新'
+    Assert-Equal 'NEW EXE' ([IO.File]::ReadAllText((Join-Path $taskOutput 'NexusExplorer.exe'))) '旧模块锁检查前已更新 EXE'
+    Assert-Protected
+}
+finally { $taskLocked.Dispose() }
+Write-Output 'PASS: 旧 SDK 模块占用时先停止更新；SDK 区域内配置保护的用户目录保持。'
 
 # Simulate a fresh checkout containing the tracked script and README only.
 Write-Fixture 'checkout/scripts/Update-Preview.ps1' ([IO.File]::ReadAllText((Join-Path $taskRepository 'scripts/Update-Preview.ps1')))
