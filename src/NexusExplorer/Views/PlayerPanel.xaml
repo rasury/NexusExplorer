@@ -4,6 +4,17 @@
    <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
    <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
   </Style>
+  <Style x:Key="HardwareDecodeToggle" TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignFlatToggleButton}">
+   <Setter Property="Background" Value="Transparent"/>
+   <Setter Property="Foreground" Value="{DynamicResource BrushSecondaryText}"/>
+   <Setter Property="ToolTip" Value="硬件解码：已关闭（软件解码）；点击开启，下次打开媒体生效"/>
+   <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
+   <Style.Triggers><Trigger Property="IsChecked" Value="True">
+    <Setter Property="Background" Value="{DynamicResource BrushAccentBlueLight}"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
+    <Setter Property="ToolTip" Value="硬件解码：已开启；点击关闭，下次打开媒体生效"/>
+   </Trigger></Style.Triggers>
+  </Style>
  </UserControl.Resources>
  <Grid>
   <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -38,14 +49,22 @@
      <Button x:Name="ModeButton" Style="{StaticResource PlayerIconButton}" Click="OnCycleMode" ToolTip="顺序"><md:PackIcon x:Name="ModeIcon" Kind="PlaylistPlay" Width="24" Height="24"/></Button>
     </StackPanel>
     <StackPanel x:Name="MediaSettingsRow" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-     <md:PopupBox x:Name="VolumePopup" Width="40" Height="40" PopupMode="MouseOver" PlacementMode="TopAndAlignCentres" StaysOpen="True" PopupElevation="Dp0" PopupUniformCornerRadius="20" Padding="8" Background="Transparent" Foreground="{DynamicResource BrushPrimaryText}" md:ButtonAssist.CornerRadius="20" ToolTip="音量 100%" AutomationProperties.Name="音量">
+     <md:PopupBox x:Name="VolumePopup" Width="40" Height="40" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PopupMode="MouseOver" PlacementMode="TopAndAlignCentres" StaysOpen="True" PopupElevation="Dp0" PopupUniformCornerRadius="20" Padding="8" Background="Transparent" Foreground="{DynamicResource BrushPrimaryText}" md:ButtonAssist.CornerRadius="20" ToolTip="音量 100%" AutomationProperties.Name="音量">
       <md:PopupBox.ToggleContent><md:PackIcon x:Name="VolumeIcon" Kind="VolumeHigh" Width="24" Height="24"/></md:PopupBox.ToggleContent>
       <StackPanel Width="40">
        <TextBlock x:Name="VolumeValueText" Text="100" HorizontalAlignment="Center" Style="{StaticResource TextCaption}" Margin="0,0,0,8"/>
-       <Slider x:Name="VolumeSlider" Orientation="Vertical" Height="144" Width="32" HorizontalAlignment="Center" Minimum="0" Maximum="100" Value="100" IsMoveToPointEnabled="True" ValueChanged="OnVolumeChanged" AutomationProperties.Name="音量"/>
+       <Slider x:Name="VolumeSlider" Orientation="Vertical" Height="144" Width="20" HorizontalAlignment="Center" Minimum="0" Maximum="100" Value="100" IsMoveToPointEnabled="True" ValueChanged="OnVolumeChanged" AutomationProperties.Name="音量"/>
       </StackPanel>
      </md:PopupBox>
-     <ToggleButton x:Name="HardwareCheck" Style="{StaticResource MaterialDesignFlatToggleButton}" Width="40" Height="40" ToolTip="硬件解码：关闭后使用软件解码；下次打开媒体生效" AutomationProperties.Name="硬件解码" Checked="OnHardwareChanged" Unchecked="OnHardwareChanged"><md:PackIcon Kind="Chip" Width="24" Height="24"/></ToggleButton>
+     <ToggleButton x:Name="HardwareCheck" Style="{StaticResource HardwareDecodeToggle}" Width="40" Height="40" Checked="OnHardwareChanged" Unchecked="OnHardwareChanged">
+      <Grid Width="28" Height="28">
+       <md:PackIcon Kind="Chip" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+       <Border x:Name="HardwareEnabledBadge" Background="{DynamicResource BrushAccentBlueLight}" CornerRadius="6" Width="12" Height="12" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+        <Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsChecked, ElementName=HardwareCheck}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Border.Style>
+        <md:PackIcon Kind="CheckBold" Width="12" Height="12"/>
+       </Border>
+      </Grid>
+     </ToggleButton>
      <Button Style="{StaticResource PlayerIconButton}" Click="OnAudioTracks" ToolTip="选择音轨"><md:PackIcon Kind="Tune" Width="24" Height="24"/></Button>
     </StackPanel>
     <StackPanel x:Name="ImageButtonsRow" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Center" Visibility="Collapsed">

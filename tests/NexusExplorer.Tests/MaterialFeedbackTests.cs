@@ -8,6 +8,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MaterialDesignThemes.Wpf;
+using NexusExplorer.Infrastructure;
 using NexusExplorer.Models;
 using NexusExplorer.Services;
 using NexusExplorer.ViewModels;
@@ -61,15 +62,18 @@ public class MaterialFeedbackTests
         });
     }
 
-    [Fact]
-    public async Task HoverVolumePopupAdjustsVolumeVerticallyAndShowsAllThreeLevels()
+    [Theory]
+    [InlineData(UiThemeMode.Light)]
+    [InlineData(UiThemeMode.Dark)]
+    public async Task HoverVolumePopupAdjustsVolumeVerticallyAndShowsAllThreeLevels(UiThemeMode theme)
     {
         using var host=new TestHost();
         await WpfTestHost.RunAsync(async()=>
         {
+            UiThemeService.Apply(theme);
             var main=new MainViewModel(host.Categories,host.Files,host.Organization,new FakePlaybackEngine());
             var panel=new PlayerPanel();panel.Initialize(main);main.Player.Kind=MediaKind.Audio;main.Player.ResetZoom();
-            var window=new Window{Content=panel,Width=600,Height=480,ShowActivated=false,ShowInTaskbar=false,Left=-5000,Top=-5000};
+            var window=new Window{Content=panel,Width=600,Height=480,ShowActivated=false,ShowInTaskbar=false,Left=SystemParameters.WorkArea.Left+80,Top=SystemParameters.WorkArea.Top+80};
             try
             {
                 window.Show();window.UpdateLayout();
@@ -89,15 +93,48 @@ public class MaterialFeedbackTests
                     slider.Value=value;slider.UpdateLayout();
                     Assert.Equal(value,main.Player.Volume);Assert.Equal(expected,icon.Kind);
                     Assert.Equal(value.ToString(),((TextBlock)panel.FindName("VolumeValueText")).Text);
+                    var iconCenter=icon.PointToScreen(new Point(icon.ActualWidth/2,icon.ActualHeight/2)).X;
+                    var thumbCenter=track.Thumb.PointToScreen(new Point(track.Thumb.ActualWidth/2,track.Thumb.ActualHeight/2)).X;
+                    Assert.InRange(Math.Abs(iconCenter-thumbCenter),0,VisualTreeHelper.GetDpi(icon).DpiScaleX);
                     if(value==0)lowY=track.Thumb.TranslatePoint(new Point(),slider).Y;
                     if(value==100)Assert.True(track.Thumb.TranslatePoint(new Point(),slider).Y<lowY);
                     Assert.True(volume.IsPopupOpen);
                 }
-                SavePreview((FrameworkElement)source.RootVisual,"volume-popup");
+                SaveVolumePreview((FrameworkElement)source.RootVisual,volume,$"volume-aligned-{theme}");
                 volume.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseLeaveEvent});
                 Assert.False(volume.IsPopupOpen);
             }
-            finally{panel.Detach();window.Close();}
+            finally{panel.Detach();window.Close();UiThemeService.Apply(UiThemeMode.Light);}
+        });
+    }
+
+    [Theory]
+    [InlineData(UiThemeMode.Light)]
+    [InlineData(UiThemeMode.Dark)]
+    public async Task HardwareDecodeToggleClearlyIdentifiesOnAndOff(UiThemeMode theme)
+    {
+        using var host=new TestHost();
+        await WpfTestHost.RunAsync(()=>
+        {
+            UiThemeService.Apply(theme);
+            var main=new MainViewModel(host.Categories,host.Files,host.Organization,new FakePlaybackEngine());
+            var panel=new PlayerPanel();panel.Initialize(main);main.Player.Kind=MediaKind.Video;main.Player.ResetZoom();
+            try
+            {
+                var toggle=(ToggleButton)panel.FindName("HardwareCheck");var badge=(Border)panel.FindName("HardwareEnabledBadge");
+                foreach(var enabled in new[]{false,true,false})
+                {
+                    toggle.IsChecked=enabled;
+                    panel.Measure(new Size(552,480));panel.Arrange(new Rect(0,0,552,480));panel.UpdateLayout();
+                    Assert.Contains(enabled?"已开启":"已关闭",(string)toggle.ToolTip);
+                    Assert.Equal(toggle.ToolTip,System.Windows.Automation.AutomationProperties.GetName(toggle));
+                    Assert.Equal(enabled?Visibility.Visible:Visibility.Collapsed,badge.Visibility);
+                    Assert.Equal(enabled?((SolidColorBrush)panel.FindResource("BrushAccentBlueLight")).Color:Colors.Transparent,((SolidColorBrush)toggle.Background).Color);
+                    Assert.Equal(((SolidColorBrush)panel.FindResource(enabled?"BrushOnPrimaryContainer":"BrushSecondaryText")).Color,((SolidColorBrush)toggle.Foreground).Color);
+                    SavePreview((FrameworkElement)panel.FindName("ControlsBar"),$"hardware-{theme}-{enabled}");
+                }
+            }
+            finally{panel.Detach();UiThemeService.Apply(UiThemeMode.Light);}
         });
     }
 
@@ -210,6 +247,21 @@ public class MaterialFeedbackTests
         var encoder=new System.Windows.Media.Imaging.PngBitmapEncoder();encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
         using var output=File.Create(Path.Combine(directory,name+".png"));encoder.Save(output);
     }
+    private static void SaveVolumePreview(FrameworkElement popup,FrameworkElement toggle,string name)
+    {
+        var start=popup.PointToScreen(new Point());var end=toggle.PointToScreen(new Point());
+        var transform=PresentationSource.FromVisual(toggle).CompositionTarget.TransformFromDevice;
+        var offset=transform.Transform(end-start);var height=Math.Max(popup.ActualHeight,offset.Y+toggle.ActualHeight);
+        var combined=new DrawingVisual();using(var drawing=combined.RenderOpen())
+        {
+            drawing.DrawRectangle(new VisualBrush(popup),null,new Rect(0,0,popup.ActualWidth,popup.ActualHeight));
+            drawing.DrawRectangle(new VisualBrush(toggle),null,new Rect(offset.X,offset.Y,toggle.ActualWidth,toggle.ActualHeight));
+        }
+        var image=new System.Windows.Controls.Image{Source=Render(combined,(int)popup.ActualWidth,(int)Math.Ceiling(height))};
+        image.Measure(new Size(popup.ActualWidth,height));image.Arrange(new Rect(0,0,popup.ActualWidth,height));SavePreview(image,name);
+    }
+    private static System.Windows.Media.Imaging.RenderTargetBitmap Render(Visual visual,int width,int height)
+    {var bitmap=new System.Windows.Media.Imaging.RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32);bitmap.Render(visual);return bitmap;}
     [DllImport("user32.dll")][return:MarshalAs(UnmanagedType.Bool)]private static extern bool IsWindowEnabled(IntPtr hwnd);
     private static IEnumerable<T>Descendants<T>(DependencyObject root)where T:DependencyObject
     {for(var i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var child=VisualTreeHelper.GetChild(root,i);if(child is T found)yield return found;foreach(var nested in Descendants<T>(child))yield return nested;}}
