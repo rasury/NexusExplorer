@@ -13,7 +13,6 @@ public partial class FileThumbnailPreview : UserControl
     public FileThumbnailPreview() => InitializeComponent();
     internal void ShowLoading(FileItem file)
     {
-        FileTitle.Text = file.FileName;
         FallbackIcon.Kind = (PackIconKind)new FileMaterialIconConverter().Convert(file.Extension, typeof(PackIconKind), null!, CultureInfo.InvariantCulture);
         PreviewImage.Source = null; PreviewImage.Visibility = Visibility.Collapsed;
         FallbackIcon.Visibility = Visibility.Visible; PreviewStatus.Visibility = Visibility.Visible; PreviewStatus.Text = "加载预览…";

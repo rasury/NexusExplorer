@@ -2,7 +2,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
+using MaterialDesignThemes.Wpf;
 using NexusExplorer.Models;
 using NexusExplorer.Services;
 using Serilog;
@@ -81,9 +83,11 @@ internal sealed class FileHoverPreview : IDisposable
         if (_popup is null)
         {
             _popup = new ToolTip { Content = _view, Placement = PlacementMode.Right, HorizontalOffset = 8,
-                StaysOpen = true, IsHitTestVisible = false, Padding = new Thickness(16), MaxHeight = SystemParameters.WorkArea.Height - 32 };
+                StaysOpen = true, IsHitTestVisible = false, Padding = new Thickness(0), HasDropShadow = false,
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent, BorderThickness = new Thickness(0),
+                MaxHeight = SystemParameters.WorkArea.Height - 32 };
             _popup.SetResourceReference(FrameworkElement.StyleProperty, "MaterialDesignToolTip");
-            _popup.SetResourceReference(Control.BackgroundProperty, "BrushPanelBg");
+            ElevationAssist.SetElevation(_popup, Elevation.Dp0);
             _popup.SetResourceReference(Control.ForegroundProperty, "BrushPrimaryText");
         }
         _view.ShowLoading(file); _popup.PlacementTarget = _row; _popup.IsOpen = true;

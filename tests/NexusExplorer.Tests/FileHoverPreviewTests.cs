@@ -36,7 +36,7 @@ public class FileHoverPreviewTests
                 var watch = Stopwatch.StartNew(); preview.Hover(row);
                 await BoundedDialogTests.Until(() => preview.IsOpen && preview.View!.IsLoaded);
                 Assert.True(watch.ElapsedMilliseconds >= 450); Assert.Equal(1, calls);
-                Assert.Equal("悬停缩略图.png", ((TextBlock)preview.View!.FindName("FileTitle")).Text);
+                Assert.Null(preview.View!.FindName("FileTitle"));
                 Assert.NotNull(((Image)preview.View.FindName("PreviewImage")).Source); Assert.Null(list.SelectedItem);
                 // Let the framework tooltip fade-in finish before visual verification.
                 await Task.Delay(180); Save(preview.View, $"preview-{theme}");
@@ -64,7 +64,7 @@ public class FileHoverPreviewTests
                 window.Show(); window.UpdateLayout(); var row = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
                 preview.Hover(row); await BoundedDialogTests.Until(() => preview.IsOpen);
                 row.DataContext = b; Assert.False(preview.IsOpen); Assert.True(oldToken.IsCancellationRequested);
-                preview.Hover(row); await BoundedDialogTests.Until(() => preview.IsOpen && ((TextBlock)preview.View!.FindName("FileTitle")).Text == "B.png");
+                preview.Hover(row); await BoundedDialogTests.Until(() => preview.IsOpen && ReferenceEquals(((Image)preview.View!.FindName("PreviewImage")).Source, nextImage));
                 oldResult.SetResult(new(ThumbnailTests.Bitmap(), ThumbnailStatus.Ready)); await Task.Delay(30);
                 Assert.Same(nextImage, ((Image)preview.View!.FindName("PreviewImage")).Source);
                 list.IsEnabled = false; Assert.False(preview.IsOpen);
@@ -103,6 +103,9 @@ public class FileHoverPreviewTests
         surface.UpdateLayout(); var visual = new DrawingVisual();
         using (var drawing = visual.RenderOpen()) drawing.DrawRectangle(new VisualBrush(surface), null, new Rect(0, 0, surface.ActualWidth, surface.ActualHeight));
         var bitmap = new RenderTargetBitmap((int)Math.Ceiling(surface.ActualWidth), (int)Math.Ceiling(surface.ActualHeight), 96, 96, PixelFormats.Pbgra32); bitmap.Render(visual);
+        var pixel = new byte[4]; bitmap.CopyPixels(new Int32Rect(0, 0, 1, 1), pixel, 4, 0); Assert.Equal(0, pixel[3]);
+        bitmap.CopyPixels(new Int32Rect(bitmap.PixelWidth / 2, bitmap.PixelHeight / 2, 1, 1), pixel, 4, 0); Assert.Equal(255, pixel[3]);
+        Assert.False(surface.HasDropShadow);
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap)); using var file = File.Create(Path.Combine(directory, name + ".png")); encoder.Save(file);
     }
 }
