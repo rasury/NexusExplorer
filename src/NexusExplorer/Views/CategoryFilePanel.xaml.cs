@@ -21,6 +21,7 @@ public partial class CategoryFilePanel : UserControl
     private const string FilesFormat = "NexusExplorer.FileIds";
     private const string CategoryFormat = "NexusExplorer.CategoryId";
     private MainViewModel _main = null!;
+    private readonly FileHoverPreview _filePreview;
     private CategoryViewModel CategoryVm => _main.Category;
     private FileListViewModel FileListVm => _main.FileList;
     public CategoryViewModel? CategoryVmBinding => _main?.Category;
@@ -39,7 +40,7 @@ public partial class CategoryFilePanel : UserControl
     private AsyncRelayCommand? _organizeCommand;
     public ICommand OrganizeCommand => _organizeCommand ??= new AsyncRelayCommand(OrganizeAsync, () => _main?.CurrentCategory is not null && _organizing is null);
 
-    public CategoryFilePanel() { InitializeComponent(); DataContext = this; }
+    public CategoryFilePanel() { InitializeComponent(); DataContext = this; _filePreview = new(FileListBox); }
     public void Initialize(MainViewModel main, IRecycleBinService recycleBin)
     {
         _main = main; DataContext = null; DataContext = this; _state = UiStateStore.Load();
@@ -105,6 +106,7 @@ public partial class CategoryFilePanel : UserControl
     }
     private void RefreshFileList()
     {
+        _filePreview.Cancel();
         var timing = Stopwatch.StartNew();
         var ids = FileListBox.SelectedItems.Cast<FileItem>().Select(f => f.Id).ToHashSet();
         var offset = FindChild<ScrollViewer>(FileListBox)?.VerticalOffset ?? 0;
@@ -138,6 +140,7 @@ public partial class CategoryFilePanel : UserControl
     }
     public async Task PrepareForCloseAsync()
     {
+        _filePreview.Cancel();
         _dragWheel.Dispose();
         _shuttingDown = true; _organizing?.Cancel();
         if (_organizeCommand?.ExecutionTask is { } task) await task;
@@ -145,6 +148,7 @@ public partial class CategoryFilePanel : UserControl
     }
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
+        _filePreview.Dispose();
         _dragWheel.Dispose();
         SaveUiState();
         _main.CategoryTreeChanged -= RefreshTree; _main.FileListChanged -= RefreshFileList; _main.CurrentFileChanged -= OnCurrentFileChanged;

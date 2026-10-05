@@ -150,6 +150,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        ThumbnailService.ShutdownShared();
         UiThemeService.Stop();
         _services?.Dispose();
         Log.Information("===== NexusExplorer 退出 =====");
