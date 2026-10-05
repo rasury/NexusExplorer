@@ -1,4 +1,4 @@
-using MessageBox = NexusExplorer.Views.Dialogs.MessageDialog;
+using NexusExplorer.Views.Dialogs;
 using NexusExplorer.ApplicationLayer;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using NexusExplorer.Services;
 using NexusExplorer.ViewModels;
 using Serilog;
+using MaterialDesignThemes.Wpf;
 
 namespace NexusExplorer.Views;
 
@@ -20,6 +21,8 @@ public partial class PlayerPanel : UserControl
     private bool _dragging;
     private bool _initialized;
     private bool _panning;
+    private bool _dialogCovered;
+    internal void SetDialogCovered(bool covered) { _dialogCovered = covered; UpdateUi(); }
     private Point _panStart;
     private double _effectiveScale = 1;
     private readonly NativeVideoBackground _nativeBackground = new();
@@ -31,7 +34,7 @@ public partial class PlayerPanel : UserControl
     }
     public void Initialize(MainViewModel main)
     {
-        _main = main; Vm.ShowError = m => MessageBox.Show(m, "播放", MessageBoxButton.OK, MessageBoxImage.Warning);
+        _main = main; Vm.ShowErrorAsync = async m => { await MessageDialog.ShowAsync(m, "播放", DialogButtons.Ok, DialogSeverity.Warning); };
         Vm.StateChanged += UpdateUi;
         if (Native is not null) Native.PlayerReady += AttachNativePlayer;
         HardwareCheck.IsChecked = Native?.HardwareDecoding ?? true; VolumeSlider.Value = Vm.Volume; _initialized = true;
@@ -58,7 +61,7 @@ public partial class PlayerPanel : UserControl
         _timer.Tick -= Poll; Loaded -= OnLoaded; Unloaded -= OnUnloaded;
     }
     private async Task RunAsync(Func<Task> action)
-    { try { await action(); } catch (Exception ex) { Log.Error(ex, "播放控制失败"); Vm.ShowError?.Invoke(ex.Message); } }
+    { try { await action(); } catch (Exception ex) { Log.Error(ex, "播放控制失败"); await MessageDialog.ShowAsync(ex.Message, "播放", severity: DialogSeverity.Warning); } }
     private void Poll(object? sender, EventArgs e)
         => RefreshPlaybackUi();
 
@@ -67,7 +70,9 @@ public partial class PlayerPanel : UserControl
         if (Vm.Kind is not (MediaKind.Video or MediaKind.Audio)) return;
         var state = Vm.Engine.Snapshot;
         if (!Vm.PlaybackCompleted) { Vm.IsPlaying = state.IsPlaying; Vm.Duration = state.Duration; Vm.Position = state.Position; }
-        PlayPauseButton.Content = Vm.PlaybackCompleted ? "↻ 重播" : state.IsPlaying ? "⏸ 暂停" : "▶ 播放";
+        PlayPauseLabel.Text = Vm.PlaybackCompleted ? "重播" : state.IsPlaying ? "暂停" : "播放";
+        PlayPauseIcon.Kind = Vm.PlaybackCompleted ? PackIconKind.Replay : state.IsPlaying ? PackIconKind.Pause : PackIconKind.Play;
+        PlayPauseButton.ToolTip = PlayPauseLabel.Text;
         ProgressSlider.IsEnabled = !Vm.PlaybackCompleted && !state.IsDurationPending && Vm.Duration > TimeSpan.Zero;
         if (_dragging) return;
         ProgressSlider.Value = Vm.Duration > TimeSpan.Zero ? Math.Clamp(Vm.Position.TotalMilliseconds / Vm.Duration.TotalMilliseconds, 0, 1) : 0;
@@ -81,7 +86,7 @@ public partial class PlayerPanel : UserControl
     private void UpdateUi()
     {
         var media = Vm.Kind is MediaKind.Video or MediaKind.Audio;
-        VideoView.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Collapsed;
+        VideoView.Visibility = Vm.Kind == MediaKind.Video && !_dialogCovered ? Visibility.Visible : Visibility.Collapsed;
         if (Vm.Kind == MediaKind.Video) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)ApplyNativeBackground);
         ImageScroll.Visibility = Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         AudioLayer.Visibility = Vm.Kind == MediaKind.Audio ? Visibility.Visible : Visibility.Collapsed;
@@ -89,9 +94,11 @@ public partial class PlayerPanel : UserControl
         ControlsBar.Visibility = media || Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         ProgressRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         MediaButtonsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
+        MediaSettingsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         ImageButtonsRow.Visibility = Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         HardwareCheck.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Collapsed;
-        ModeButton.Content = Vm.PlayMode switch { PlayMode.RepeatAll => "🔁 列表循环", PlayMode.RepeatOne => "🔂 单曲循环", PlayMode.Shuffle => "🔀 随机", _ => "➡ 顺序" };
+        ModeLabel.Text = Vm.PlayMode switch { PlayMode.RepeatAll => "列表循环", PlayMode.RepeatOne => "单曲循环", PlayMode.Shuffle => "随机", _ => "顺序" };
+        ModeIcon.Kind = Vm.PlayMode switch { PlayMode.RepeatAll => PackIconKind.Repeat, PlayMode.RepeatOne => PackIconKind.RepeatOnce, PlayMode.Shuffle => PackIconKind.ShuffleVariant, _ => PackIconKind.PlaylistPlay };
         if (Vm.Kind == MediaKind.Image) { ImageDisplay.Source = Vm.ImageSource; ApplyImageZoom(); }
         else ImageDisplay.Source = null;
         RefreshPlaybackUi();
@@ -108,7 +115,7 @@ public partial class PlayerPanel : UserControl
     { if (_dragging) PositionText.Text = FormatTime(Vm.Duration * e.NewValue); }
     private async void OnVolumeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     { if (_initialized) await RunAsync(() => Vm.SetVolumeAsync((int)e.NewValue)); }
-    private void OnHardwareChanged(object sender, RoutedEventArgs e)
+    private async void OnHardwareChanged(object sender, RoutedEventArgs e)
     {
         if (!_initialized || Native is null) return;
         Native.HardwareDecoding = HardwareCheck.IsChecked == true;
@@ -118,21 +125,17 @@ public partial class PlayerPanel : UserControl
             config.Playback.HardwareDecoding = Native.HardwareDecoding;
             config.Save(Infrastructure.AppPaths.SettingsPath);
         }
-        catch (Exception ex) { Log.Error(ex, "保存播放配置失败"); Vm.ShowError?.Invoke(ex.Message); }
+        catch (Exception ex) { Log.Error(ex, "保存播放配置失败"); await MessageDialog.ShowAsync(ex.Message, "播放", severity: DialogSeverity.Warning); }
     }
-    private void OnAudioTracks(object sender, RoutedEventArgs e)
+    private async void OnAudioTracks(object sender, RoutedEventArgs e)
     {
         var native = Native?.NativePlayer; if (native is null) return;
         Native!.LogAudioDiagnostics();
-        var menu = new ContextMenu();
-        foreach (var track in native.AudioTrackDescription)
-        {
-            var id = track.Id; var item = new MenuItem { Header = track.Name, IsCheckable = true, IsChecked = id == Native.SelectedAudioTrack };
-            item.Click += async (_, _) => await RunAsync(() => Native.SetAudioTrackAsync(id));
-            menu.Items.Add(item);
-        }
-        if (menu.Items.Count == 0) menu.Items.Add(new MenuItem { Header = "无可用音轨", IsEnabled = false });
-        menu.PlacementTarget = sender as UIElement; menu.IsOpen = true;
+        var path = Native.CurrentPath;
+        var choices = native.AudioTrackDescription.Select(t => new DialogChoice<int>(t.Id == -1 ? "禁用音轨" : t.Name, t.Id)).ToList();
+        if (choices.Count == 0) { await MessageDialog.ShowAsync("无可用音轨", "音轨"); return; }
+        var selected = await ChoiceDialog.ShowAsync("选择音轨", "音轨", choices, Native.SelectedAudioTrack);
+        if (selected.Confirmed && path == Native.CurrentPath) await RunAsync(() => Native.SetAudioTrackAsync(selected.Value));
     }
     internal static double FitScale(double width, double height, double viewportWidth, double viewportHeight) =>
         width <= 0 || height <= 0 ? 1 : Math.Max(0.001, Math.Min(1, Math.Min(Math.Max(1, viewportWidth) / width, Math.Max(1, viewportHeight) / height)));

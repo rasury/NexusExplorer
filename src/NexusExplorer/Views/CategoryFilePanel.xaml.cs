@@ -1,4 +1,4 @@
-using MessageBox = NexusExplorer.Views.Dialogs.MessageDialog;
+using NexusExplorer.Views.Dialogs;
 using System.IO;
 using System.Diagnostics;
 using System.Windows;
@@ -44,10 +44,10 @@ public partial class CategoryFilePanel : UserControl
     {
         _main = main; DataContext = null; DataContext = this; _state = UiStateStore.Load();
         CategoryVm.RecycleBin = recycleBin; FileListVm.RecycleBin = recycleBin;
-        CategoryVm.ShowInputDialog = (title, value) => Task.FromResult(Dialogs.InputDialog.Show(title, "分类名称:", value));
+        CategoryVm.ShowInputDialog = (title, value) => Dialogs.InputDialog.ShowAsync(title, "分类名称", value);
         CategoryVm.ShowConfirmDialog = ConfirmAsync; FileListVm.ShowConfirmDialog = ConfirmAsync;
-        CategoryVm.ShowError = ShowError; FileListVm.ShowError = ShowError;
-        FileListVm.ShowInfo = message => OperationStatus.Text = message;
+        CategoryVm.ShowErrorAsync = ShowErrorAsync; FileListVm.ShowErrorAsync = ShowErrorAsync;
+        FileListVm.ShowInfo = message => { OperationStatus.Text = message; MaterialDialogService.Notice(message); };
         FileListVm.ShowImportStatus = message => OperationStatus.Text = message;
         FileListVm.PickFiles = () =>
         {
@@ -64,12 +64,13 @@ public partial class CategoryFilePanel : UserControl
         main.CurrentFileChanged += OnCurrentFileChanged;
         Unloaded += OnUnloaded;
     }
-    private static Task<bool> ConfirmAsync(string message) => Task.FromResult(MessageBox.Show(message, "确认", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes);
-    private static void ShowError(string message) => MessageBox.Show(message, "错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+    private static Task<bool> ConfirmAsync(string message) => MessageDialog.ConfirmAsync(message);
+    private static async Task ShowErrorAsync(string message) => await MessageDialog.ShowAsync(message, "错误", severity: DialogSeverity.Warning);
+    private static void ShowError(string message) => MaterialDialogService.NotifyError(message);
     private static string? PickDirectory(string title)
     { var dialog = new OpenFolderDialog { Title = title }; return dialog.ShowDialog() == true ? dialog.FolderName : null; }
     private static async Task RunAsync(Func<Task> action)
-    { try { await action(); } catch (Exception ex) { Log.Error(ex, "界面操作失败"); ShowError(ex.Message); } }
+    { try { await action(); } catch (Exception ex) { Log.Error(ex, "界面操作失败"); await ShowErrorAsync(ex.Message); } }
     internal static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
     {
         while (node is not null)
@@ -194,7 +195,7 @@ public partial class CategoryFilePanel : UserControl
     {
         var path = PickDirectory("选择分类的新位置"); if (path is null) return;
         var preview = await _main.Categories.PreviewRelocateAsync(c.Id, path);
-        if (!Dialogs.LocationPreviewDialog.Confirm(preview)) return;
+        if (!await Dialogs.LocationPreviewDialog.ConfirmAsync(preview)) return;
         await _main.Categories.RelocateAsync(c.Id, path); await _main.RefreshTreeAsync();
     });
     private async void OnMigrateCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(async c =>
@@ -222,19 +223,19 @@ public partial class CategoryFilePanel : UserControl
         {
             Dialogs.ConflictDecision? policy = null; var cancelledByDialog = false;
             var progress = new Progress<OrganizeProgress>(p => OperationStatus.Text = $"整理 {p.Completed}/{p.Total}: {p.FileName}");
-            var result = await _main.Organization.OrganizeAsync(category.Id, (name, target) =>
+            var result = await _main.Organization.OrganizeAsync(category.Id, async (name, target) =>
             {
-                var decision = policy ?? Dialogs.ConflictDialog.ShowDecision(name, target);
+                var decision = policy ?? await Dialogs.ConflictDialog.ShowDecisionAsync(name, target);
                 if (decision.Resolution == ConflictResolution.Ask) cancelledByDialog = true;
                 if (decision.ApplyToAll && decision.Resolution != ConflictResolution.Ask) policy = decision;
-                return Task.FromResult(decision.Resolution);
+                return decision.Resolution;
             }, _organizing.Token, progress);
             await _main.RefreshOrganizationStatesAsync(); statusRefreshed = true;
             await _main.RefreshFilesAsync();
             OperationStatus.Text = _organizing.IsCancellationRequested || cancelledByDialog ? $"整理已取消，已处理 {result.Count} 项" : $"整理完成，已处理 {result.Count} 项";
-            if (!_shuttingDown) Dialogs.OrganizeResultDialog.Show(category.Name, result);
+            if (!_shuttingDown) await Dialogs.OrganizeResultDialog.ShowAsync(category.Name, result);
         }
-        catch (Exception ex) { Log.Error(ex, "整理失败"); ShowError(ex.Message); OperationStatus.Text = "整理失败，请查看日志"; }
+        catch (Exception ex) { Log.Error(ex, "整理失败"); await ShowErrorAsync(ex.Message); OperationStatus.Text = "整理失败，请查看日志"; }
         finally
         {
             _organizing.Dispose(); _organizing = null; CancelOrganizeButton.Visibility = Visibility.Collapsed; _organizeCommand?.NotifyCanExecuteChanged();

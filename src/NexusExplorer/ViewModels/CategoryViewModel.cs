@@ -26,6 +26,9 @@ public partial class CategoryViewModel : ObservableObject
 
     /// <summary>错误提示回调。</summary>
     public Action<string>? ShowError { get; set; }
+    public Func<string, Task>? ShowErrorAsync { get; set; }
+    private async Task ReportErrorAsync(string message)
+    { if (ShowErrorAsync is not null) await ShowErrorAsync(message); else ShowError?.Invoke(message); }
 
     public IRecycleBinService RecycleBin { get; set; } = null!;
 
@@ -88,11 +91,11 @@ public partial class CategoryViewModel : ObservableObject
         }
         catch (OperationException ex)
         {
-            ShowError?.Invoke(ex.Message);
+            await ReportErrorAsync(ex.Message);
         }
         catch (Exception ex)
         {
-            ShowError?.Invoke($"创建分类失败: {ex.Message}");
+            await ReportErrorAsync($"创建分类失败: {ex.Message}");
         }
     }
 
@@ -108,11 +111,11 @@ public partial class CategoryViewModel : ObservableObject
         }
         catch (OperationException ex)
         {
-            ShowError?.Invoke(ex.Message);
+            await ReportErrorAsync(ex.Message);
         }
         catch (Exception ex)
         {
-            ShowError?.Invoke($"重命名失败: {ex.Message}");
+            await ReportErrorAsync($"重命名失败: {ex.Message}");
         }
     }
 
@@ -128,7 +131,7 @@ public partial class CategoryViewModel : ObservableObject
                 await _main.SelectFileAsync(null);
             await _main.RefreshTreeAsync();
         }
-        catch (Exception ex) { ShowError?.Invoke($"移除分类失败: {ex.Message}"); }
+        catch (Exception ex) { await ReportErrorAsync($"移除分类失败: {ex.Message}"); }
     }
 
     public async Task DeleteAsync(Category category)
@@ -148,15 +151,15 @@ public partial class CategoryViewModel : ObservableObject
             await _categoryService.DeleteAsync(category.Id, RecycleBin);
             await _main.RefreshTreeAsync();
             if (_categoryService.LastDeleteWarnings.Count > 0)
-                ShowError?.Invoke(string.Join("\n", _categoryService.LastDeleteWarnings));
+                await ReportErrorAsync(string.Join("\n", _categoryService.LastDeleteWarnings));
         }
         catch (OperationException ex)
         {
-            ShowError?.Invoke(ex.Message);
+            await ReportErrorAsync(ex.Message);
         }
         catch (Exception ex)
         {
-            ShowError?.Invoke($"删除失败: {ex.Message}");
+            await ReportErrorAsync($"删除失败: {ex.Message}");
         }
         finally { await _main.RefreshTreeAsync(); }
     }
@@ -171,11 +174,11 @@ public partial class CategoryViewModel : ObservableObject
         }
         catch (OperationException ex)
         {
-            ShowError?.Invoke(ex.Message);
+            await ReportErrorAsync(ex.Message);
         }
         catch (Exception ex)
         {
-            ShowError?.Invoke($"移动分类失败: {ex.Message}");
+            await ReportErrorAsync($"移动分类失败: {ex.Message}");
         }
     }
 
@@ -188,7 +191,7 @@ public partial class CategoryViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ShowError?.Invoke($"钉住失败: {ex.Message}");
+            await ReportErrorAsync($"钉住失败: {ex.Message}");
         }
     }
 
@@ -201,7 +204,7 @@ public partial class CategoryViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ShowError?.Invoke($"取消钉住失败: {ex.Message}");
+            await ReportErrorAsync($"取消钉住失败: {ex.Message}");
         }
     }
 
@@ -217,7 +220,7 @@ public partial class CategoryViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ShowError?.Invoke($"调整排序失败: {ex.Message}");
+            await ReportErrorAsync($"调整排序失败: {ex.Message}");
         }
     }
 

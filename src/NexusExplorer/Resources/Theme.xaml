@@ -1,174 +1,70 @@
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-
-    <!-- ===== 配色(开发文档 §3.2) ===== -->
-    <Color x:Key="ColorPrimaryBg">#F7F3EA</Color>
-    <Color x:Key="ColorSecondaryBg">#FBF9F4</Color>
-    <Color x:Key="ColorPanelBg">#FFFDF9</Color>
-    <Color x:Key="ColorAccentOrange">#E98A3A</Color>
-    <Color x:Key="ColorAccentOrangeLight">#F8E2CE</Color>
-    <Color x:Key="ColorAccentBlue">#4C86C6</Color>
-    <Color x:Key="ColorAccentBlueLight">#DCEAF8</Color>
-    <Color x:Key="ColorPrimaryText">#303030</Color>
-    <Color x:Key="ColorSecondaryText">#77736C</Color>
-    <Color x:Key="ColorDisabledText">#A9A59E</Color>
-    <Color x:Key="ColorDivider">#E6E0D6</Color>
-    <Color x:Key="ColorPlayerBg">#000000</Color>
-    <Color x:Key="ColorDanger">#D9634E</Color>
-
-    <SolidColorBrush x:Key="BrushPrimaryBg" Color="{StaticResource ColorPrimaryBg}" />
-    <SolidColorBrush x:Key="BrushSecondaryBg" Color="{StaticResource ColorSecondaryBg}" />
-    <SolidColorBrush x:Key="BrushPanelBg" Color="{StaticResource ColorPanelBg}" />
-    <SolidColorBrush x:Key="BrushAccentOrange" Color="{StaticResource ColorAccentOrange}" />
-    <SolidColorBrush x:Key="BrushAccentOrangeLight" Color="{StaticResource ColorAccentOrangeLight}" />
-    <SolidColorBrush x:Key="BrushAccentBlue" Color="{StaticResource ColorAccentBlue}" />
-    <SolidColorBrush x:Key="BrushAccentBlueLight" Color="{StaticResource ColorAccentBlueLight}" />
-    <SolidColorBrush x:Key="BrushPrimaryText" Color="{StaticResource ColorPrimaryText}" />
-    <SolidColorBrush x:Key="BrushSecondaryText" Color="{StaticResource ColorSecondaryText}" />
-    <SolidColorBrush x:Key="BrushDisabledText" Color="{StaticResource ColorDisabledText}" />
-    <SolidColorBrush x:Key="BrushDivider" Color="{StaticResource ColorDivider}" />
-    <SolidColorBrush x:Key="BrushPlayerBg" Color="{StaticResource ColorPlayerBg}" />
-    <SolidColorBrush x:Key="BrushDanger" Color="{StaticResource ColorDanger}" />
-    <SolidColorBrush x:Key="BrushHoverOverlay" Color="#14000000" />
-    <SolidColorBrush x:Key="BrushPressOverlay" Color="#28000000" />
-
-    <!-- ===== 圆角 ===== -->
-    <CornerRadius x:Key="CornerRadiusSmall">4</CornerRadius>
-    <CornerRadius x:Key="CornerRadiusMedium">8</CornerRadius>
-    <CornerRadius x:Key="CornerRadiusLarge">12</CornerRadius>
-
-    <!-- ===== 字体 ===== -->
-    <FontFamily x:Key="FontFamilyMain">Microsoft YaHei UI, Segoe UI</FontFamily>
-    <sys:Double x:Key="FontSizeSmall" xmlns:sys="clr-namespace:System;assembly=mscorlib">11</sys:Double>
-    <sys:Double x:Key="FontSizeNormal" xmlns:sys="clr-namespace:System;assembly=mscorlib">13</sys:Double>
-    <sys:Double x:Key="FontSizeMedium" xmlns:sys="clr-namespace:System;assembly=mscorlib">14</sys:Double>
-    <sys:Double x:Key="FontSizeLarge" xmlns:sys="clr-namespace:System;assembly=mscorlib">17</sys:Double>
-
-    <!-- ===== 按钮 ===== -->
-    <Style x:Key="ButtonPrimary" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource BrushAccentOrange}" />
-        <Setter Property="Foreground" Value="White" />
-        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}" />
-        <Setter Property="FontSize" Value="{StaticResource FontSizeNormal}" />
-        <Setter Property="Padding" Value="14,7" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border x:Name="border"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="{StaticResource CornerRadiusSmall}"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Opacity" Value="0.88" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="border" Property="Opacity" Value="0.75" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource BrushDisabledText}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <!-- M3 semantic roles. Runtime theme changes replace these dynamic brush resources. -->
+    <SolidColorBrush x:Key="BrushPrimaryBg" Color="#FFFBFE"/>
+    <SolidColorBrush x:Key="BrushSecondaryBg" Color="#F7F2FA"/>
+    <SolidColorBrush x:Key="BrushPanelBg" Color="#F3EDF7"/>
+    <SolidColorBrush x:Key="BrushPrimaryText" Color="#1C1B1F"/>
+    <SolidColorBrush x:Key="BrushSecondaryText" Color="#49454F"/>
+    <SolidColorBrush x:Key="BrushDisabledText" Color="#938F99"/>
+    <SolidColorBrush x:Key="BrushDivider" Color="#CAC4D0"/>
+    <SolidColorBrush x:Key="BrushAccentBlue" Color="#6750A4"/>
+    <SolidColorBrush x:Key="BrushAccentBlueLight" Color="#EADDFF"/>
+    <SolidColorBrush x:Key="BrushAccentOrange" Color="#006B60"/>
+    <SolidColorBrush x:Key="BrushAccentOrangeLight" Color="#9EF2E3"/>
+    <SolidColorBrush x:Key="BrushOnPrimary" Color="White"/>
+    <SolidColorBrush x:Key="BrushOnPrimaryContainer" Color="#21005D"/>
+    <SolidColorBrush x:Key="BrushOnSecondaryContainer" Color="#00201C"/>
+    <SolidColorBrush x:Key="BrushStatusPending" Color="#B85C16"/>
+    <SolidColorBrush x:Key="BrushStatusOrganized" Color="#237D4E"/>
+    <SolidColorBrush x:Key="BrushDanger" Color="#B3261E"/>
+    <SolidColorBrush x:Key="BrushPlayerBg" Color="Black"/>
+    <FontFamily x:Key="FontFamilyMain">Segoe UI, Microsoft YaHei UI</FontFamily>
+    <Style x:Key="ButtonPrimary" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="20"/>
+        <Setter Property="md:ElevationAssist.Elevation" Value="Dp0"/>
+        <Setter Property="Height" Value="40"/><Setter Property="MinWidth" Value="64"/>
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
     </Style>
-
     <Style x:Key="ButtonSecondary" TargetType="Button" BasedOn="{StaticResource ButtonPrimary}">
-        <Setter Property="Background" Value="{StaticResource BrushAccentBlue}" />
+        <Setter Property="Background" Value="{DynamicResource BrushAccentBlueLight}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
     </Style>
-
-    <Style x:Key="ButtonGhost" TargetType="Button" BasedOn="{StaticResource ButtonPrimary}">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{StaticResource BrushSecondaryText}" />
-        <Setter Property="BorderBrush" Value="{StaticResource BrushDivider}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border x:Name="border"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{StaticResource CornerRadiusSmall}"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource BrushAccentBlueLight}" />
-                            <Setter Property="Foreground" Value="{StaticResource BrushAccentBlue}" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource BrushAccentBlue}" />
-                            <Setter Property="Foreground" Value="White" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{StaticResource BrushDisabledText}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+    <Style x:Key="ButtonGhost" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="20"/>
+        <Setter Property="Height" Value="40"/><Setter Property="Padding" Value="16,0"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
     </Style>
-
-    <!-- ===== 输入框 ===== -->
-    <Style x:Key="TextBoxStandard" TargetType="TextBox">
-        <Setter Property="Background" Value="White" />
-        <Setter Property="Foreground" Value="{StaticResource BrushPrimaryText}" />
-        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}" />
-        <Setter Property="FontSize" Value="{StaticResource FontSizeMedium}" />
-        <Setter Property="Padding" Value="8,6" />
-        <Setter Property="BorderBrush" Value="{StaticResource BrushDivider}" />
-        <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CaretBrush" Value="{StaticResource BrushAccentOrange}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="TextBox">
-                    <Border x:Name="border"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="{StaticResource CornerRadiusSmall}">
-                        <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
-                                      VerticalAlignment="Center" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BrushAccentOrange}" />
-                        </Trigger>
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="border" Property="Background" Value="{StaticResource BrushSecondaryBg}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
+    <Style x:Key="ButtonText" TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="20"/>
+        <Setter Property="Height" Value="40"/><Setter Property="Padding" Value="16,0"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
     </Style>
-
-    <!-- ===== 文字 ===== -->
-    <Style x:Key="TextPrimary" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="{StaticResource BrushPrimaryText}" />
-        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}" />
-        <Setter Property="FontSize" Value="{StaticResource FontSizeNormal}" />
+    <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+        <Setter Property="Width" Value="40"/><Setter Property="Height" Value="40"/>
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="20"/>
     </Style>
-
+    <Style x:Key="TextBoxStandard" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignOutlinedTextBox}">
+        <Setter Property="MinHeight" Value="56"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+    </Style>
+    <Style x:Key="TextPrimary" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignBodyMediumTextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+    </Style>
     <Style x:Key="TextSecondary" TargetType="TextBlock" BasedOn="{StaticResource TextPrimary}">
-        <Setter Property="Foreground" Value="{StaticResource BrushSecondaryText}" />
+        <Setter Property="Foreground" Value="{DynamicResource BrushSecondaryText}"/>
     </Style>
-
-    <Style x:Key="TextCaption" TargetType="TextBlock" BasedOn="{StaticResource TextPrimary}">
-        <Setter Property="Foreground" Value="{StaticResource BrushSecondaryText}" />
-        <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}" />
+    <Style x:Key="TextCaption" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignBodySmallTextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushSecondaryText}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
     </Style>
-
-    <Style x:Key="TextHeader" TargetType="TextBlock" BasedOn="{StaticResource TextPrimary}">
-        <Setter Property="FontSize" Value="{StaticResource FontSizeLarge}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+    <Style x:Key="TextHeader" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignTitleMediumTextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
     </Style>
-
+    <Style x:Key="DialogTitle" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignHeadlineSmallTextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+    </Style>
 </ResourceDictionary>

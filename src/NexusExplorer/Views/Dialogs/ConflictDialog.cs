@@ -1,98 +1,25 @@
 using System.Windows;
 using System.Windows.Controls;
 using NexusExplorer.Services;
-
 namespace NexusExplorer.Views.Dialogs;
-
-/// <summary>整理时同名文件冲突对话框:替换/跳过/保留两个/取消。支持应用到全部。</summary>
 public record ConflictDecision(ConflictResolution Resolution, bool ApplyToAll);
 public static class ConflictDialog
 {
-    public static ConflictResolution Show(string fileName, string targetPath)
-        => ShowDecision(fileName, targetPath).Resolution;
-    public static ConflictDecision ShowDecision(string fileName, string targetPath)
+    public static async Task<ConflictDecision> ShowDecisionAsync(string fileName, string targetPath)
+        => await MaterialDialogService.ShowAsync(Create(fileName, targetPath)) as ConflictDecision ?? new(ConflictResolution.Ask, false);
+    internal static DialogSurface Create(string fileName, string targetPath)
     {
-        var result = new ConflictDecision(ConflictResolution.Ask, false);
-        var dialog = Create(fileName, targetPath, decision => result = decision);
-        dialog.ShowDialog();
-        return result;
+        var body = new StackPanel();
+        void Text(string text, string style) { var block = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) }; block.SetResourceReference(FrameworkElement.StyleProperty, style); body.Children.Add(block); }
+        Text("目标目录已存在同名文件:", "TextPrimary"); Text(fileName, "TextHeader"); Text(targetPath, "TextCaption");
+        Text("跳过：使用目标目录已有文件，保留外部源文件；若目标已有分类记录则提示冲突。", "TextSecondary");
+        var all = CreateApplyToAllCheckBox(); body.Children.Add(all);
+        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; DialogSurface view = null!;
+        void Add(string label, ConflictResolution resolution, string style)
+        { var button = new Button { Content = label, MinWidth = 80, Margin = new Thickness(8, 0, 0, 8) }; button.SetResourceReference(FrameworkElement.StyleProperty, style); button.Click += (_, _) => view.Complete(new ConflictDecision(resolution, all.IsChecked == true)); actions.Children.Add(button); }
+        Add("替换", ConflictResolution.Replace, "ButtonGhost"); Add("保留两个", ConflictResolution.KeepBoth, "ButtonSecondary");
+        Add("跳过", ConflictResolution.Skip, "ButtonText"); Add("取消整理", ConflictResolution.Ask, "ButtonText");
+        view = new DialogSurface("文件冲突", body, actions); return view;
     }
-
-    internal static Window Create(string fileName, string targetPath, Action<ConflictDecision> select)
-    {
-
-        var dialog = new Window
-        {
-            Title = "文件冲突",
-            Style = (Style)System.Windows.Application.Current.Resources["DialogWindow"],
-            Width = 460,
-            Owner = DialogChrome.Owner,
-            ResizeMode = ResizeMode.NoResize
-        };
-        DialogChrome.Apply(dialog);
-
-        var applyToAllCheckBox = CreateApplyToAllCheckBox();
-
-        var panel = new StackPanel();
-        panel.Children.Add(new TextBlock
-        {
-            Text = $"目标目录已存在同名文件:",
-            Style = (Style)System.Windows.Application.Current.Resources["TextHeader"],
-            TextWrapping = TextWrapping.Wrap
-        });
-        panel.Children.Add(new TextBlock
-        {
-            Text = fileName,
-            Style = (Style)System.Windows.Application.Current.Resources["TextPrimary"],
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 6, 0, 0),
-            TextWrapping = TextWrapping.Wrap
-        });
-        panel.Children.Add(new TextBlock
-        {
-            Text = targetPath,
-            Style = (Style)System.Windows.Application.Current.Resources["TextCaption"],
-            Margin = new Thickness(0, 4, 0, 16),
-            TextWrapping = TextWrapping.Wrap
-        });
-        panel.Children.Add(new TextBlock { Text = "跳过：使用目标目录已有文件，保留外部源文件；若目标已有分类记录则提示冲突。", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) });
-
-        var buttons = new WrapPanel
-        {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right
-        };
-
-        void AddButton(string text, ConflictResolution resolution, string styleKey, int marginLeft = 8)
-        {
-            var button = new Button
-            {
-                Content = text,
-                Style = (Style)System.Windows.Application.Current.Resources[styleKey],
-                MinWidth = 88,
-                Margin = new Thickness(marginLeft, 0, 0, 6)
-            };
-            button.Click += (_, _) =>
-            {
-                select(new ConflictDecision(resolution, applyToAllCheckBox.IsChecked == true));
-                dialog.Close();
-            };
-            buttons.Children.Add(button);
-        }
-
-        AddButton("替换", ConflictResolution.Replace, "ButtonPrimary", 0);
-        AddButton("保留两个", ConflictResolution.KeepBoth, "ButtonSecondary");
-        AddButton("跳过", ConflictResolution.Skip, "ButtonGhost");
-        AddButton("取消整理", ConflictResolution.Ask, "ButtonGhost");
-
-        panel.Children.Add(applyToAllCheckBox);
-        DialogChrome.SetContent(dialog, panel, buttons);
-        return dialog;
-    }
-    internal static CheckBox CreateApplyToAllCheckBox()
-    {
-        var checkBox = new CheckBox { Content = "应用到全部后续冲突", Margin = new Thickness(0, 12, 0, 0) };
-        checkBox.SetResourceReference(Control.ForegroundProperty, "BrushSecondaryText");
-        return checkBox;
-    }
+    internal static CheckBox CreateApplyToAllCheckBox() => new() { Content = "应用到全部后续冲突", Margin = new Thickness(0, 8, 0, 0) };
 }

@@ -210,7 +210,7 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
             var treeTemplate = (HierarchicalDataTemplate)panel.Resources[new DataTemplateKey(typeof(Category))];
             var treeContent = (StackPanel)treeTemplate.LoadContent(); treeContent.DataContext = node;
             Assert.Equal(2, treeContent.Children.Count);
-            var treeIcon = Assert.IsType<System.Windows.Shapes.Path>(treeContent.Children[0]);
+            var treeIcon = Assert.IsType<MaterialDesignThemes.Wpf.PackIcon>(treeContent.Children[0]);
             var navigation = new NavigationBar();
             var navTemplate = (DataTemplate)navigation.Resources["CategoryNavigationContent"];
             var navContent = Assert.IsType<TextBlock>(navTemplate.LoadContent());
@@ -218,21 +218,21 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
             void AssertColor(byte red, byte green, byte blue)
             {
                 var color = System.Windows.Media.Color.FromRgb(red, green, blue);
-                Assert.Equal(color, Assert.IsType<System.Windows.Media.SolidColorBrush>(treeIcon.Fill).Color);
+                Assert.Equal(color, Assert.IsType<System.Windows.Media.SolidColorBrush>(treeIcon.Foreground).Color);
             }
             await Dispatcher.Yield(DispatcherPriority.DataBind);
             Assert.Equal(a.Name, navContent.Text);
-            AssertColor(0xD8, 0x89, 0x24);
+            AssertColor(0xB8, 0x5C, 0x16);
             treeContent.Measure(new Size(170, double.PositiveInfinity));
             treeContent.Arrange(new Rect(0, 0, 170, treeContent.DesiredSize.Height)); treeContent.UpdateLayout();
-            Assert.Equal(16, treeIcon.ActualWidth); Assert.Equal(0, treeIcon.TranslatePoint(new Point(), treeContent).X);
+            Assert.Equal(24, treeIcon.ActualWidth); Assert.Equal(0, treeIcon.TranslatePoint(new Point(), treeContent).X);
             await _host.Organization.OrganizeAsync(a.Id); await main.RefreshOrganizationStatesAsync();
             await Dispatcher.Yield(DispatcherPriority.DataBind);
             AssertColor(0x23, 0x7D, 0x4E);
             Assert.Equal("分类内不包含外部文件", Assert.IsType<string>(treeIcon.ToolTip));
             main.FileList.PickFiles = () => Task.FromResult<IReadOnlyList<string>>(new[] { _host.CreateTestFile("new.txt") });
             await main.FileList.AddFilesAsync(); await Dispatcher.Yield(DispatcherPriority.DataBind);
-            AssertColor(0xD8, 0x89, 0x24);
+            AssertColor(0xB8, 0x5C, 0x16);
             Assert.Equal("分类内包含外部文件", Assert.IsType<string>(treeIcon.ToolTip));
             Assert.Equal(a.Name, navContent.Text);
             Assert.Same(node, Assert.Single(main.Category.FlatCategories)); Assert.True(node.IsExpanded);

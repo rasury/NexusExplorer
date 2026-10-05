@@ -1,106 +1,38 @@
 <UserControl x:Class="NexusExplorer.Views.NavigationBar"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:models="clr-namespace:NexusExplorer.Models"
-             Background="{StaticResource BrushPanelBg}"
-             BorderBrush="{StaticResource BrushDivider}"
+             Background="{DynamicResource BrushPanelBg}"
+             BorderBrush="{DynamicResource BrushDivider}"
              BorderThickness="0,1,0,0">
 
     <UserControl.Resources>
         <DataTemplate x:Key="CategoryNavigationContent" DataType="{x:Type models:Category}">
             <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
         </DataTemplate>
-        <!-- 导航分类按钮:点击=导航下钻 -->
-        <Style x:Key="NavCategoryButton" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource BrushAccentBlueLight}" />
-            <Setter Property="Foreground" Value="{StaticResource BrushAccentBlue}" />
-            <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="Padding" Value="14,6" />
-            <Setter Property="Margin" Value="0,0,8,6" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="border"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="13"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="{StaticResource BrushAccentBlue}" />
-                                <Setter Property="Foreground" Value="White" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="border" Property="Background" Value="{StaticResource BrushSecondaryBg}" />
-                                <Setter Property="Foreground" Value="{StaticResource BrushDisabledText}" />
-                                <Setter Property="Cursor" Value="Arrow" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <Style x:Key="NavCategoryButton" TargetType="Button" BasedOn="{StaticResource ButtonText}">
+            <Setter Property="Background" Value="{DynamicResource BrushAccentBlueLight}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
+            <Setter Property="Margin" Value="0,0,8,8"/>
         </Style>
-
-        <!-- 快捷分类按钮(第二层,钉):橙色系区分,当前选中的高亮 -->
-        <Style x:Key="PinnedCategoryButton" TargetType="Button" BasedOn="{StaticResource NavCategoryButton}">
-            <Setter Property="Background" Value="{StaticResource BrushAccentOrangeLight}" />
-            <Setter Property="Foreground" Value="#B45F1D" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Padding" Value="12,4" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                    <Setter Property="Background" Value="{StaticResource BrushAccentOrange}" />
-                    <Setter Property="Foreground" Value="White" />
-                </DataTrigger>
-            </Style.Triggers>
+        <Style x:Key="PinnedCategoryButton" TargetType="Button" BasedOn="{StaticResource ButtonGhost}">
+            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="Padding" Value="16,0"/>
+            <Style.Triggers><DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource BrushAccentBlueLight}"/>
+                <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource BrushAccentBlue}"/>
+            </DataTrigger></Style.Triggers>
         </Style>
-
-        <!-- 绿色打勾确认按钮(两层共用) -->
-        <Style x:Key="ConfirmButton" TargetType="Button">
-            <Setter Property="Background" Value="#4CAF7D" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}" />
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Padding" Value="0,4" />
-            <Setter Property="Width" Value="42" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="ToolTip" Value="把当前文件归入此分类" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="border"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="16"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Opacity" Value="0.85" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="border" Property="Opacity" Value="0.7" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="border" Property="Background" Value="{StaticResource BrushDisabledText}" />
-                                <Setter TargetName="border" Property="Opacity" Value="0.5" />
-                                <Setter Property="Foreground" Value="#FFFFFF" />
-                                <Setter Property="ToolTip" Value="文件已在此分类中" />
-                                <Setter Property="Cursor" Value="Arrow" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+        <Style x:Key="ConfirmButton" TargetType="Button" BasedOn="{StaticResource ButtonPrimary}">
+            <Setter Property="Background" Value="{DynamicResource BrushAccentOrange}"/>
+            <Setter Property="Width" Value="56"/><Setter Property="MinWidth" Value="56"/>
+            <Setter Property="ToolTip" Value="把当前文件归入此分类"/>
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="14,8,14,8">
+    <Grid Margin="24,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -114,11 +46,11 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
                 <TextBlock Text="当前分类:"
                            Style="{StaticResource TextCaption}"
                            VerticalAlignment="Center"
-                           Margin="0,0,6,0" />
+                           Margin="0,0,8,0" />
                 <TextBlock MaxWidth="240" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentPathText}" Text="{Binding CurrentPathText}"
                            Style="{StaticResource TextPrimary}"
                            FontWeight="SemiBold"
@@ -127,7 +59,7 @@
 
             <ScrollViewer Grid.Column="1"
                           HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto" MaxHeight="140"
+                          VerticalScrollBarVisibility="Auto" MaxHeight="112"
                           VerticalAlignment="Center">
                 <WrapPanel>
                     <!-- 面包屑(导航路径) -->
@@ -148,7 +80,7 @@
                                     <TextBlock Text="›"
                                                Style="{StaticResource TextSecondary}"
                                                VerticalAlignment="Center"
-                                               Margin="2,0,8,0" />
+                                               Margin="8,0" />
                                 </StackPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -184,14 +116,13 @@
             <Button x:Name="ConfirmButton"
                     Grid.Column="2"
                     Style="{StaticResource ConfirmButton}"
-                    Content="✔"
                     VerticalAlignment="Center"
                     Margin="16,0,0,0"
-                    Click="OnConfirmClick" />
+                    Click="OnConfirmClick"><md:PackIcon Kind="Check" Width="24" Height="24"/></Button>
         </Grid>
 
         <!-- ===== 第二层:快捷分类(钉) ===== -->
-        <Grid Grid.Row="1" Margin="0,6,0,0">
+        <Grid Grid.Row="1" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -205,7 +136,7 @@
 
             <ScrollViewer x:Name="PinnedScroll" Grid.Column="1" Background="Transparent" AllowDrop="True" DragOver="OnPinnedDragOver" Drop="OnPinnedDrop"
                           HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto" MaxHeight="140"
+                          VerticalScrollBarVisibility="Auto" MaxHeight="112"
                           VerticalAlignment="Center">
                 <ItemsControl x:Name="PinnedHost" AllowDrop="True" PreviewMouseLeftButtonDown="OnPinnedMouseDown" PreviewMouseMove="OnPinnedMouseMove" DragOver="OnPinnedDragOver" Drop="OnPinnedDrop"
                               Background="Transparent" HorizontalAlignment="Stretch"
@@ -218,7 +149,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type models:Category}">
-                            <Button MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                            <Button MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource AvailableWidthConverter}}"
                                     Style="{StaticResource PinnedCategoryButton}"
                                     Click="OnPinnedClick"
                                     ContextMenuOpening="OnPinnedContextMenuOpening"

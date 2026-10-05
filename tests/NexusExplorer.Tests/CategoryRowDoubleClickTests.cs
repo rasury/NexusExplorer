@@ -30,7 +30,7 @@ public class CategoryRowDoubleClickTests
                 window.Show(); window.UpdateLayout();
                 var tree = (TreeView)panel.FindName("CategoryTree");
                 var item = (TreeViewItem)tree.ItemContainerGenerator.ContainerFromIndex(0);
-                var border = (Border)item.Template.FindName("itemBorder", item);
+                var border = (MaterialDesignThemes.Wpf.Ripple)item.Template.FindName("Ripple", item);
                 Assert.True(border.ActualWidth > 350);
                 var source = region switch
                 {
@@ -71,7 +71,7 @@ public class CategoryRowDoubleClickTests
                 var tree = (TreeView)panel.FindName("CategoryTree");
                 var item = (TreeViewItem)tree.ItemContainerGenerator.ContainerFromIndex(0);
                 item.IsSelected = true; Assert.Null(main.CurrentCategory);
-                var expander = (System.Windows.Controls.Primitives.ToggleButton)item.Template.FindName("expander", item);
+                var expander = (System.Windows.Controls.Primitives.ToggleButton)item.Template.FindName("Expander", item);
                 expander.IsChecked = true;
                 tree.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
                 { RoutedEvent = Control.MouseDoubleClickEvent, Source = expander });
@@ -80,7 +80,7 @@ public class CategoryRowDoubleClickTests
                 tree.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
                 { RoutedEvent = Control.MouseDoubleClickEvent, Source = scrollbar });
                 Assert.Null(main.CurrentCategory);
-                var border = (Border)item.Template.FindName("itemBorder", item);
+                var border = (MaterialDesignThemes.Wpf.Ripple)item.Template.FindName("Ripple", item);
                 tree.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Right)
                 { RoutedEvent = Control.MouseDoubleClickEvent, Source = border });
                 Assert.Null(main.CurrentCategory);

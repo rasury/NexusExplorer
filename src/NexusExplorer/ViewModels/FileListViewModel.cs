@@ -35,6 +35,9 @@ public partial class FileListViewModel : ObservableObject
     public Func<string, Task<string?>>? PickRelocateFile { get; set; }
 
     public Action<string>? ShowError { get; set; }
+    public Func<string, Task>? ShowErrorAsync { get; set; }
+    private async Task ReportErrorAsync(string message)
+    { if (ShowErrorAsync is not null) await ShowErrorAsync(message); else ShowError?.Invoke(message); }
     public Func<string, Task<bool>>? ShowConfirmDialog { get; set; }
     public Action<string>? ShowInfo { get; set; }
     public Action<string>? ShowImportStatus { get; set; }
@@ -59,7 +62,7 @@ public partial class FileListViewModel : ObservableObject
         if (file is null) return;
         if (!file.ExistsOnDisk)
         {
-            ShowError?.Invoke($"文件已失效(可能被移动或删除):\n{file.AbsolutePath}\n\n请右键选择「重新定位」。");
+            await ReportErrorAsync($"文件已失效(可能被移动或删除):\n{file.AbsolutePath}\n\n请右键选择「重新定位」。");
             return;
         }
         await _main.SelectFileAsync(file);
@@ -70,7 +73,7 @@ public partial class FileListViewModel : ObservableObject
     {
         if (_main.CurrentCategory is null)
         {
-            ShowError?.Invoke("请先选择一个分类。");
+            await ReportErrorAsync("请先选择一个分类。");
             return;
         }
 
@@ -81,7 +84,7 @@ public partial class FileListViewModel : ObservableObject
         var result = await _fileService.AddRangeAsync(paths, _main.CurrentCategory.Id);
         await _main.RefreshOrganizationStatesAsync();
         await _main.RefreshFilesAsync();
-        ReportBatchResult(result);
+        await ReportBatchResultAsync(result);
     }
 
     [RelayCommand]
@@ -89,7 +92,7 @@ public partial class FileListViewModel : ObservableObject
     {
         if (_main.CurrentCategory is null)
         {
-            ShowError?.Invoke("请先选择一个分类。");
+            await ReportErrorAsync("请先选择一个分类。");
             return;
         }
 
@@ -102,18 +105,18 @@ public partial class FileListViewModel : ObservableObject
             var result = await _fileService.ImportDirectoryAsync(directory, _main.CurrentCategory.Id, _categoryService);
             await _main.RefreshTreeAsync();
             await _main.RefreshFilesAsync();
-            ReportBatchResult(result);
+            await ReportBatchResultAsync(result);
         }
         catch (OperationException ex)
         {
-            ShowError?.Invoke(ex.Message);
+            await ReportErrorAsync(ex.Message);
         }
     }
 
     /// <summary>Windows Explorer 拖入:文件或文件夹。</summary>
     public async Task ImportDroppedPathsAsync(string[] paths)
     {
-        if (_main.CurrentCategory is null) { ShowError?.Invoke("请先双击打开分类，再拖入文件。"); return; }
+        if (_main.CurrentCategory is null) { await ReportErrorAsync("请先双击打开分类，再拖入文件。"); return; }
         await ImportIntoAsync(paths, _main.CurrentCategory);
     }
 
@@ -128,10 +131,10 @@ public partial class FileListViewModel : ObservableObject
         timing.Restart();
         await _main.RefreshTreeAsync();
         Serilog.Log.Information("分类导入刷新结束;导入 {ImportId};目标 {CategoryId};当前浏览 {BrowsedId};耗时 {ElapsedMs:F1} ms", importId, target.Id, _main.CurrentCategory?.Id, timing.Elapsed.TotalMilliseconds);
-        ReportBatchResult(result, nonBlocking: true);
+        await ReportBatchResultAsync(result, nonBlocking: true);
     }
 
-    private void ReportBatchResult(BatchAddResult result, bool nonBlocking = false)
+    private async Task ReportBatchResultAsync(BatchAddResult result, bool nonBlocking = false)
     {
         if (result.Failed.Count == 0)
         {
@@ -142,7 +145,8 @@ public partial class FileListViewModel : ObservableObject
             var errors = string.Join("\n", result.Failed.Take(5).Select(f => $"• {f.FileName}: {f.Error}"));
             if (result.Failed.Count > 5)
                 errors += $"\n… 以及另外 {result.Failed.Count - 5} 个失败";
-            (nonBlocking ? ShowImportStatus : ShowError)?.Invoke($"成功添加 {result.Added.Count} 个,失败 {result.Failed.Count} 个:\n{errors}");
+            if (nonBlocking) ShowImportStatus?.Invoke($"成功添加 {result.Added.Count} 个,失败 {result.Failed.Count} 个:\n{errors}");
+            else await ReportErrorAsync($"成功添加 {result.Added.Count} 个,失败 {result.Failed.Count} 个:\n{errors}");
         }
     }
 
@@ -169,7 +173,7 @@ public partial class FileListViewModel : ObservableObject
         }
         catch (OperationException ex)
         {
-            ShowError?.Invoke(ex.Message);
+            await ReportErrorAsync(ex.Message);
         }
     }
 
@@ -183,7 +187,7 @@ public partial class FileListViewModel : ObservableObject
             catch (Exception ex) { errors.Add($"{f.FileName}: {ex.Message}"); Serilog.Log.Error(ex, "批量归类失败"); }
         }
         await _main.OnFilesRecategorizedAsync(succeeded);
-        if (errors.Count > 0) ShowError?.Invoke($"成功 {succeeded.Count}，失败 {errors.Count}\n" + string.Join("\n", errors));
+        if (errors.Count > 0) await ReportErrorAsync($"成功 {succeeded.Count}，失败 {errors.Count}\n" + string.Join("\n", errors));
     }
     public Task RecategorizeAsync(FileItem file, Category target) => RecategorizeManyAsync(new[] { file }, target);
 
@@ -207,6 +211,6 @@ public partial class FileListViewModel : ObservableObject
         }
         await _main.RefreshOrganizationStatesAsync();
         await _main.RefreshFilesAsync();
-        if (failures.Count > 0) ShowError?.Invoke($"成功 {succeeded}，失败 {failures.Count}\n" + string.Join("\n", failures));
+        if (failures.Count > 0) await ReportErrorAsync($"成功 {succeeded}，失败 {failures.Count}\n" + string.Join("\n", failures));
     }
 }

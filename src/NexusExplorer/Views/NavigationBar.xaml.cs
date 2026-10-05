@@ -1,4 +1,4 @@
-using MessageBox = NexusExplorer.Views.Dialogs.MessageDialog;
+using NexusExplorer.Views.Dialogs;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -85,7 +85,7 @@ public partial class NavigationBar : UserControl
             if (index > from) index--;
             await _main.Categories.ReorderPinnedAsync(id, index); await Vm.OnPinsChangedAsync();
         }
-        catch (Exception ex) { Serilog.Log.Error(ex, "快捷分类排序失败"); MessageBox.Show(ex.Message, "排序失败"); }
+        catch (Exception ex) { Serilog.Log.Error(ex, "快捷分类排序失败"); await MessageDialog.ShowAsync(ex.Message, "排序失败"); }
     }
     private MainViewModel _main = null!;
     private NavigationViewModel Vm => _main.Navigation;
@@ -98,8 +98,7 @@ public partial class NavigationBar : UserControl
     public void Initialize(MainViewModel main)
     {
         _main = main;
-        Vm.ShowError = message =>
-            MessageBox.Show(message, "分类导航", MessageBoxButton.OK, MessageBoxImage.Warning);
+        Vm.ShowErrorAsync = async message => { await MessageDialog.ShowAsync(message, "分类导航", DialogButtons.Ok, DialogSeverity.Warning); };
 
         DataContext = Vm;
         Vm.PropertyChanged += OnVmPropertyChanged;
@@ -153,8 +152,8 @@ public partial class NavigationBar : UserControl
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "导航栏下钻失败");
-            MessageBox.Show($"导航失败: {ex.Message}", "分类导航",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            await MessageDialog.ShowAsync($"导航失败: {ex.Message}", "分类导航",
+                DialogButtons.Ok, DialogSeverity.Warning);
         }
     }
 
@@ -193,8 +192,8 @@ public partial class NavigationBar : UserControl
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "选择快捷分类失败");
-            MessageBox.Show($"选择失败: {ex.Message}", "分类导航",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            await MessageDialog.ShowAsync($"选择失败: {ex.Message}", "分类导航",
+                DialogButtons.Ok, DialogSeverity.Warning);
         }
     }
 
@@ -205,7 +204,7 @@ public partial class NavigationBar : UserControl
     {
         if (sender is not Button button) return;
         try { await PreparePinnedContextAsync(button); }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "分类导航", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception ex) { await MessageDialog.ShowAsync(ex.Message, "分类导航", DialogButtons.Ok, DialogSeverity.Warning); }
     }
 
     internal async Task PreparePinnedContextAsync(Button button)
@@ -232,8 +231,8 @@ public partial class NavigationBar : UserControl
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "取消钉住失败");
-            MessageBox.Show($"取消失败: {ex.Message}", "分类导航",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            await MessageDialog.ShowAsync($"取消失败: {ex.Message}", "分类导航",
+                DialogButtons.Ok, DialogSeverity.Warning);
         }
     }
 
@@ -244,8 +243,8 @@ public partial class NavigationBar : UserControl
         catch (Exception ex)
         {
             Serilog.Log.Error(ex, "确认归类失败");
-            MessageBox.Show($"归类失败: {ex.Message}", "分类导航",
-                MessageBoxButton.OK, MessageBoxImage.Warning);
+            await MessageDialog.ShowAsync($"归类失败: {ex.Message}", "分类导航",
+                DialogButtons.Ok, DialogSeverity.Warning);
         }
     }
 }

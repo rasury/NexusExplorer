@@ -59,6 +59,9 @@ public partial class NavigationViewModel : ObservableObject
     private long _version;
 
     public Action<string>? ShowError { get; set; }
+    public Func<string, Task>? ShowErrorAsync { get; set; }
+    private async Task ReportErrorAsync(string message)
+    { if (ShowErrorAsync is not null) await ShowErrorAsync(message); else ShowError?.Invoke(message); }
 
     public NavigationViewModel(MainViewModel main, CategoryService categoryService, FileService fileService)
     {
@@ -257,13 +260,13 @@ public partial class NavigationViewModel : ObservableObject
     {
         if (_main.CurrentFile is null)
         {
-            ShowError?.Invoke("当前没有打开的文件。");
+            await ReportErrorAsync("当前没有打开的文件。");
             return;
         }
 
         if (SelectedCategory is null)
         {
-            ShowError?.Invoke("请先选择一个分类。");
+            await ReportErrorAsync("请先选择一个分类。");
             return;
         }
 
@@ -276,7 +279,7 @@ public partial class NavigationViewModel : ObservableObject
         }
         catch (OperationException ex)
         {
-            ShowError?.Invoke(ex.Message);
+            await ReportErrorAsync(ex.Message);
         }
     }
 }

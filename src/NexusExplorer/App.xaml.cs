@@ -1,4 +1,4 @@
-using MessageBox = NexusExplorer.Views.Dialogs.MessageDialog;
+using NexusExplorer.Views.Dialogs;
 using NexusExplorer.ApplicationLayer;
 using System.IO;
 using System.Windows;
@@ -22,11 +22,13 @@ public partial class App : Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        MaterialDialogService.BeginSession();
 
         try
         {
 
         var config = AppConfig.LoadOrDefault(AppPaths.SettingsPath);
+        UiThemeService.Start(config.Appearance?.ThemeMode ?? UiThemeMode.System);
 
         config.EnsureDirectories();
 
@@ -62,7 +64,7 @@ public partial class App : Application
             await NexusExplorer.Data.DatabaseInitializer.InitializeAsync(db, config.Database.ResolvedPath);
             var recoveryProblems = await _services.GetRequiredService<FileOperationExecutor>().RecoverAsync();
             if (recoveryProblems.Count > 0)
-                MessageBox.Show("以下操作需要手动检查，已保留原件：\n" + string.Join("\n", recoveryProblems), "操作恢复");
+                await MessageDialog.ShowAsync("以下操作需要手动检查，已保留原件：\n" + string.Join("\n", recoveryProblems), "操作恢复");
             Log.Information("数据库初始化完成: {Path}", config.Database.ResolvedPath);
         }
 
@@ -91,7 +93,7 @@ public partial class App : Application
             Log.Fatal(ex, "启动失败，原数据保留");
             if (e.Args.Contains("--verify-startup", StringComparer.Ordinal))
                 File.WriteAllText(Path.Combine(AppPaths.AppRoot, "startup-verification.json"), System.Text.Json.JsonSerializer.Serialize(new { Success = false, Error = ex.ToString() }));
-            else MessageBox.Show("启动失败，原数据保留：\n" + ex.Message, "NexusExplorer", MessageBoxButton.OK, MessageBoxImage.Error);
+            else await MessageDialog.ShowAsync("启动失败，原数据保留：\n" + ex.Message, "NexusExplorer", DialogButtons.Ok, DialogSeverity.Error);
             Shutdown(1);
         }
     }
@@ -120,15 +122,15 @@ public partial class App : Application
         return services.BuildServiceProvider();
     }
 
-    private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
+    private async void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
+        e.Handled = true;
         Log.Error(e.Exception, "UI 线程未处理异常");
-        MessageBox.Show(
+        await MessageDialog.ShowAsync(
             $"发生未处理的错误:\n{e.Exception.Message}",
             "NexusExplorer",
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
-        e.Handled = true;
+            DialogButtons.Ok,
+            DialogSeverity.Error);
     }
 
     private void OnDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
@@ -148,6 +150,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        UiThemeService.Stop();
         _services?.Dispose();
         Log.Information("===== NexusExplorer 退出 =====");
         Log.CloseAndFlush();

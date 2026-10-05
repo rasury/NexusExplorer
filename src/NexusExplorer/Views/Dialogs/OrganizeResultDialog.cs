@@ -7,10 +7,10 @@ namespace NexusExplorer.Views.Dialogs;
 /// <summary>整理结果汇总对话框。</summary>
 public static class OrganizeResultDialog
 {
-    public static void Show(string categoryName, List<OrganizeFileResult> results)
-        => Create(categoryName, results).ShowDialog();
+    public static Task ShowAsync(string categoryName, List<OrganizeFileResult> results)
+        => MaterialDialogService.ShowAsync(Create(categoryName, results));
 
-    internal static Window Create(string categoryName, List<OrganizeFileResult> results)
+    internal static DialogSurface Create(string categoryName, List<OrganizeFileResult> results)
     {
         var moved = results.Count(r => r.Outcome is OrganizeOutcome.Moved);
         var renamed = results.Count(r => r.Outcome is OrganizeOutcome.Renamed);
@@ -64,27 +64,11 @@ public static class OrganizeResultDialog
             }
         }
 
-        var dialog = new Window
-        {
-            Title = "整理结果",
-            Style = (Style)System.Windows.Application.Current.Resources["DialogWindow"],
-            Width = 480,
-            Owner = DialogChrome.Owner
-        };
-        DialogChrome.Apply(dialog);
-
-        var okButton = new Button
-        {
-            Content = "确定",
-            Style = (Style)System.Windows.Application.Current.Resources["ButtonPrimary"],
-            MinWidth = 88,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 16, 0, 0)
-        };
-        okButton.Click += (_, _) => dialog.Close();
-        okButton.IsDefault = true;
-        okButton.IsCancel = true;
-        DialogChrome.SetContent(dialog, panel, okButton);
+        DialogSurface dialog = null!;
+        var ok = new Button { Content = "确定", MinWidth = 80, IsDefault = true };
+        ok.SetResourceReference(FrameworkElement.StyleProperty, "ButtonPrimary");
+        ok.Click += (_, _) => dialog.Complete(null);
+        dialog = new DialogSurface("整理结果", panel, ok);
         return dialog;
     }
 }

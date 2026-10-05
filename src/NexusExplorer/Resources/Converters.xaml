@@ -2,4 +2,6 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:converters="clr-namespace:NexusExplorer.Converters">
     <converters:FileIconConverter x:Key="FileIconConverter" />
+    <converters:FileMaterialIconConverter x:Key="FileMaterialIconConverter" />
+    <converters:AvailableWidthConverter x:Key="AvailableWidthConverter" />
 </ResourceDictionary>

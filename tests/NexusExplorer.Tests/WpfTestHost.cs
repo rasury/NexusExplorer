@@ -15,6 +15,10 @@ internal static class WpfTestHost
             try
             {
                 var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+                app.Resources.MergedDictionaries.Add(new MaterialDesignThemes.Wpf.BundledTheme
+                { BaseTheme = MaterialDesignThemes.Wpf.BaseTheme.Light, PrimaryColor = MaterialDesignColors.PrimaryColor.DeepPurple, SecondaryColor = MaterialDesignColors.SecondaryColor.Teal });
+                app.Resources.MergedDictionaries.Add(new ResourceDictionary
+                { Source = new Uri("pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml") });
                 foreach (var name in new[] { "Theme", "Controls", "Converters" })
                     app.Resources.MergedDictionaries.Add(new ResourceDictionary
                     { Source = new Uri($"pack://application:,,,/NexusExplorer;component/Resources/{name}.xaml") });

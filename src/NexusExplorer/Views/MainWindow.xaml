@@ -1,64 +1,29 @@
-<Window x:Class="NexusExplorer.Views.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:views="clr-namespace:NexusExplorer.Views"
-        Title="NexusExplorer"
-        Icon="/NexusExplorer;component/Assets/AppIcon.ico"
-        Width="1280" Height="800"
-        MinWidth="960" MinHeight="600"
-        WindowStartupLocation="CenterScreen"
-        Background="{StaticResource BrushPrimaryBg}"
-        FontFamily="{StaticResource FontFamilyMain}">
-
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
-        <!-- 顶部标题栏 -->
-        <Border Grid.Row="0"
-                Background="{StaticResource BrushPanelBg}"
-                BorderBrush="{StaticResource BrushDivider}"
-                BorderThickness="0,0,0,1"
-                Padding="16,10">
-            <DockPanel>
-                <Ellipse Width="14" Height="14" Fill="{StaticResource BrushAccentOrange}"
-                         VerticalAlignment="Center" DockPanel.Dock="Left" Margin="0,0,10,0" />
-                <TextBlock Text="NexusExplorer"
-                           FontSize="15" FontWeight="SemiBold"
-                           Foreground="{StaticResource BrushPrimaryText}"
-                           VerticalAlignment="Center" />
-                <TextBlock Text="文件分类工具"
-                           FontSize="12"
-                           Foreground="{StaticResource BrushSecondaryText}"
-                           VerticalAlignment="Center"
-                           Margin="16,0,0,0" />
-            </DockPanel>
-        </Border>
-
-        <!-- 中部:左(分类/文件) + 右(播放) -->
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="360" MinWidth="240" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <views:CategoryFilePanel x:Name="LeftPanel" Grid.Column="0" />
-
-            <GridSplitter Grid.Column="1"
-                          Width="5"
-                          Background="Transparent"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Stretch"
-                          ShowsPreview="False" />
-
-            <views:PlayerPanel x:Name="PlayerArea" Grid.Column="2" />
-        </Grid>
-
-        <!-- 底部:分类导航栏 -->
-        <views:NavigationBar x:Name="NavBar" Grid.Row="2" />
-    </Grid>
+<Window x:Class="NexusExplorer.Views.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:NexusExplorer.Views" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+ Title="NexusExplorer" Icon="/NexusExplorer;component/Assets/AppIcon.ico" Width="1280" Height="880" MinWidth="960" MinHeight="680" WindowStartupLocation="CenterScreen"
+ Style="{StaticResource MaterialDesignWindow}" Background="{DynamicResource BrushPrimaryBg}" FontFamily="{StaticResource FontFamilyMain}" UseLayoutRounding="True">
+ <md:DialogHost x:Name="RootDialog" Identifier="Nexus.Main" Style="{StaticResource MaterialDesignEmbeddedDialogHost}" CloseOnClickAway="False" DialogContentUniformCornerRadius="28"
+  DialogOpened="OnDialogOpened" DialogClosed="OnDialogClosed">
+  <Grid>
+   <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <md:ColorZone Mode="Standard" Background="{DynamicResource BrushSecondaryBg}" Padding="16,8">
+    <DockPanel LastChildFill="True">
+     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+      <Button Style="{StaticResource IconButton}" Click="OnAppearanceClick" ToolTip="外观设置"><md:PackIcon Kind="PaletteOutline" Width="24" Height="24"/></Button>
+     </StackPanel>
+     <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板" Margin="0,0,16,0"><md:PackIcon Kind="Menu" Width="24" Height="24"/></Button>
+     <Image DockPanel.Dock="Left" Source="/NexusExplorer;component/Assets/AppIcon.ico" Width="32" Height="32" Margin="0,0,16,0"/>
+     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+      <TextBlock Text="NexusExplorer" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource BrushPrimaryText}"/>
+      <TextBlock Text="文件分类工具" Style="{StaticResource TextSecondary}" Margin="24,0,0,0" VerticalAlignment="Center"/>
+     </StackPanel>
+    </DockPanel>
+   </md:ColorZone>
+   <md:DrawerHost x:Name="NavigationDrawer" Grid.Row="1" OpenMode="Standard" IsLeftDrawerOpen="True" LeftDrawerCloseOnClickAway="False">
+    <md:DrawerHost.LeftDrawerContent><views:CategoryFilePanel x:Name="LeftPanel" Width="360"/></md:DrawerHost.LeftDrawerContent>
+    <views:PlayerPanel x:Name="PlayerArea" Margin="16"/>
+   </md:DrawerHost>
+   <md:ColorZone Grid.Row="2" Mode="Standard" Background="{DynamicResource BrushSecondaryBg}"><views:NavigationBar x:Name="NavBar"/></md:ColorZone>
+   <md:Snackbar x:Name="TaskSnackbar" Grid.Row="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="24" MaxWidth="560"/>
+  </Grid>
+ </md:DialogHost>
 </Window>

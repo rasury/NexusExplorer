@@ -16,6 +16,7 @@ public class AppConfig
     [JsonPropertyName("Logging")]
     public LoggingConfig Logging { get; set; } = new();
     public PlaybackConfig Playback { get; set; } = new();
+    public AppearanceConfig Appearance { get; set; } = new();
 
     public static AppConfig LoadOrDefault(string path)
     {
@@ -57,6 +58,12 @@ public class AppConfig
 public class PlaybackConfig
 {
     public bool HardwareDecoding { get; set; } = true;
+}
+
+public class AppearanceConfig
+{
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public UiThemeMode ThemeMode { get; set; } = UiThemeMode.System;
 }
 
 public class StorageConfig

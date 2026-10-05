@@ -34,6 +34,9 @@ public partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private ImageSource? _imageSource;
     [ObservableProperty] private double _imageScale; // 0 means fit; effective scale is computed by the view.
     public Action<string>? ShowError { get; set; }
+    public Func<string, Task>? ShowErrorAsync { get; set; }
+    private async Task ReportErrorAsync(string message)
+    { if (ShowErrorAsync is not null) await ShowErrorAsync(message); else ShowError?.Invoke(message); }
     public event Action? StateChanged;
     public PlayerViewModel(MainViewModel main, FileService files, IPlaybackEngine engine)
     {
@@ -89,7 +92,7 @@ public partial class PlayerViewModel : ObservableObject
                 await Engine.PlayAsync(file.AbsolutePath, Kind == MediaKind.Audio, token);
                 if (version == Interlocked.Read(ref _version)) IsPlaying = true;
             }
-            else ShowError?.Invoke("暂不支持预览该文件类型。");
+            else await ReportErrorAsync("暂不支持预览该文件类型。");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { if (version == Interlocked.Read(ref _version)) OnPlaybackError(file.AbsolutePath, ex.Message); }
@@ -134,8 +137,8 @@ public partial class PlayerViewModel : ObservableObject
     }
 
 
-    private void OnPlaybackError(string path, string message)
-    { Log.Error("播放失败 {Path}: {Message}", path, message); ShowError?.Invoke(message); IsPlaying = false; PlaybackCompleted = false; StateChanged?.Invoke(); }
+    private async void OnPlaybackError(string path, string message)
+    { Log.Error("播放失败 {Path}: {Message}", path, message); IsPlaying = false; PlaybackCompleted = false; StateChanged?.Invoke(); try { await ReportErrorAsync(message); } catch (Exception ex) { Log.Error(ex, "显示播放错误失败"); } }
     private async void OnMediaEnded()
     {
         if (!await _ended.WaitAsync(0)) return;
