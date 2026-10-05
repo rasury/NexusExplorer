@@ -11,11 +11,7 @@
       <Button Style="{StaticResource IconButton}" Click="OnAppearanceClick" ToolTip="外观设置"><md:PackIcon Kind="PaletteOutline" Width="24" Height="24"/></Button>
      </StackPanel>
      <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板" Margin="0,0,16,0"><md:PackIcon Kind="Menu" Width="24" Height="24"/></Button>
-     <Image DockPanel.Dock="Left" Source="/NexusExplorer;component/Assets/AppIcon.ico" Width="32" Height="32" Margin="0,0,16,0"/>
-     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-      <TextBlock Text="NexusExplorer" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource BrushPrimaryText}"/>
-      <TextBlock Text="文件分类工具" Style="{StaticResource TextSecondary}" Margin="24,0,0,0" VerticalAlignment="Center"/>
-     </StackPanel>
+     <TextBlock Text="NexusExplorer" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource BrushPrimaryText}" VerticalAlignment="Center"/>
     </DockPanel>
    </md:ColorZone>
    <md:DrawerHost x:Name="NavigationDrawer" Grid.Row="1" OpenMode="Standard" IsLeftDrawerOpen="True" LeftDrawerCloseOnClickAway="False">
