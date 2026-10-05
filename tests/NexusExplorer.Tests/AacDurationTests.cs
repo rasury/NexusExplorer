@@ -153,7 +153,7 @@ public class AacDurationTests
                 if (completes)
                 {
                     Assert.Equal("0:10 · 已播放完", duration.Text); Assert.Equal(1, progress.Value); Assert.False(progress.IsEnabled);
-                    Assert.Equal("重播", ((TextBlock)panel.FindName("PlayPauseLabel")).Text);
+                    Assert.Equal("重播", ((Button)panel.FindName("PlayPauseButton")).ToolTip);
                     await main.Player.TogglePlayPauseAsync(); Assert.False(main.Player.PlaybackCompleted);
                     panel.RefreshPlaybackUi(); Assert.Equal(0, progress.Value);
                 }

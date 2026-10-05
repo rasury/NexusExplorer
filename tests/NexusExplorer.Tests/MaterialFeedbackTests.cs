@@ -62,21 +62,75 @@ public class MaterialFeedbackTests
     }
 
     [Fact]
-    public async Task VolumeThumbAndIconShareTheSameVerticalCenter()
+    public async Task HoverVolumePopupAdjustsVolumeVerticallyAndShowsAllThreeLevels()
+    {
+        using var host=new TestHost();
+        await WpfTestHost.RunAsync(async()=>
+        {
+            var main=new MainViewModel(host.Categories,host.Files,host.Organization,new FakePlaybackEngine());
+            var panel=new PlayerPanel();panel.Initialize(main);main.Player.Kind=MediaKind.Audio;main.Player.ResetZoom();
+            var window=new Window{Content=panel,Width=600,Height=480,ShowActivated=false,ShowInTaskbar=false,Left=-5000,Top=-5000};
+            try
+            {
+                window.Show();window.UpdateLayout();
+                var volume=(PopupBox)panel.FindName("VolumePopup");var slider=(Slider)panel.FindName("VolumeSlider");var icon=(PackIcon)panel.FindName("VolumeIcon");
+                Assert.False(volume.IsPopupOpen);Assert.Equal(PopupBoxPopupMode.MouseOver,volume.PopupMode);
+                volume.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseEnterEvent});
+                await BoundedDialogTests.Until(()=>slider.IsVisible && slider.ActualHeight>100);
+                Assert.True(volume.IsPopupOpen);Assert.Equal(Orientation.Vertical,slider.Orientation);
+                var source=(HwndSource)PresentationSource.FromVisual(slider);
+                Assert.NotEqual(new WindowInteropHelper(window).Handle,source.Handle);
+                var point=slider.TranslatePoint(new Point(slider.ActualWidth/2,slider.ActualHeight/2),(UIElement)source.RootVisual);
+                Assert.Same(slider,CategoryFilePanel.FindAncestor<Slider>(((UIElement)source.RootVisual).InputHitTest(point) as DependencyObject));
+                var track=(Track)slider.Template.FindName("PART_Track",slider);
+                double? lowY=null;
+                foreach(var (value,expected) in new[]{(0,PackIconKind.VolumeLow),(30,PackIconKind.VolumeLow),(31,PackIconKind.VolumeMedium),(60,PackIconKind.VolumeMedium),(61,PackIconKind.VolumeHigh),(100,PackIconKind.VolumeHigh)})
+                {
+                    slider.Value=value;slider.UpdateLayout();
+                    Assert.Equal(value,main.Player.Volume);Assert.Equal(expected,icon.Kind);
+                    Assert.Equal(value.ToString(),((TextBlock)panel.FindName("VolumeValueText")).Text);
+                    if(value==0)lowY=track.Thumb.TranslatePoint(new Point(),slider).Y;
+                    if(value==100)Assert.True(track.Thumb.TranslatePoint(new Point(),slider).Y<lowY);
+                    Assert.True(volume.IsPopupOpen);
+                }
+                SavePreview((FrameworkElement)source.RootVisual,"volume-popup");
+                volume.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseLeaveEvent});
+                Assert.False(volume.IsPopupOpen);
+            }
+            finally{panel.Detach();window.Close();}
+        });
+    }
+
+    [Theory]
+    [InlineData(MediaKind.Video,552)]
+    [InlineData(MediaKind.Audio,552)]
+    [InlineData(MediaKind.Video,800)]
+    [InlineData(MediaKind.Image,552)]
+    public async Task PlayerUsesOneRowAndIconOnlyButtons(MediaKind kind,int width)
     {
         using var host=new TestHost();
         await WpfTestHost.RunAsync(()=>
         {
             var main=new MainViewModel(host.Categories,host.Files,host.Organization,new FakePlaybackEngine());
-            var panel=new PlayerPanel();panel.Initialize(main);main.Player.Kind=MediaKind.Audio;main.Player.ResetZoom();
-            panel.Measure(new Size(600,480));panel.Arrange(new Rect(0,0,600,480));panel.UpdateLayout();
-            var slider=(Slider)panel.FindName("VolumeSlider");var icon=(FrameworkElement)panel.FindName("VolumeIcon");
-            var track=(Track)slider.Template.FindName("PART_Track",slider);var thumb=track.Thumb;
-            var iconCenter=icon.TranslatePoint(new Point(icon.ActualWidth/2,icon.ActualHeight/2),panel).Y;
-            var thumbCenter=thumb.TranslatePoint(new Point(thumb.ActualWidth/2,thumb.ActualHeight/2),panel).Y;
-            Assert.InRange(Math.Abs(iconCenter-thumbCenter),0,1);
-            foreach(var value in new[]{0d,50d,100d}){slider.Value=value;panel.UpdateLayout();Assert.Equal(iconCenter,thumb.TranslatePoint(new Point(thumb.ActualWidth/2,thumb.ActualHeight/2),panel).Y);}
-            panel.Detach();
+            var panel=new PlayerPanel();panel.Initialize(main);main.Player.Kind=kind;main.Player.ResetZoom();
+            try
+            {
+                panel.Measure(new Size(width,480));panel.Arrange(new Rect(0,0,width,480));panel.UpdateLayout();
+                var card=(FrameworkElement)panel.FindName("ControlsBar");Assert.InRange(card.ActualHeight,40,72);
+                foreach(var button in Descendants<Button>(card).Where(b=>b.ActualWidth>0).ToList())
+                {Assert.IsType<PackIcon>(button.Content);Assert.NotNull(button.ToolTip);button.ApplyTemplate();Assert.True(Descendants<Ripple>(button).Any(),$"缺少水波纹：{button.ToolTip}");}
+                if(kind!=MediaKind.Image)
+                {
+                    var buttons=(FrameworkElement)panel.FindName("MediaButtonsRow");var progress=(FrameworkElement)panel.FindName("ProgressRow");var settings=(FrameworkElement)panel.FindName("MediaSettingsRow");
+                    double Center(FrameworkElement e)=>e.TranslatePoint(new Point(0,e.ActualHeight/2),panel).Y;
+                    Assert.InRange(Math.Abs(Center(buttons)-Center(progress)),0,1);Assert.Equal(Center(buttons),Center(settings));
+                    Assert.True(((Slider)panel.FindName("ProgressSlider")).ActualWidth>=80);
+                    Assert.True(settings.TranslatePoint(new Point(settings.ActualWidth,0),panel).X<=width);
+                    Assert.Equal(kind==MediaKind.Video?Visibility.Visible:Visibility.Collapsed,((FrameworkElement)panel.FindName("HardwareCheck")).Visibility);
+                }
+                SavePreview(card,$"{kind}-{width}");
+            }
+            finally{panel.Detach();}
         });
     }
 
@@ -121,10 +175,16 @@ public class MaterialFeedbackTests
                 var player=(PlayerPanel)window.FindName("PlayerArea");var video=(FrameworkElement)player.FindName("VideoView");
                 var clickSurface=(FrameworkElement)player.FindName("VideoClickSurface");var foreground=Window.GetWindow(clickSurface);
                 Assert.NotNull(foreground);Assert.NotSame(window,foreground);Assert.True(foreground.IsVisible);
+                var volume=(PopupBox)player.FindName("VolumePopup");volume.IsPopupOpen=true;
+                var slider=(Slider)player.FindName("VolumeSlider");await BoundedDialogTests.Until(()=>slider.IsVisible && slider.ActualHeight>100);
+                var volumeSource=(HwndSource)PresentationSource.FromVisual(slider);
+                var volumePoint=slider.TranslatePoint(new Point(slider.ActualWidth/2,slider.ActualHeight/2),(UIElement)volumeSource.RootVisual);
+                Assert.Same(slider,CategoryFilePanel.FindAncestor<Slider>(((UIElement)volumeSource.RootVisual).InputHitTest(volumePoint) as DependencyObject));
+                slider.Value=50;Assert.Equal(50,main.Player.Volume);Assert.True(engine.Snapshot.IsPlaying);
                 var choices=engine.NativePlayer!.AudioTrackDescription.Select(t=>new DialogChoice<int>(t.Name,t.Id)).ToList();
                 var result=ChoiceDialog.ShowAsync("音轨","音轨",choices,engine.SelectedAudioTrack);
                 var root=(DialogHost)window.FindName("RootDialog");await BoundedDialogTests.Until(()=>root.IsOpen && root.DialogContent is DialogSurface s && s.IsLoaded);
-                await Task.Delay(350);Assert.False(foreground.IsVisible);Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
+                await Task.Delay(350);Assert.False(volume.IsPopupOpen);Assert.False(foreground.IsVisible);Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
                 var view=(DialogSurface)root.DialogContent!;
                 var box=Descendants<ComboBox>(view).Single();var apply=Descendants<Button>(view).Single(b=>b.Content is string text && text=="应用");
                 var popupSource=(HwndSource)PresentationSource.FromVisual(apply);
@@ -142,6 +202,14 @@ public class MaterialFeedbackTests
         });
     }
     [DllImport("user32.dll")][return:MarshalAs(UnmanagedType.Bool)]private static extern bool IsWindowVisible(IntPtr hwnd);
+    private static void SavePreview(FrameworkElement element,string name)
+    {
+        var directory=Path.GetFullPath("../../../../../artifacts/player-controls-preview",AppContext.BaseDirectory);Directory.CreateDirectory(directory);
+        var visual=new DrawingVisual();using(var drawing=visual.RenderOpen())drawing.DrawRectangle(new VisualBrush(element),null,new Rect(0,0,element.ActualWidth,element.ActualHeight));
+        var bitmap=new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth),(int)Math.Ceiling(element.ActualHeight),96,96,PixelFormats.Pbgra32);bitmap.Render(visual);
+        var encoder=new System.Windows.Media.Imaging.PngBitmapEncoder();encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+        using var output=File.Create(Path.Combine(directory,name+".png"));encoder.Save(output);
+    }
     [DllImport("user32.dll")][return:MarshalAs(UnmanagedType.Bool)]private static extern bool IsWindowEnabled(IntPtr hwnd);
     private static IEnumerable<T>Descendants<T>(DependencyObject root)where T:DependencyObject
     {for(var i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var child=VisualTreeHelper.GetChild(root,i);if(child is T found)yield return found;foreach(var nested in Descendants<T>(child))yield return nested;}}

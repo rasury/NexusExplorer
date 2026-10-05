@@ -1,4 +1,10 @@
 <UserControl x:Class="NexusExplorer.Views.PlayerPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+ <UserControl.Resources>
+  <Style x:Key="PlayerIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+   <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+   <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
+  </Style>
+ </UserControl.Resources>
  <Grid>
   <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <md:Card x:Name="PreviewCard" Background="Black" UniformCornerRadius="16" md:ElevationAssist.Elevation="Dp0" ClipContent="True">
@@ -17,37 +23,39 @@
   </md:Card>
   <md:Card x:Name="ControlsBar" Grid.Row="1" Style="{StaticResource PlayerCard}" Padding="16" Margin="0,16,0,0" Visibility="Collapsed">
    <Grid>
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <Grid x:Name="ProgressRow" Margin="0,0,0,16">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+    <Grid x:Name="ProgressRow" Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-     <TextBlock x:Name="PositionText" Text="0:00" Style="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,16,0"/>
+     <TextBlock x:Name="PositionText" Text="0:00" Style="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
      <Slider x:Name="ProgressSlider" Grid.Column="1" Minimum="0" Maximum="1" IsMoveToPointEnabled="True" ValueChanged="OnProgressChanged"/>
-     <TextBlock x:Name="DurationText" Grid.Column="2" Text="0:00" Style="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+     <TextBlock x:Name="DurationText" Grid.Column="2" Text="0:00" MaxWidth="80" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Style="{StaticResource TextPrimary}" VerticalAlignment="Center" Margin="8,0,0,0"/>
     </Grid>
-    <WrapPanel x:Name="MediaButtonsRow" Grid.Row="1" HorizontalAlignment="Center">
-     <Button Style="{StaticResource ButtonOnPlayer}" Click="OnPrevious" ToolTip="上一项"><StackPanel Orientation="Horizontal"><md:PackIcon Kind="SkipPrevious" Width="24" Height="24" Margin="0,0,8,0"/><TextBlock Text="上一项" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="PlayPauseButton" Style="{StaticResource ButtonPrimary}" Click="OnPlayPause" Margin="0,0,8,8"><StackPanel Orientation="Horizontal"><md:PackIcon x:Name="PlayPauseIcon" Kind="Play" Width="24" Height="24" Margin="0,0,8,0"/><TextBlock x:Name="PlayPauseLabel" Text="播放" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button Style="{StaticResource ButtonOnPlayer}" Click="OnStop" ToolTip="停止"><StackPanel Orientation="Horizontal"><md:PackIcon Kind="Stop" Width="24" Height="24" Margin="0,0,8,0"/><TextBlock Text="停止" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button Style="{StaticResource ButtonOnPlayer}" Click="OnNext" ToolTip="下一项"><StackPanel Orientation="Horizontal"><md:PackIcon Kind="SkipNext" Width="24" Height="24" Margin="0,0,8,0"/><TextBlock Text="下一项" VerticalAlignment="Center"/></StackPanel></Button>
-     <Button x:Name="ModeButton" Style="{StaticResource ButtonOnPlayer}" Click="OnCycleMode"><StackPanel Orientation="Horizontal"><md:PackIcon x:Name="ModeIcon" Kind="PlaylistPlay" Width="24" Height="24" Margin="0,0,8,0"/><TextBlock x:Name="ModeLabel" Text="顺序" VerticalAlignment="Center"/></StackPanel></Button>
-    </WrapPanel>
-    <WrapPanel x:Name="MediaSettingsRow" Grid.Row="2" HorizontalAlignment="Center">
-     <Grid Height="40" Margin="8,0,16,0">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="8"/><ColumnDefinition Width="112"/></Grid.ColumnDefinitions>
-      <md:PackIcon x:Name="VolumeIcon" Kind="VolumeHigh" Width="24" Height="24" VerticalAlignment="Center" Foreground="{DynamicResource BrushSecondaryText}"/>
-      <Slider x:Name="VolumeSlider" Grid.Column="2" Height="20" VerticalAlignment="Center" Minimum="0" Maximum="100" Value="100" IsMoveToPointEnabled="True" ValueChanged="OnVolumeChanged"/>
-     </Grid>
-     <CheckBox x:Name="HardwareCheck" Content="硬件解码" Margin="0,0,16,0" VerticalAlignment="Center" ToolTip="关闭后使用软件解码；下次打开媒体生效" Checked="OnHardwareChanged" Unchecked="OnHardwareChanged"/>
-     <Button Style="{StaticResource ButtonText}" Click="OnAudioTracks"><StackPanel Orientation="Horizontal"><md:PackIcon Kind="Tune" Width="24" Height="24" Margin="0,0,8,0"/><TextBlock Text="音轨" VerticalAlignment="Center"/></StackPanel></Button>
-    </WrapPanel>
-    <WrapPanel x:Name="ImageButtonsRow" Grid.Row="1" HorizontalAlignment="Center" Visibility="Collapsed">
-     <Button Style="{StaticResource ButtonOnPlayer}" Click="OnPrevious" ToolTip="上一张"><md:PackIcon Kind="SkipPrevious" Width="24" Height="24"/></Button>
-     <Button Style="{StaticResource ButtonOnPlayer}" Click="OnZoomIn" ToolTip="放大"><md:PackIcon Kind="MagnifyPlusOutline" Width="24" Height="24"/></Button>
-     <Button x:Name="ZoomResetButton" Style="{StaticResource ButtonSecondary}" Content="适合窗口" Click="OnZoomReset" Margin="0,0,8,8"/>
-     <Button Style="{StaticResource ButtonOnPlayer}" Click="OnZoomOut" ToolTip="缩小"><md:PackIcon Kind="MagnifyMinusOutline" Width="24" Height="24"/></Button>
-     <Button Style="{StaticResource ButtonOnPlayer}" Content="1:1" Click="OnZoomOriginal"/>
-     <Button Style="{StaticResource ButtonOnPlayer}" Click="OnNext" ToolTip="下一张"><md:PackIcon Kind="SkipNext" Width="24" Height="24"/></Button>
-    </WrapPanel>
+    <StackPanel x:Name="MediaButtonsRow" Orientation="Horizontal" VerticalAlignment="Center">
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnPrevious" ToolTip="上一项"><md:PackIcon Kind="SkipPrevious" Width="24" Height="24"/></Button>
+     <Button x:Name="PlayPauseButton" Style="{StaticResource PlayerIconButton}" Background="{DynamicResource BrushAccentBlueLight}" Foreground="{DynamicResource BrushOnPrimaryContainer}" Click="OnPlayPause" ToolTip="播放"><md:PackIcon x:Name="PlayPauseIcon" Kind="Play" Width="24" Height="24"/></Button>
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnStop" ToolTip="停止"><md:PackIcon Kind="Stop" Width="24" Height="24"/></Button>
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnNext" ToolTip="下一项"><md:PackIcon Kind="SkipNext" Width="24" Height="24"/></Button>
+     <Button x:Name="ModeButton" Style="{StaticResource PlayerIconButton}" Click="OnCycleMode" ToolTip="顺序"><md:PackIcon x:Name="ModeIcon" Kind="PlaylistPlay" Width="24" Height="24"/></Button>
+    </StackPanel>
+    <StackPanel x:Name="MediaSettingsRow" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+     <md:PopupBox x:Name="VolumePopup" Width="40" Height="40" PopupMode="MouseOver" PlacementMode="TopAndAlignCentres" StaysOpen="True" PopupElevation="Dp0" PopupUniformCornerRadius="20" Padding="8" Background="Transparent" Foreground="{DynamicResource BrushPrimaryText}" md:ButtonAssist.CornerRadius="20" ToolTip="音量 100%" AutomationProperties.Name="音量">
+      <md:PopupBox.ToggleContent><md:PackIcon x:Name="VolumeIcon" Kind="VolumeHigh" Width="24" Height="24"/></md:PopupBox.ToggleContent>
+      <StackPanel Width="40">
+       <TextBlock x:Name="VolumeValueText" Text="100" HorizontalAlignment="Center" Style="{StaticResource TextCaption}" Margin="0,0,0,8"/>
+       <Slider x:Name="VolumeSlider" Orientation="Vertical" Height="144" Width="32" HorizontalAlignment="Center" Minimum="0" Maximum="100" Value="100" IsMoveToPointEnabled="True" ValueChanged="OnVolumeChanged" AutomationProperties.Name="音量"/>
+      </StackPanel>
+     </md:PopupBox>
+     <ToggleButton x:Name="HardwareCheck" Style="{StaticResource MaterialDesignFlatToggleButton}" Width="40" Height="40" ToolTip="硬件解码：关闭后使用软件解码；下次打开媒体生效" AutomationProperties.Name="硬件解码" Checked="OnHardwareChanged" Unchecked="OnHardwareChanged"><md:PackIcon Kind="Chip" Width="24" Height="24"/></ToggleButton>
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnAudioTracks" ToolTip="选择音轨"><md:PackIcon Kind="Tune" Width="24" Height="24"/></Button>
+    </StackPanel>
+    <StackPanel x:Name="ImageButtonsRow" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Center" Visibility="Collapsed">
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnPrevious" ToolTip="上一张"><md:PackIcon Kind="SkipPrevious" Width="24" Height="24"/></Button>
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnZoomIn" ToolTip="放大"><md:PackIcon Kind="MagnifyPlusOutline" Width="24" Height="24"/></Button>
+     <Button x:Name="ZoomResetButton" Style="{StaticResource PlayerIconButton}" Click="OnZoomReset" ToolTip="适合窗口"><md:PackIcon Kind="FitToScreenOutline" Width="24" Height="24"/></Button>
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnZoomOut" ToolTip="缩小"><md:PackIcon Kind="MagnifyMinusOutline" Width="24" Height="24"/></Button>
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnZoomOriginal" ToolTip="原始尺寸（1:1）"><md:PackIcon Kind="ImageSizeSelectActual" Width="24" Height="24"/></Button>
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnNext" ToolTip="下一张"><md:PackIcon Kind="SkipNext" Width="24" Height="24"/></Button>
+    </StackPanel>
    </Grid>
   </md:Card>
  </Grid>

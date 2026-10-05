@@ -26,6 +26,7 @@ public partial class PlayerPanel : UserControl
     internal void SetDialogCovered(bool covered)
     {
         _dialogCovered = covered;
+        if (covered) VolumePopup.IsPopupOpen = false;
         VideoClickSurface.Visibility = covered ? Visibility.Collapsed : Visibility.Visible;
         if (covered)
         {
@@ -54,7 +55,7 @@ public partial class PlayerPanel : UserControl
         _main = main; Vm.ShowErrorAsync = async m => { await MessageDialog.ShowAsync(m, "播放", DialogButtons.Ok, DialogSeverity.Warning); };
         Vm.StateChanged += UpdateUi;
         if (Native is not null) Native.PlayerReady += AttachNativePlayer;
-        HardwareCheck.IsChecked = Native?.HardwareDecoding ?? true; VolumeSlider.Value = Vm.Volume; _initialized = true;
+        HardwareCheck.IsChecked = Native?.HardwareDecoding ?? true; VolumeSlider.Value = Vm.Volume; UpdateVolumeUi(Vm.Volume); _initialized = true;
         ProgressSlider.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, _) => _dragging = true), true);
         AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(OnProgressReleased), true);
         _timer.Tick += Poll; _timer.Start();
@@ -67,6 +68,7 @@ public partial class PlayerPanel : UserControl
     private void ApplyNativeBackground() => _nativeBackground.Attach(VideoView.MediaPlayer?.Hwnd ?? IntPtr.Zero);
     public void Detach()
     {
+        VolumePopup.IsPopupOpen = false;
         _timer.Stop(); _nativeBackground.Dispose(); VideoView.MediaPlayer = null;
         if (_initialized) Vm.ReleaseImagePreview();
         ImageDisplay.Source = null;
@@ -87,9 +89,8 @@ public partial class PlayerPanel : UserControl
         if (Vm.Kind is not (MediaKind.Video or MediaKind.Audio)) return;
         var state = Vm.Engine.Snapshot;
         if (!Vm.PlaybackCompleted) { Vm.IsPlaying = state.IsPlaying; Vm.Duration = state.Duration; Vm.Position = state.Position; }
-        PlayPauseLabel.Text = Vm.PlaybackCompleted ? "重播" : state.IsPlaying ? "暂停" : "播放";
         PlayPauseIcon.Kind = Vm.PlaybackCompleted ? PackIconKind.Replay : state.IsPlaying ? PackIconKind.Pause : PackIconKind.Play;
-        PlayPauseButton.ToolTip = PlayPauseLabel.Text;
+        PlayPauseButton.ToolTip = Vm.PlaybackCompleted ? "重播" : state.IsPlaying ? "暂停" : "播放";
         ProgressSlider.IsEnabled = !Vm.PlaybackCompleted && !state.IsDurationPending && Vm.Duration > TimeSpan.Zero;
         if (_dragging) return;
         ProgressSlider.Value = Vm.Duration > TimeSpan.Zero ? Math.Clamp(Vm.Position.TotalMilliseconds / Vm.Duration.TotalMilliseconds, 0, 1) : 0;
@@ -112,9 +113,10 @@ public partial class PlayerPanel : UserControl
         ProgressRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         MediaButtonsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         MediaSettingsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
+        if (!media) VolumePopup.IsPopupOpen = false;
         ImageButtonsRow.Visibility = Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         HardwareCheck.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Collapsed;
-        ModeLabel.Text = Vm.PlayMode switch { PlayMode.RepeatAll => "列表循环", PlayMode.RepeatOne => "单曲循环", PlayMode.Shuffle => "随机", _ => "顺序" };
+        ModeButton.ToolTip = Vm.PlayMode switch { PlayMode.RepeatAll => "列表循环", PlayMode.RepeatOne => "单曲循环", PlayMode.Shuffle => "随机", _ => "顺序" };
         ModeIcon.Kind = Vm.PlayMode switch { PlayMode.RepeatAll => PackIconKind.Repeat, PlayMode.RepeatOne => PackIconKind.RepeatOnce, PlayMode.Shuffle => PackIconKind.ShuffleVariant, _ => PackIconKind.PlaylistPlay };
         if (Vm.Kind == MediaKind.Image) { ImageDisplay.Source = Vm.ImageSource; ApplyImageZoom(); }
         else ImageDisplay.Source = null;
@@ -132,7 +134,13 @@ public partial class PlayerPanel : UserControl
     private void OnProgressChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     { if (_dragging) PositionText.Text = FormatTime(Vm.Duration * e.NewValue); }
     private async void OnVolumeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    { if (_initialized) await RunAsync(() => Vm.SetVolumeAsync((int)e.NewValue)); }
+    { UpdateVolumeUi((int)e.NewValue); if (_initialized) await RunAsync(() => Vm.SetVolumeAsync((int)e.NewValue)); }
+    private void UpdateVolumeUi(int volume)
+    {
+        if (VolumeIcon is null || VolumeValueText is null) return;
+        VolumeIcon.Kind = volume <= 30 ? PackIconKind.VolumeLow : volume <= 60 ? PackIconKind.VolumeMedium : PackIconKind.VolumeHigh;
+        VolumeValueText.Text = volume.ToString(); VolumePopup.ToolTip = $"音量 {volume}%";
+    }
     private async void OnHardwareChanged(object sender, RoutedEventArgs e)
     {
         if (!_initialized || Native is null) return;
@@ -165,7 +173,7 @@ public partial class PlayerPanel : UserControl
         var h = ImageScroll.ViewportHeight > 0 ? ImageScroll.ViewportHeight : ImageScroll.ActualHeight;
         _effectiveScale = Vm.ImageScale > 0 ? Vm.ImageScale : FitScale(source.PixelWidth, source.PixelHeight, w, h);
         ImageDisplay.Width = source.PixelWidth * _effectiveScale; ImageDisplay.Height = source.PixelHeight * _effectiveScale;
-        ZoomResetButton.Content = Vm.ImageScale == 0 ? "适合窗口" : $"{_effectiveScale:0.##}×";
+        ZoomResetButton.ToolTip = Vm.ImageScale == 0 ? "适合窗口" : $"当前缩放 {_effectiveScale:0.##}×；点击适合窗口";
     }
     private void ZoomAt(Point point, double factor)
     {
