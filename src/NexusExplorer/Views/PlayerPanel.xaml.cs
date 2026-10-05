@@ -60,13 +60,22 @@ public partial class PlayerPanel : UserControl
     private async Task RunAsync(Func<Task> action)
     { try { await action(); } catch (Exception ex) { Log.Error(ex, "播放控制失败"); Vm.ShowError?.Invoke(ex.Message); } }
     private void Poll(object? sender, EventArgs e)
+        => RefreshPlaybackUi();
+
+    internal void RefreshPlaybackUi()
     {
         if (Vm.Kind is not (MediaKind.Video or MediaKind.Audio)) return;
-        var state = Vm.Engine.Snapshot; Vm.IsPlaying = state.IsPlaying; Vm.Duration = state.Duration; Vm.Position = state.Position;
-        PlayPauseButton.Content = state.IsPlaying ? "⏸ 暂停" : "▶ 播放";
+        var state = Vm.Engine.Snapshot;
+        if (!Vm.PlaybackCompleted) { Vm.IsPlaying = state.IsPlaying; Vm.Duration = state.Duration; Vm.Position = state.Position; }
+        PlayPauseButton.Content = Vm.PlaybackCompleted ? "↻ 重播" : state.IsPlaying ? "⏸ 暂停" : "▶ 播放";
+        ProgressSlider.IsEnabled = !Vm.PlaybackCompleted && !state.IsDurationPending && Vm.Duration > TimeSpan.Zero;
         if (_dragging) return;
-        ProgressSlider.Value = state.Duration > TimeSpan.Zero ? Math.Clamp(state.Position.TotalMilliseconds / state.Duration.TotalMilliseconds, 0, 1) : 0;
-        PositionText.Text = FormatTime(state.Position); DurationText.Text = FormatTime(state.Duration);
+        ProgressSlider.Value = Vm.Duration > TimeSpan.Zero ? Math.Clamp(Vm.Position.TotalMilliseconds / Vm.Duration.TotalMilliseconds, 0, 1) : 0;
+        PositionText.Text = FormatTime(Vm.Position);
+        var estimated = Vm.PlaybackCompleted ? Vm.CompletedDurationEstimated : state.IsDurationEstimated;
+        DurationText.Text = state.IsDurationPending && !Vm.PlaybackCompleted ? "读取时长中…"
+            : (Vm.Duration > TimeSpan.Zero ? (estimated ? "约 " : "") + FormatTime(Vm.Duration) : "未知时长")
+                + (Vm.PlaybackCompleted ? " · 已播放完" : "");
     }
     private static string FormatTime(TimeSpan time) => time.TotalHours >= 1 ? $"{(int)time.TotalHours}:{time.Minutes:D2}:{time.Seconds:D2}" : $"{(int)time.TotalMinutes}:{time.Seconds:D2}";
     private void UpdateUi()
@@ -85,6 +94,7 @@ public partial class PlayerPanel : UserControl
         ModeButton.Content = Vm.PlayMode switch { PlayMode.RepeatAll => "🔁 列表循环", PlayMode.RepeatOne => "🔂 单曲循环", PlayMode.Shuffle => "🔀 随机", _ => "➡ 顺序" };
         if (Vm.Kind == MediaKind.Image) { ImageDisplay.Source = Vm.ImageSource; ApplyImageZoom(); }
         else ImageDisplay.Source = null;
+        RefreshPlaybackUi();
     }
     private async void OnPlayPause(object sender, RoutedEventArgs e) => await RunAsync(Vm.TogglePlayPauseAsync);
     private async void OnVideoAreaClick(object sender, MouseButtonEventArgs e) => await RunAsync(Vm.TogglePlayPauseAsync);

@@ -25,6 +25,7 @@
     <None Update="Assets\seek-h264-aac.mp4" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Assets\Gif\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Assets\Apng\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Assets\Aac\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -27,6 +27,8 @@ public partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _isPlaying;
     [ObservableProperty] private TimeSpan _position;
     [ObservableProperty] private TimeSpan _duration;
+    [ObservableProperty] private bool _playbackCompleted;
+    public bool CompletedDurationEstimated { get; private set; }
     [ObservableProperty] private int _volume = 100;
     [ObservableProperty] private PlayMode _playMode = PlayMode.Sequential;
     [ObservableProperty] private ImageSource? _imageSource;
@@ -53,7 +55,7 @@ public partial class PlayerViewModel : ObservableObject
         ClearImageAnimation();
         await Engine.StopAndReleaseAsync();
         if (version != Interlocked.Read(ref _version)) return;
-        ImageSource = null; ImageScale = 0; Position = TimeSpan.Zero; Duration = TimeSpan.Zero; IsPlaying = false;
+        ImageSource = null; ImageScale = 0; Position = TimeSpan.Zero; Duration = TimeSpan.Zero; IsPlaying = false; PlaybackCompleted = false;
         Kind = file is null ? MediaKind.None : GetMediaKind(file.FileName); MediaTitle = file?.FileName; MediaPath = file?.AbsolutePath;
         StateChanged?.Invoke();
         if (file is null) return;
@@ -133,13 +135,14 @@ public partial class PlayerViewModel : ObservableObject
 
 
     private void OnPlaybackError(string path, string message)
-    { Log.Error("播放失败 {Path}: {Message}", path, message); ShowError?.Invoke(message); IsPlaying = false; StateChanged?.Invoke(); }
+    { Log.Error("播放失败 {Path}: {Message}", path, message); ShowError?.Invoke(message); IsPlaying = false; PlaybackCompleted = false; StateChanged?.Invoke(); }
     private async void OnMediaEnded()
     {
         if (!await _ended.WaitAsync(0)) return;
         try
         {
             if (_main.CurrentFile is null) return;
+            var finalState = Engine.Snapshot;
             if (PlayMode == PlayMode.RepeatOne) await PlayFileAsync(_main.CurrentFile);
             else if (PlayMode == PlayMode.Shuffle)
             {
@@ -150,11 +153,12 @@ public partial class PlayerViewModel : ObservableObject
                     if (file is not null && file.ExistsOnDisk)
                     { await _main.PlayQueuedIdAsync(file.Id); }
                 }
+                else await FinishPlaybackAsync(finalState);
             }
             else if (!await _main.PlayAdjacentAsync(1))
             {
                 if (PlayMode == PlayMode.RepeatAll) await _main.ReplayQueueAsync();
-                else await StopPlaybackAsync();
+                else await FinishPlaybackAsync(finalState);
             }
         }
         catch (Exception ex) { OnPlaybackError(MediaPath ?? "", ex.Message); }
@@ -164,9 +168,17 @@ public partial class PlayerViewModel : ObservableObject
     {
         if (Kind is not (MediaKind.Video or MediaKind.Audio)) return;
         if (Engine.Snapshot.IsPlaying || Engine.Snapshot.IsPaused) await Engine.TogglePauseAsync();
-        else if (_main.CurrentFile is not null) await Engine.PlayAsync(_main.CurrentFile.AbsolutePath, Kind == MediaKind.Audio);
+        else if (_main.CurrentFile is not null) await PlayFileAsync(_main.CurrentFile);
     }
-    public async Task StopPlaybackAsync() { ReleaseImagePreview(); await Engine.StopAndReleaseAsync(); IsPlaying = false; Position = TimeSpan.Zero; StateChanged?.Invoke(); }
+    public async Task StopPlaybackAsync() { PlaybackCompleted = false; ReleaseImagePreview(); await Engine.StopAndReleaseAsync(); IsPlaying = false; Position = TimeSpan.Zero; StateChanged?.Invoke(); }
+    private async Task FinishPlaybackAsync(PlaybackSnapshot state)
+    {
+        var version = Interlocked.Read(ref _version); var fileId = _main.CurrentFile?.Id;
+        await StopPlaybackAsync();
+        if (Interlocked.Read(ref _version) != version + 1 || _main.CurrentFile?.Id != fileId) return;
+        Duration = state.Duration; Position = state.Duration; CompletedDurationEstimated = state.IsDurationEstimated;
+        PlaybackCompleted = true; StateChanged?.Invoke();
+    }
     public Task NextAsync() => AdjacentAsync(1);
     public Task PreviousAsync() => AdjacentAsync(-1);
     private async Task AdjacentAsync(int offset)

@@ -27,6 +27,11 @@ public sealed class MediaPlayerService : IPlaybackEngine
         public string Path { get; } = path;
         public int PlayingLogged;
         public int TimeLogged;
+        public bool IsAac;
+        public CancellationTokenSource? DurationCancellation;
+        public Task? DurationTask;
+        public long ExactDurationTicks = -1;
+        public int DurationPending;
     }
     public bool HardwareDecoding { get; set; } = true;
     public NativePlayer? NativePlayer => _player;
@@ -43,7 +48,12 @@ public sealed class MediaPlayerService : IPlaybackEngine
         {
             var p = _player;
             if (p is null || _disposed) return new(false, TimeSpan.Zero, TimeSpan.Zero);
-            return new(p.IsPlaying, TimeSpan.FromMilliseconds(Math.Max(0, p.Time)), TimeSpan.FromMilliseconds(Math.Max(0, p.Length)), p.State == VLCState.Paused);
+            var timing = ActiveTiming();
+            var pending = timing is { IsAac: true } && Volatile.Read(ref timing.DurationPending) != 0;
+            var exact = timing is null ? -1 : Interlocked.Read(ref timing.ExactDurationTicks);
+            var duration = pending ? TimeSpan.Zero : exact >= 0 ? TimeSpan.FromTicks(exact) : TimeSpan.FromMilliseconds(Math.Max(0, p.Length));
+            return new(p.IsPlaying, TimeSpan.FromMilliseconds(Math.Max(0, p.Time)), duration, p.State == VLCState.Paused,
+                pending, timing is { IsAac: true } && !pending && exact < 0);
         }
     }
     public MediaPlayerService(Dispatcher? dispatcher = null) =>
@@ -68,7 +78,9 @@ public sealed class MediaPlayerService : IPlaybackEngine
         {
             if (e.Message.Contains("using audio output module", StringComparison.Ordinal)
                 || e.Message.Contains("using aout stream module", StringComparison.Ordinal)
-                || e.Message.Contains("using audio resampler module", StringComparison.Ordinal))
+                || e.Message.Contains("using audio resampler module", StringComparison.Ordinal)
+                || e.Message.Contains("using demux module", StringComparison.Ordinal)
+                || e.Message.Contains("using audio decoder module", StringComparison.Ordinal))
                 Log.Information("VLC 实际音频模块;请求 {Request};{Module}: {Message}", Interlocked.Read(ref _activeGeneration), e.Module, e.Message);
             else Log.Debug("VLC {Module}: {Message}", e.Module, e.Message);
         };
@@ -107,7 +119,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
         {
             Log.Information("VLC 播放命令就绪;请求 {Request};排队 {ElapsedMs:F1} ms", generation, timing.Elapsed.TotalMilliseconds);
             if (generation != Interlocked.Read(ref _generation)) return;
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 var step = Stopwatch.StartNew();
                 EnsurePlayer();
@@ -115,23 +127,27 @@ public sealed class MediaPlayerService : IPlaybackEngine
                 step.Restart();
                 Interlocked.Exchange(ref _activeGeneration, 0);
                 _player!.Stop(); _player.Media = null;
+                await ReleaseDurationAnalysisAsync();
                 Log.Information("VLC 清理旧媒体结束;请求 {Request};耗时 {ElapsedMs:F1} ms", generation, step.Elapsed.TotalMilliseconds);
                 if (generation != Interlocked.Read(ref _generation) || cancellationToken.IsCancellationRequested) return;
                 step.Restart();
                 if (!File.Exists(path)) throw new FileNotFoundException("媒体文件不存在。", path);
                 CurrentPath = path;
                 using var media = new Media(_vlc!, new Uri(path));
+                var isAac = Path.GetExtension(path).Equals(".aac", StringComparison.OrdinalIgnoreCase);
                 // VLC 3's MP4 demuxer misreads seek indexes/timestamps in some HLS-derived
                 // local MP4s. Keep native decoding/output, using libavformat for these containers.
                 if (Path.GetExtension(path).Equals(".mp4", StringComparison.OrdinalIgnoreCase)
                     || Path.GetExtension(path).Equals(".mov", StringComparison.OrdinalIgnoreCase)
-                    || Path.GetExtension(path).Equals(".m4v", StringComparison.OrdinalIgnoreCase))
+                    || Path.GetExtension(path).Equals(".m4v", StringComparison.OrdinalIgnoreCase) || isAac)
                     media.AddOption(":demux=avformat");
                 _player.EnableHardwareDecoding = HardwareDecoding;
                 _player.SetRole(audio ? MediaPlayerRole.Music : MediaPlayerRole.Video);
                 _player.Volume = _volume; _player.SetRate(1);
-                Volatile.Write(ref _playbackTiming, new PlaybackTiming(generation, startedAt, path));
+                var playback = new PlaybackTiming(generation, startedAt, path) { IsAac = isAac };
+                Volatile.Write(ref _playbackTiming, playback);
                 Interlocked.Exchange(ref _activeGeneration, generation);
+                if (isAac) StartDurationAnalysis(playback, cancellationToken);
                 if (!_player.Play(media)) throw new OperationException("播放器拒绝打开该媒体。");
                 Log.Information("VLC 打开调用返回;请求 {Request};打开步骤 {StepMs:F1} ms;请求累计 {ElapsedMs:F1} ms", generation, step.Elapsed.TotalMilliseconds, timing.Elapsed.TotalMilliseconds);
                 Log.Information("播放 {Path};硬件解码 {Hardware};音量 {Volume};角色 {Role};请求音频输出 MMDevice/WASAPI;请求重采样 Speex", path, HardwareDecoding, _volume, audio ? "Music" : "Video");
@@ -146,10 +162,11 @@ public sealed class MediaPlayerService : IPlaybackEngine
         await _commands.WaitAsync();
         try
         {
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 Interlocked.Exchange(ref _activeGeneration, 0);
                 if (_player is not null && !_disposed) { _player.Stop(); _player.Media = null; }
+                await ReleaseDurationAnalysisAsync();
                 CurrentPath = null;
             });
             Log.Information("VLC 停止释放结束;耗时 {ElapsedMs:F1} ms", timing.Elapsed.TotalMilliseconds);
@@ -185,8 +202,44 @@ public sealed class MediaPlayerService : IPlaybackEngine
     });
     public Task SeekAsync(float fraction) => CommandAsync(p =>
     {
-        if (p.Length > 0) p.SeekTo(TimeSpan.FromMilliseconds(p.Length * Math.Clamp(fraction, 0, 1)));
+        var state = Snapshot;
+        if (!state.IsDurationPending && state.Duration > TimeSpan.Zero)
+            p.SeekTo(state.Duration * Math.Clamp(fraction, 0, 1));
     });
+
+    private void StartDurationAnalysis(PlaybackTiming timing, CancellationToken cancellationToken)
+    {
+        timing.DurationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var token = timing.DurationCancellation.Token;
+        Volatile.Write(ref timing.DurationPending, 1);
+        timing.DurationTask = Task.Run(() =>
+        {
+            var watch = Stopwatch.StartNew();
+            try
+            {
+                var result = AdtsDurationReader.TryRead(timing.Path, token);
+                token.ThrowIfCancellationRequested();
+                if (result is not null)
+                {
+                    Interlocked.Exchange(ref timing.ExactDurationTicks, result.Duration.Ticks);
+                    Log.Information("AAC 固定时长;请求 {Request};帧数 {Frames};采样率 {SampleRate};时长 {DurationMs:F3} ms;扫描 {ElapsedMs:F1} ms", timing.Generation, result.Frames, result.SampleRate, result.Duration.TotalMilliseconds, watch.Elapsed.TotalMilliseconds);
+                }
+                else Log.Warning("AAC 无法取得完整 ADTS 帧时长，将标注估算值;请求 {Request};路径 {Path}", timing.Generation, timing.Path);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { Log.Warning(ex, "AAC 时长读取失败，将标注估算值;请求 {Request}", timing.Generation); }
+            finally { Volatile.Write(ref timing.DurationPending, 0); }
+        });
+    }
+
+    private async Task ReleaseDurationAnalysisAsync()
+    {
+        var timing = Interlocked.Exchange(ref _playbackTiming, null);
+        if (timing?.DurationCancellation is null) return;
+        timing.DurationCancellation.Cancel();
+        if (timing.DurationTask is not null) await timing.DurationTask;
+        timing.DurationCancellation.Dispose();
+    }
     public Task SetVolumeAsync(int volume)
     { _volume = Math.Clamp(volume, 0, 100); return CommandAsync(p => p.Volume = _volume); }
     private Task CommandAsync(Action<NativePlayer> command) => CommandAsync(player =>
@@ -249,6 +302,7 @@ public sealed class MediaPlayerService : IPlaybackEngine
         {
             if (_disposed) return; _disposed = true; Interlocked.Increment(ref _generation);
             if (_player is not null) { _player.EndReached -= OnEnded; _player.EncounteredError -= OnError; _player.Playing -= OnPlaying; _player.TimeChanged -= OnTimeChanged; _player.Stop(); _player.Media = null; _player.Dispose(); }
+            ReleaseDurationAnalysisAsync().GetAwaiter().GetResult();
             _vlc?.Dispose(); _player = null; _vlc = null;
         }
         finally { _commands.Release(); }
