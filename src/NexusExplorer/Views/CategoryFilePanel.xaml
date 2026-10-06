@@ -55,7 +55,7 @@
         <!-- 分类树 -->
         <TreeView x:Name="CategoryTree"
                   Grid.Row="1"
-                  Margin="8,0,8,8"
+                  Margin="0,0,0,8"
                   Padding="8"
                   VirtualizingPanel.IsVirtualizing="True"
                   AllowDrop="True"

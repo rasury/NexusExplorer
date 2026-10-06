@@ -23,7 +23,7 @@
    <md:DrawerHost x:Name="NavigationDrawer" Grid.Row="1" OpenMode="Standard" IsLeftDrawerOpen="True" LeftDrawerCloseOnClickAway="False">
     <!-- Standard drawer measures across Auto rows; constrain its content to the viewport to preserve virtualization. -->
     <md:DrawerHost.LeftDrawerContent><views:CategoryFilePanel x:Name="LeftPanel" Width="360" Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=md:DrawerHost}, FallbackValue=0}"/></md:DrawerHost.LeftDrawerContent>
-    <views:PlayerPanel x:Name="PlayerArea" Margin="16"/>
+    <views:PlayerPanel x:Name="PlayerArea" Margin="8"/>
    </md:DrawerHost>
    <md:ColorZone Grid.Row="2" Mode="Standard" Background="{DynamicResource BrushSecondaryBg}"><views:NavigationBar x:Name="NavBar"/></md:ColorZone>
    <md:Snackbar x:Name="TaskSnackbar" Grid.Row="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="24" MaxWidth="560"/>

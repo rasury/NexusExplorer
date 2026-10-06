@@ -9,20 +9,30 @@
 
     <UserControl.Resources>
         <DataTemplate x:Key="CategoryNavigationContent" DataType="{x:Type models:Category}">
-            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding Name}" FontSize="14" LineHeight="20" TextWrapping="Wrap" VerticalAlignment="Center" />
         </DataTemplate>
         <DataTemplate x:Key="NavigationInlineContent" DataType="{x:Type models:Category}">
-            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding Name}" FontSize="14" LineHeight="20" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" VerticalAlignment="Center" />
         </DataTemplate>
         <Style x:Key="NavCategoryButton" TargetType="Button" BasedOn="{StaticResource ButtonText}">
             <Setter Property="MaxWidth" Value="160"/>
             <Setter Property="Background" Value="{DynamicResource BrushAccentBlueLight}"/>
             <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
-            <Setter Property="Margin" Value="0,0,8,8"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
         </Style>
         <Style x:Key="PinnedCategoryButton" TargetType="Button" BasedOn="{StaticResource ButtonGhost}">
-            <Setter Property="Margin" Value="0,0,8,8"/>
-            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,4,8,4"/>
+            <Setter Property="Padding" Value="8,4"/>
             <Style.Triggers><DataTrigger Binding="{Binding IsSelected}" Value="True">
                 <Setter Property="Background" Value="{DynamicResource BrushAccentBlueLight}"/>
                 <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
@@ -53,6 +63,7 @@
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
                 <TextBlock Text="当前分类:"
                            Style="{StaticResource TextCaption}"
+                           FontSize="14" LineHeight="20"
                            VerticalAlignment="Center"
                            Margin="0,0,8,0" />
                 <TextBlock MaxWidth="240" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentPathText}" Text="{Binding CurrentPathText}"
@@ -117,7 +128,7 @@
             </ScrollViewer>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-            <Button x:Name="MoreChildrenButton" Style="{StaticResource ButtonGhost}" Click="OnMoreChildren" Content="更多子分类" Margin="8,0,0,8"/>
+            <Button x:Name="MoreChildrenButton" Style="{StaticResource ButtonGhost}" Padding="8,4" Height="32" MinHeight="32" MinWidth="0" VerticalAlignment="Center" Click="OnMoreChildren" Content="更多子分类" Margin="8,0,0,0"/>
             <!-- 绿色打勾(两层共用) -->
             <Button x:Name="ConfirmButton"
                     Grid.Column="2"
@@ -134,16 +145,18 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="0"
+            <Border Grid.Column="0" Height="40" VerticalAlignment="Top" Margin="0,0,8,0">
+            <TextBlock
                        Text="快捷标签:"
                        Style="{StaticResource TextCaption}"
-                       VerticalAlignment="Center"
-                       Margin="0,0,8,0" />
+                       FontSize="14" LineHeight="20"
+                       VerticalAlignment="Center" />
+            </Border>
 
             <ScrollViewer x:Name="PinnedScroll" Grid.Column="1" Background="Transparent" AllowDrop="True" DragOver="OnPinnedDragOver" Drop="OnPinnedDrop"
                           HorizontalScrollBarVisibility="Disabled"
                           VerticalScrollBarVisibility="Auto" MaxHeight="112"
-                          VerticalAlignment="Center">
+                          VerticalAlignment="Top">
                 <ItemsControl x:Name="PinnedHost" AllowDrop="True" PreviewMouseLeftButtonDown="OnPinnedMouseDown" PreviewMouseMove="OnPinnedMouseMove" DragOver="OnPinnedDragOver" Drop="OnPinnedDrop"
                               Background="Transparent" HorizontalAlignment="Stretch"
                               ItemsSource="{Binding PinnedCategories}"

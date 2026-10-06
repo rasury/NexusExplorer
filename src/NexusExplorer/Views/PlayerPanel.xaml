@@ -32,7 +32,7 @@
     </StackPanel>
    </Grid>
   </md:Card>
-  <md:Card x:Name="ControlsBar" Grid.Row="1" Style="{StaticResource PlayerCard}" Padding="16" Margin="0,16,0,0" Visibility="Collapsed">
+  <md:Card x:Name="ControlsBar" Grid.Row="1" Style="{StaticResource PlayerCard}" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
    <Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
     <Grid x:Name="ProgressRow" Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
