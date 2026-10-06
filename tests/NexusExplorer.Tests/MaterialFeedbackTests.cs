@@ -143,6 +143,37 @@ public class MaterialFeedbackTests
         });
     }
 
+    [Fact]
+    public async Task VolumeThumbReleaseDoesNotLeavePopupCapturingTheRestOfTheWindow()
+    {
+        using var host=new TestHost();
+        await WpfTestHost.RunAsync(async()=>
+        {
+            var main=new MainViewModel(host.Categories,host.Files,host.Organization,new FakePlaybackEngine());
+            var panel=new PlayerPanel(); panel.Initialize(main); main.Player.Kind=MediaKind.Audio; main.Player.ResetZoom();
+            var window=new Window{Content=panel,Width=600,Height=480,ShowActivated=false,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.Manual,Left=-5000,Top=-5000};
+            try
+            {
+                window.Show(); window.UpdateLayout();
+                var popup=(PopupBox)panel.FindName("VolumePopup"); var slider=(Slider)panel.FindName("VolumeSlider");
+                popup.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseEnterEvent});
+                await BoundedDialogTests.Until(()=>popup.IsPopupOpen && slider.IsVisible);
+                var thumb=((Track)slider.Template.FindName("PART_Track",slider)).Thumb;
+                Assert.True(thumb.CaptureMouse()); Assert.Same(thumb,System.Windows.Input.Mouse.Captured);
+                slider.Value=43;
+                thumb.ReleaseMouseCapture(); await Dispatcher.Yield(DispatcherPriority.Input);
+                Assert.NotSame(popup,System.Windows.Input.Mouse.Captured);
+                popup.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseLeaveEvent});
+                Assert.False(popup.IsPopupOpen); Assert.Null(System.Windows.Input.Mouse.Captured); Assert.Equal(43,main.Player.Volume);
+                // Cleanup must not steal a capture legitimately owned by an unrelated control.
+                var other=(Button)panel.FindName("PlayPauseButton"); Assert.True(other.CaptureMouse());
+                popup.IsPopupOpen=true; popup.IsPopupOpen=false;
+                Assert.Same(other,System.Windows.Input.Mouse.Captured); other.ReleaseMouseCapture();
+            }
+            finally { System.Windows.Input.Mouse.Capture(null); panel.Detach(); window.Close(); }
+        });
+    }
+
     [Theory]
     [InlineData(UiThemeMode.Light)]
     [InlineData(UiThemeMode.Dark)]

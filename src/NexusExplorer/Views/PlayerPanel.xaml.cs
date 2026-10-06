@@ -2,6 +2,7 @@ using NexusExplorer.Views.Dialogs;
 using NexusExplorer.ApplicationLayer;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -35,7 +36,24 @@ public partial class PlayerPanel : UserControl
     public PlayerPanel()
     {
         InitializeComponent();
+        VolumeSlider.AddHandler(Mouse.LostMouseCaptureEvent, new MouseEventHandler(OnVolumeSliderLostCapture), true);
+        VolumePopup.Closed += OnVolumePopupClosed;
         VideoView.SurfaceCreated += hwnd => { if (_main is not null) Lifetime?.AttachSurface(hwnd); };
+    }
+    private void OnVolumeSliderLostCapture(object sender, MouseEventArgs e)
+    {
+        // PopupBox's StaysOpen handler otherwise recaptures the entire subtree when
+        // Thumb releases capture. Hover volume is not a modal input surface.
+        if (e.OriginalSource is Thumb thumb && ReferenceEquals(CategoryFilePanel.FindAncestor<Slider>(thumb), VolumeSlider))
+            e.Handled = true;
+    }
+    private void OnVolumePopupClosed(object sender, RoutedEventArgs e)
+    {
+        // MouseOver PopupBox does not release capture in its close callback.
+        // Only release this popup/slider's capture, never another control's drag.
+        if (ReferenceEquals(Mouse.Captured, VolumePopup)
+            || Mouse.Captured is DependencyObject captured && ReferenceEquals(CategoryFilePanel.FindAncestor<Slider>(captured), VolumeSlider))
+            Mouse.Capture(null);
     }
     public void Initialize(MainViewModel main)
     {
