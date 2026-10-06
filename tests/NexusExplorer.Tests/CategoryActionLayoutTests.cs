@@ -60,7 +60,16 @@ public class CategoryActionLayoutTests
                 window.Show(); await main.SelectCategoryAsync(parent);
                 main.Category.ShowInputDialog=(_,_)=>Task.FromResult<string?>("new-root");
                 var button=(Button)window.FindName("CreateRootCategoryButton");
-                Assert.Equal(PackIconKind.Plus,Assert.IsType<PackIcon>(button.Content).Kind);
+                Assert.Equal(PackIconKind.PlusBox,Assert.IsType<PackIcon>(button.Content).Kind);
+                window.UpdateLayout();
+                var title=(TextBlock)window.FindName("AppTitle"); var header=(FrameworkElement)title.Parent;
+                var toggle=(Button)window.FindName("DrawerToggleButton");
+                Assert.Equal(40,header.ActualHeight);
+                Assert.InRange(Math.Abs(toggle.TranslatePoint(new Point(0,toggle.ActualHeight/2),header).Y-button.TranslatePoint(new Point(0,button.ActualHeight/2),header).Y),0,.1);
+                var image=new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(header.ActualWidth),40,96,96,PixelFormats.Pbgra32); image.Render(header);
+                var directory=Path.GetFullPath("../../../../../artifacts/ui-feedback",AppContext.BaseDirectory); Directory.CreateDirectory(directory);
+                var encoder=new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(image));
+                using(var output=File.Create(Path.Combine(directory,"header-plusbox.png")))encoder.Save(output);
                 Assert.Same(main.Category.CreateRootCommand,button.Command);
                 await main.Category.CreateRootCommand.ExecuteAsync(null);
                 Assert.Contains(await host.Categories.GetChildrenAsync(null),c=>c.Name=="new-root");

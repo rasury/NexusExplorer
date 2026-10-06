@@ -10,11 +10,14 @@
      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
       <Button Style="{StaticResource IconButton}" Click="OnAppearanceClick" ToolTip="外观设置"><md:PackIcon Kind="PaletteOutline" Width="24" Height="24"/></Button>
      </StackPanel>
-     <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板" Margin="0,0,16,0"><md:PackIcon Kind="Menu" Width="24" Height="24"/></Button>
-     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-      <TextBlock Text="NexusExplorer" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource BrushPrimaryText}" VerticalAlignment="Center"/>
-      <Button x:Name="CreateRootCategoryButton" Style="{StaticResource IconButton}" Margin="8,0,0,0" ToolTip="新建分类" AutomationProperties.Name="新建分类"><md:PackIcon Kind="Plus" Width="24" Height="24"/></Button>
-     </StackPanel>
+     <Grid Height="40" VerticalAlignment="Center" HorizontalAlignment="Left">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
+      <Button x:Name="DrawerToggleButton" Grid.Column="0" Style="{StaticResource IconButton}" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板"><md:PackIcon Kind="Menu" Width="24" Height="24"/></Button>
+      <TextBlock x:Name="AppTitle" Grid.Column="1" Text="NexusExplorer" FontSize="22" FontWeight="SemiBold" Margin="16,0,8,0" Foreground="{DynamicResource BrushPrimaryText}" VerticalAlignment="Center">
+       <TextBlock.RenderTransform><TranslateTransform Y="-2"/></TextBlock.RenderTransform>
+      </TextBlock>
+      <Button x:Name="CreateRootCategoryButton" Grid.Column="2" Style="{StaticResource IconButton}" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" ToolTip="新建分类" AutomationProperties.Name="新建分类"><md:PackIcon Kind="PlusBox" Width="24" Height="24"/></Button>
+     </Grid>
     </DockPanel>
    </md:ColorZone>
    <md:DrawerHost x:Name="NavigationDrawer" Grid.Row="1" OpenMode="Standard" IsLeftDrawerOpen="True" LeftDrawerCloseOnClickAway="False">
