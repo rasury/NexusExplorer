@@ -43,6 +43,8 @@
         </Style>
         <Style x:Key="ConfirmButton" TargetType="Button" BasedOn="{StaticResource ButtonPrimary}">
             <Setter Property="md:ButtonAssist.CornerRadius" Value="10"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinHeight" Value="32"/>
             <Setter Property="Background" Value="{DynamicResource BrushAccentOrange}"/>
             <Setter Property="Width" Value="56"/><Setter Property="MinWidth" Value="56"/>
             <Setter Property="ToolTip" Value="把当前文件归入此分类"/>
