@@ -113,7 +113,9 @@ public partial class PlayerPanel : UserControl
     private void UpdateUi()
     {
         var media = Vm.Kind is MediaKind.Video or MediaKind.Audio;
-        VideoView.Visibility = Vm.Kind == MediaKind.Video && !_dialogCovered ? Visibility.Visible : Visibility.Hidden;
+        // Material dialogs use their own popup HWND above the native video.
+        // Keep rendering underneath; _dialogCovered still blocks video clicks.
+        VideoView.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Hidden;
         ImageScroll.Visibility = Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         AudioLayer.Visibility = Vm.Kind == MediaKind.Audio ? Visibility.Visible : Visibility.Collapsed;
         AudioTitle.Text = Vm.MediaTitle ?? "";

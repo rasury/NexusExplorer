@@ -333,7 +333,7 @@ public class MaterialFeedbackTests
                 var choices=engine.AudioTracks.Select(t=>new DialogChoice<long>(t.Name,t.Id)).Prepend(new DialogChoice<long>("禁用音轨",-1)).ToList();
                 var result=ChoiceDialog.ShowAsync("音轨","音轨",choices,engine.SelectedAudioTrack);
                 var root=(DialogHost)window.FindName("RootDialog");await BoundedDialogTests.Until(()=>root.IsOpen && root.DialogContent is DialogSurface s && s.IsLoaded);
-                await Task.Delay(350);Assert.False(volume.IsPopupOpen);Assert.Equal(Visibility.Hidden,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
+                await Task.Delay(350);Assert.False(volume.IsPopupOpen);Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(IsWindowVisible(videoHost.Handle));Assert.True(engine.Snapshot.IsPlaying);
                 var view=(DialogSurface)root.DialogContent!;
                 var box=Descendants<ComboBox>(view).Single();var apply=Descendants<Button>(view).Single(b=>b.Content is string text && text=="应用");
                 var popupSource=(HwndSource)PresentationSource.FromVisual(apply);
@@ -350,6 +350,60 @@ public class MaterialFeedbackTests
             finally{MaterialDialogService.CancelAll();await engine.StopAndReleaseAsync();window.PrepareForVerificationExit();window.Close();}
         });
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task VideoRenameDialogKeepsPreviewPlayingUntilConfirmation(bool confirm)
+    {
+        using var host=new TestHost();var category=await host.Categories.CreateAsync("video",null);
+        var path=SyntheticMedia.WriteAvi(Path.Combine(host.RootDir,"pending.avi"),audio:true,silentAudio:true);
+        var file=await host.Files.AddAsync(path,category.Id);
+        await WpfTestHost.RunAsync(async()=>
+        {
+            using var engine=new MpvPlaybackEngine(){HardwareDecoding=false};
+            var main=new MainViewModel(host.Categories,host.Files,host.Organization,engine);
+            var window=new MainWindow(main,host.Categories,host.Files,host.Organization,host.RecycleBin,engine){ShowInTaskbar=false,ShowActivated=false};
+            window.Show();await Dispatcher.Yield(DispatcherPriority.Loaded);
+            try
+            {
+                await main.SelectCategoryAsync(category);await main.SelectFileAsync(file);
+                await BoundedDialogTests.Until(()=>engine.Snapshot.Position.TotalMilliseconds>100 && engine.AudioOutput=="wasapi");
+                var video=(MpvVideoHost)((PlayerPanel)window.FindName("PlayerArea")).FindName("VideoView");
+                var token=engine.CurrentToken;var position=engine.Snapshot.Position;
+                var rename=main.FileList.RenameFileAsync(file);
+                var root=(DialogHost)window.FindName("RootDialog");
+                await BoundedDialogTests.Until(()=>root.IsOpen && root.DialogContent is DialogSurface {IsLoaded:true});
+                var view=(DialogSurface)root.DialogContent!;var box=Descendants<TextBox>(view).Single();
+                await BoundedDialogTests.Until(()=>box.SelectedText=="pending");
+                await Task.Delay(350);
+                Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(IsWindowVisible(video.Handle));
+                Assert.True(engine.Snapshot.IsPlaying);Assert.True(engine.Snapshot.Position>position);
+                Assert.Equal(token,engine.CurrentToken);Assert.Equal(path,(await host.Files.GetByIdAsync(file.Id))!.AbsolutePath);
+                Assert.Equal("gpu-next",engine.VideoOutput);
+                var button=Descendants<Button>(view).Single(b=>b.Content is string label && label==(confirm?"确定":"取消"));
+                var source=(HwndSource)PresentationSource.FromVisual(button);
+                Assert.NotEqual(new WindowInteropHelper(window).Handle,source.Handle);
+                var point=button.TranslatePoint(new Point(button.ActualWidth/2,button.ActualHeight/2),(UIElement)source.RootVisual);
+                Assert.Same(button,CategoryFilePanel.FindAncestor<Button>(((UIElement)source.RootVisual).InputHitTest(point) as DependencyObject));
+                if(confirm)box.Text="renamed.avi";
+                button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await rename;
+                if(confirm)
+                {
+                    Assert.False(engine.Snapshot.IsPlaying);Assert.Null(main.CurrentFile);
+                    Assert.False(File.Exists(path));Assert.True(File.Exists(Path.Combine(host.RootDir,"renamed.avi")));
+                    Assert.Equal("renamed.avi",(await host.Files.GetByIdAsync(file.Id))!.FileName);
+                }
+                else
+                {
+                    Assert.True(engine.Snapshot.IsPlaying);Assert.Equal(token,engine.CurrentToken);
+                    Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(IsWindowVisible(video.Handle));
+                    Assert.True(File.Exists(path));Assert.Equal("pending.avi",(await host.Files.GetByIdAsync(file.Id))!.FileName);
+                }
+            }
+            finally{MaterialDialogService.CancelAll();await engine.StopAndReleaseAsync();window.PrepareForVerificationExit();window.Close();}
+        });
+    }
+
     [DllImport("user32.dll")][return:MarshalAs(UnmanagedType.Bool)]private static extern bool IsWindowVisible(IntPtr hwnd);
     private static void SavePreview(FrameworkElement element,string name)
     {
