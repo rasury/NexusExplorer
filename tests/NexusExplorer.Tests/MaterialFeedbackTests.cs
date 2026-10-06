@@ -89,7 +89,7 @@ public class MaterialFeedbackTests
                 Assert.Same(slider,CategoryFilePanel.FindAncestor<Slider>(((UIElement)source.RootVisual).InputHitTest(point) as DependencyObject));
                 var track=(Track)slider.Template.FindName("PART_Track",slider);
                 double? lowY=null;
-                foreach(var (value,expected) in new[]{(0,PackIconKind.VolumeLow),(30,PackIconKind.VolumeLow),(31,PackIconKind.VolumeMedium),(60,PackIconKind.VolumeMedium),(61,PackIconKind.VolumeHigh),(100,PackIconKind.VolumeHigh)})
+                foreach(var (value,expected) in new[]{(0,PackIconKind.VolumeMute),(30,PackIconKind.VolumeLow),(31,PackIconKind.VolumeMedium),(60,PackIconKind.VolumeMedium),(61,PackIconKind.VolumeHigh),(100,PackIconKind.VolumeHigh)})
                 {
                     slider.Value=value;slider.UpdateLayout();
                     Assert.Equal(value,main.Player.Volume);Assert.Equal(expected,icon.Kind);
@@ -106,6 +106,38 @@ public class MaterialFeedbackTests
                 Assert.False(volume.IsPopupOpen);
             }
             finally{panel.Detach();window.Close();UiThemeService.Apply(UiThemeMode.Light);}
+        });
+    }
+
+    [Fact]
+    public async Task ClickingVolumeIconTogglesZeroAndRemembersSliderVolumeWithoutDoubleCommands()
+    {
+        using var host = new TestHost();
+        await WpfTestHost.RunAsync(async () =>
+        {
+            var engine = new FakePlaybackEngine();
+            var main = new MainViewModel(host.Categories, host.Files, host.Organization, engine);
+            var panel = new PlayerPanel(); panel.Initialize(main); main.Player.Kind = MediaKind.Audio; main.Player.ResetZoom();
+            var window = new Window { Content=panel, Width=600, Height=480, ShowActivated=false, ShowInTaskbar=false, WindowStartupLocation=WindowStartupLocation.Manual, Left=-5000, Top=-5000 };
+            try
+            {
+                window.Show(); window.UpdateLayout();
+                var popup=(PopupBox)panel.FindName("VolumePopup"); var slider=(Slider)panel.FindName("VolumeSlider"); var icon=(PackIcon)panel.FindName("VolumeIcon");
+                var button=(ToggleButton)popup.Template.FindName(PopupBox.TogglePartName,popup);
+                slider.Value=57; Assert.Equal(57,main.Player.Volume);
+                popup.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseEnterEvent});
+                await BoundedDialogTests.Until(()=>popup.IsPopupOpen && slider.IsVisible);
+                button.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount,System.Windows.Input.MouseButton.Left){RoutedEvent=UIElement.PreviewMouseLeftButtonUpEvent});
+                Assert.Equal(0,main.Player.Volume); Assert.Equal(0,slider.Value); Assert.Equal(PackIconKind.VolumeMute,icon.Kind);
+                button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                Assert.Equal(57,main.Player.Volume); Assert.Equal(57,slider.Value); Assert.Equal(PackIconKind.VolumeMedium,icon.Kind);
+                slider.Value=0; button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); Assert.Equal(57,main.Player.Volume);
+                slider.Value=23; button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)); button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                Assert.Equal(23,main.Player.Volume); Assert.Equal(PackIconKind.VolumeLow,icon.Kind);
+                Assert.Equal(new[]{57,0,57,0,57,23,0,23},engine.Volumes);
+                Assert.Equal(PopupBoxPopupMode.MouseOver,popup.PopupMode);
+            }
+            finally { panel.Detach(); window.Close(); }
         });
     }
 

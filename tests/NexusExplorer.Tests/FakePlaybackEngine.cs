@@ -9,6 +9,7 @@ internal sealed class FakePlaybackEngine : IPlaybackEngine
     public event Action<string, string>? PlaybackError;
     public string? Path { get; private set; }
     public List<string> Played { get; } = new();
+    public List<int> Volumes { get; } = new();
     public PlaybackSnapshot Snapshot { get; private set; } = new(false, TimeSpan.Zero, TimeSpan.Zero);
     public void SetSnapshot(PlaybackSnapshot snapshot) => Snapshot = snapshot;
     public Task PlayAsync(string path, bool audio, CancellationToken cancellationToken = default)
@@ -16,7 +17,7 @@ internal sealed class FakePlaybackEngine : IPlaybackEngine
     public Task StopAndReleaseAsync() { _handle?.Dispose(); _handle = null; Path = null; Snapshot = new(false, TimeSpan.Zero, TimeSpan.Zero); return Task.CompletedTask; }
     public Task TogglePauseAsync() { Snapshot = Snapshot with { IsPlaying = !Snapshot.IsPlaying, IsPaused = Snapshot.IsPlaying }; return Task.CompletedTask; }
     public Task SeekAsync(float fraction) { Snapshot = Snapshot with { Position = Snapshot.Duration * fraction }; return Task.CompletedTask; }
-    public Task SetVolumeAsync(int volume) => Task.CompletedTask;
+    public Task SetVolumeAsync(int volume) { Volumes.Add(volume); return Task.CompletedTask; }
     public void End() => MediaEnded?.Invoke();
     public void Error() => PlaybackError?.Invoke(Path ?? "", "test error");
     public void Dispose() { _handle?.Dispose(); }

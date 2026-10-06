@@ -49,7 +49,7 @@
      <Button x:Name="ModeButton" Style="{StaticResource PlayerIconButton}" Click="OnCycleMode" ToolTip="顺序"><md:PackIcon x:Name="ModeIcon" Kind="PlaylistPlay" Width="24" Height="24"/></Button>
     </StackPanel>
     <StackPanel x:Name="MediaSettingsRow" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-     <md:PopupBox x:Name="VolumePopup" Width="40" Height="40" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PopupMode="MouseOver" PlacementMode="TopAndAlignCentres" StaysOpen="True" PopupElevation="Dp0" PopupUniformCornerRadius="20" Padding="8" Background="Transparent" Foreground="{DynamicResource BrushPrimaryText}" md:ButtonAssist.CornerRadius="20" ToolTip="音量 100%" AutomationProperties.Name="音量">
+     <md:PopupBox x:Name="VolumePopup" Width="40" Height="40" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PopupMode="MouseOver" PlacementMode="TopAndAlignCentres" StaysOpen="True" PopupElevation="Dp0" PopupUniformCornerRadius="20" Padding="8" Background="Transparent" Foreground="{DynamicResource BrushPrimaryText}" md:ButtonAssist.CornerRadius="20" ToolTip="音量 100%" AutomationProperties.Name="音量" ToggleCheckedContent="{Binding ToggleContent, RelativeSource={RelativeSource Self}}" ToggleCheckedContentClick="OnVolumeToggleClick" ButtonBase.Click="OnVolumeToggleButtonClick">
       <md:PopupBox.ToggleContent><md:PackIcon x:Name="VolumeIcon" Kind="VolumeHigh" Width="24" Height="24"/></md:PopupBox.ToggleContent>
       <StackPanel Width="40">
        <TextBlock x:Name="VolumeValueText" Text="100" HorizontalAlignment="Center" Style="{StaticResource TextCaption}" Margin="0,0,0,8"/>

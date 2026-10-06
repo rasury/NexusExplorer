@@ -30,6 +30,7 @@ public partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private bool _playbackCompleted;
     public bool CompletedDurationEstimated { get; private set; }
     [ObservableProperty] private int _volume = 100;
+    private int _lastNonZeroVolume = 100;
     [ObservableProperty] private PlayMode _playMode = PlayMode.Sequential;
     [ObservableProperty] private ImageSource? _imageSource;
     [ObservableProperty] private double _imageScale; // 0 means fit; effective scale is computed by the view.
@@ -190,7 +191,14 @@ public partial class PlayerViewModel : ObservableObject
         if (PlayMode == PlayMode.RepeatAll) await _main.ReplayQueueAsync(offset < 0);
     }
     public Task SeekAsync(float fraction) => Engine.SeekAsync(fraction);
-    public Task SetVolumeAsync(int value) { Volume = Math.Clamp(value, 0, 100); return Engine.SetVolumeAsync(Volume); }
+    public Task SetVolumeAsync(int value)
+    {
+        if (Volume > 0) _lastNonZeroVolume = Volume;
+        Volume = Math.Clamp(value, 0, 100);
+        if (Volume > 0) _lastNonZeroVolume = Volume;
+        return Engine.SetVolumeAsync(Volume);
+    }
+    public Task ToggleVolumeAsync() => SetVolumeAsync(Volume > 0 ? 0 : _lastNonZeroVolume);
     public void CyclePlayMode() { PlayMode = (PlayMode)(((int)PlayMode + 1) % 4); StateChanged?.Invoke(); }
     public void ResetZoom() { ImageScale = 0; StateChanged?.Invoke(); }
 }

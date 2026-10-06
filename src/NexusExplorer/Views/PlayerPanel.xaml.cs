@@ -21,6 +21,7 @@ public partial class PlayerPanel : UserControl
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private bool _dragging;
     private bool _initialized;
+    private bool _syncingVolume;
     private bool _panning;
     private bool _dialogCovered;
     internal void SetDialogCovered(bool covered)
@@ -123,11 +124,30 @@ public partial class PlayerPanel : UserControl
     private void OnProgressChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     { if (_dragging) PositionText.Text = FormatTime(Vm.Duration * e.NewValue); }
     private async void OnVolumeChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    { UpdateVolumeUi((int)e.NewValue); if (_initialized) await RunAsync(() => Vm.SetVolumeAsync((int)e.NewValue)); }
+    { UpdateVolumeUi((int)e.NewValue); if (_initialized && !_syncingVolume) await RunAsync(() => Vm.SetVolumeAsync((int)e.NewValue)); }
+    private void OnVolumeToggleButtonClick(object sender, RoutedEventArgs e)
+    {
+        // MouseOver PopupBox consumes mouse-up and raises ToggleCheckedContentClick;
+        // keyboard activation (or clicking before hover opens) uses ButtonBase.Click instead.
+        if (ReferenceEquals(e.OriginalSource, VolumePopup.Template.FindName(PopupBox.TogglePartName, VolumePopup)))
+            OnVolumeToggleClick(sender, e);
+    }
+    private async void OnVolumeToggleClick(object sender, RoutedEventArgs e)
+    {
+        if (!_initialized) return;
+        await RunAsync(async () =>
+        {
+            var change = Vm.ToggleVolumeAsync();
+            _syncingVolume = true;
+            try { VolumeSlider.Value = Vm.Volume; UpdateVolumeUi(Vm.Volume); }
+            finally { _syncingVolume = false; }
+            await change;
+        });
+    }
     private void UpdateVolumeUi(int volume)
     {
         if (VolumeIcon is null || VolumeValueText is null) return;
-        VolumeIcon.Kind = volume <= 30 ? PackIconKind.VolumeLow : volume <= 60 ? PackIconKind.VolumeMedium : PackIconKind.VolumeHigh;
+        VolumeIcon.Kind = volume == 0 ? PackIconKind.VolumeMute : volume <= 30 ? PackIconKind.VolumeLow : volume <= 60 ? PackIconKind.VolumeMedium : PackIconKind.VolumeHigh;
         VolumeValueText.Text = volume.ToString(); VolumePopup.ToolTip = $"音量 {volume}%";
     }
     private async void OnHardwareChanged(object sender, RoutedEventArgs e)
