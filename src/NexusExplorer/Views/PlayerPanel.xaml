@@ -49,13 +49,13 @@
      <Button x:Name="ModeButton" Style="{StaticResource PlayerIconButton}" Click="OnCycleMode" ToolTip="顺序"><md:PackIcon x:Name="ModeIcon" Kind="PlaylistPlay" Width="24" Height="24"/></Button>
     </StackPanel>
     <StackPanel x:Name="MediaSettingsRow" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-     <md:PopupBox x:Name="VolumePopup" Width="40" Height="40" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PopupMode="MouseOver" PlacementMode="TopAndAlignCentres" StaysOpen="True" PopupElevation="Dp0" PopupUniformCornerRadius="20" Padding="8" Background="Transparent" Foreground="{DynamicResource BrushPrimaryText}" md:ButtonAssist.CornerRadius="20" ToolTip="音量 100%" AutomationProperties.Name="音量" ToggleCheckedContent="{Binding ToggleContent, RelativeSource={RelativeSource Self}}" ToggleCheckedContentClick="OnVolumeToggleClick" ButtonBase.Click="OnVolumeToggleButtonClick">
+     <views:VolumeHoverPopupBox x:Name="VolumePopup" Width="40" Height="40" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" PopupMode="MouseOver" PlacementMode="TopAndAlignCentres" StaysOpen="True" PopupElevation="Dp0" PopupUniformCornerRadius="20" Padding="8" Background="Transparent" Foreground="{DynamicResource BrushPrimaryText}" md:ButtonAssist.CornerRadius="20" ToolTip="音量 100%" AutomationProperties.Name="音量" ToggleCheckedContent="{Binding ToggleContent, RelativeSource={RelativeSource Self}}" ToggleCheckedContentClick="OnVolumeToggleClick" ButtonBase.Click="OnVolumeToggleButtonClick">
       <md:PopupBox.ToggleContent><md:PackIcon x:Name="VolumeIcon" Kind="VolumeHigh" Width="24" Height="24"/></md:PopupBox.ToggleContent>
       <StackPanel Width="40">
        <TextBlock x:Name="VolumeValueText" Text="100" HorizontalAlignment="Center" Style="{StaticResource TextCaption}" Margin="0,0,0,8"/>
        <Slider x:Name="VolumeSlider" Orientation="Vertical" Height="144" Width="20" HorizontalAlignment="Center" Minimum="0" Maximum="100" Value="100" IsMoveToPointEnabled="True" ValueChanged="OnVolumeChanged" AutomationProperties.Name="音量"/>
       </StackPanel>
-     </md:PopupBox>
+     </views:VolumeHoverPopupBox>
      <ToggleButton x:Name="HardwareCheck" Style="{StaticResource HardwareDecodeToggle}" Width="40" Height="40" Checked="OnHardwareChanged" Unchecked="OnHardwareChanged">
       <Grid Width="28" Height="28">
        <md:PackIcon Kind="Chip" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>

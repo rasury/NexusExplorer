@@ -105,7 +105,8 @@ public class MaterialFeedbackTests
                 }
                 SaveVolumePreview((FrameworkElement)source.RootVisual,volume,$"volume-aligned-{theme}");
                 volume.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseLeaveEvent});
-                Assert.False(volume.IsPopupOpen);
+                Assert.True(volume.IsPopupOpen);
+                await BoundedDialogTests.Until(()=>!volume.IsPopupOpen);
             }
             finally{panel.Detach();window.Close();UiThemeService.Apply(UiThemeMode.Light);}
         });
@@ -151,7 +152,7 @@ public class MaterialFeedbackTests
         {
             var main=new MainViewModel(host.Categories,host.Files,host.Organization,new FakePlaybackEngine());
             var panel=new PlayerPanel(); panel.Initialize(main); main.Player.Kind=MediaKind.Audio; main.Player.ResetZoom();
-            var window=new Window{Content=panel,Width=600,Height=480,ShowActivated=false,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.Manual,Left=-5000,Top=-5000};
+            var window=new Window{Content=panel,Width=600,Height=480,ShowActivated=false,ShowInTaskbar=false,WindowStartupLocation=WindowStartupLocation.Manual,Left=SystemParameters.WorkArea.Left+80,Top=SystemParameters.WorkArea.Top+80};
             try
             {
                 window.Show(); window.UpdateLayout();
@@ -164,13 +165,58 @@ public class MaterialFeedbackTests
                 thumb.ReleaseMouseCapture(); await Dispatcher.Yield(DispatcherPriority.Input);
                 Assert.NotSame(popup,System.Windows.Input.Mouse.Captured);
                 popup.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseLeaveEvent});
-                Assert.False(popup.IsPopupOpen); Assert.Null(System.Windows.Input.Mouse.Captured); Assert.Equal(43,main.Player.Volume);
+                Assert.True(popup.IsPopupOpen);
+                await BoundedDialogTests.Until(()=>!popup.IsPopupOpen);
+                Assert.Null(System.Windows.Input.Mouse.Captured); Assert.Equal(43,main.Player.Volume);
                 // Cleanup must not steal a capture legitimately owned by an unrelated control.
                 var other=(Button)panel.FindName("PlayPauseButton"); Assert.True(other.CaptureMouse());
                 popup.IsPopupOpen=true; popup.IsPopupOpen=false;
                 Assert.Same(other,System.Windows.Input.Mouse.Captured); other.ReleaseMouseCapture();
             }
             finally { System.Windows.Input.Mouse.Capture(null); panel.Detach(); window.Close(); }
+        });
+    }
+
+    [Fact]
+    public async Task VolumeHoverCorridorAllowsDiagonalApproachReentryAndThumbDrag()
+    {
+        using var host=new TestHost();
+        await WpfTestHost.RunAsync(async()=>
+        {
+            var main=new MainViewModel(host.Categories,host.Files,host.Organization,new FakePlaybackEngine());
+            var panel=new PlayerPanel(); panel.Initialize(main); main.Player.Kind=MediaKind.Audio; main.Player.ResetZoom();
+            var window=new Window{Content=panel,Width=600,Height=480,ShowActivated=false,ShowInTaskbar=false,Left=SystemParameters.WorkArea.Left+80,Top=SystemParameters.WorkArea.Top+80};
+            try
+            {
+                window.Show(); window.UpdateLayout();
+                var popup=(VolumeHoverPopupBox)panel.FindName("VolumePopup"); var slider=(Slider)panel.FindName("VolumeSlider");
+                popup.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseEnterEvent});
+                await BoundedDialogTests.Until(()=>slider.IsVisible && slider.ActualHeight>100);
+                var bounds=popup.GetHoverBounds();
+                Assert.True(bounds.Width>=popup.ActualWidth+24);
+                Assert.True(bounds.Top<-100, $"Hover bounds: {bounds}; slider: {slider.PointToScreen(new Point())}; toggle: {popup.PointToScreen(new Point())}");
+                Assert.True(bounds.Bottom>=popup.ActualHeight);
+                // Both sides, including the gap immediately above the icon,
+                // remain open without taking capture from the rest of the app.
+                foreach(var x in new[]{bounds.Left+1,bounds.Right-1})
+                {
+                    popup.ProcessHover(new Point(x,-1),false,1000);
+                    popup.ProcessHover(new Point(x,bounds.Top+1),false,2000);
+                    Assert.True(popup.IsPopupOpen);
+                }
+                var outside=new Point(bounds.Right+30,bounds.Bottom+30);
+                popup.ProcessHover(outside,false,3000);
+                popup.ProcessHover(outside,false,3249); Assert.True(popup.IsPopupOpen);
+                popup.ProcessHover(new Point(20,20),false,3250); // Reentry cancels pending closure.
+                popup.ProcessHover(outside,false,4000);
+                popup.ProcessHover(outside,true,5000); Assert.True(popup.IsPopupOpen); // Captured thumb can drag outside.
+                popup.ProcessHover(outside,false,6000);
+                popup.ProcessHover(outside,false,6250); Assert.False(popup.IsPopupOpen);
+                Assert.Null(System.Windows.Input.Mouse.Captured);
+                popup.IsPopupOpen=true; panel.Detach(); Assert.False(popup.IsPopupOpen);
+                await Task.Delay(350); Assert.False(popup.IsPopupOpen);
+            }
+            finally { panel.Detach(); window.Close(); }
         });
     }
 
