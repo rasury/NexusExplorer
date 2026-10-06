@@ -89,6 +89,25 @@ public partial class CategoryFilePanel : UserControl
         { var child = VisualTreeHelper.GetChild(node, i); if (child is T found) return found; if (FindChild<T>(child) is { } nested) return nested; }
         return null;
     }
+    private void OnListTopIndicatorLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ItemsControl list && FindChild<ScrollViewer>(list) is { } viewer)
+            UpdateTopIndicator(list, viewer);
+    }
+    private void OnListTopIndicatorScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is ItemsControl list && e.OriginalSource is ScrollViewer viewer
+            && ReferenceEquals(viewer, FindChild<ScrollViewer>(list)))
+            UpdateTopIndicator(list, viewer);
+    }
+    private void UpdateTopIndicator(ItemsControl list, ScrollViewer viewer)
+    {
+        // A non-interactive overlay avoids adding a fake row to the virtualized
+        // collections (which would affect selection, navigation and drag/drop).
+        var indicator = ReferenceEquals(list, CategoryTree) ? CategoryTopIndicator : FileTopIndicator;
+        indicator.Visibility = list.HasItems && viewer.VerticalOffset <= 0.001
+            ? Visibility.Visible : Visibility.Hidden;
+    }
     internal static bool IsControlChrome(DependencyObject? source) => FindAncestor<ScrollBar>(source) is not null || FindAncestor<Thumb>(source) is not null || FindAncestor<ButtonBase>(source) is not null;
     internal static FileItem? HitFile(DependencyObject? source) => IsControlChrome(source) ? null : FindAncestor<ListBoxItem>(source)?.DataContext as FileItem;
     internal static Category? HitCategory(DependencyObject? source) => IsControlChrome(source) ? null : FindAncestor<TreeViewItem>(source)?.Header as Category;
