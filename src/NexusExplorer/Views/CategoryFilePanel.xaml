@@ -120,7 +120,8 @@
             <ListBox.ContextMenu>
                 <ContextMenu>
                     <MenuItem Header="在资源管理器中打开" Click="OnOpenFileInExplorer" />
-                    <MenuItem Header="重新定位…" Click="OnRelocateFile" />
+                    <MenuItem x:Name="RelocateFileMenu" Header="重新定位…" Click="OnRelocateFile" />
+                    <MenuItem x:Name="RenameFileMenu" Header="重命名…" Click="OnRenameFile" />
                     <Separator />
                     <MenuItem Header="从分类移除" Click="OnRemoveFile" />
                     <MenuItem Header="删除" Click="OnDeleteFile" Foreground="{DynamicResource BrushDanger}" />

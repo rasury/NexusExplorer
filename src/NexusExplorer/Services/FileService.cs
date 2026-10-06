@@ -202,6 +202,60 @@ public class FileService
         Log.Information("文件重新分类: {Path} {OldId} -> {NewId}", file.AbsolutePath, oldId, targetCategoryId);
     }
 
+    // ---------- 重命名 ----------
+
+    public Task<FileItem> RenameAsync(int fileId, string newFileName) => Task.Run(() => RenameAsyncCore(fileId, newFileName));
+    private async Task<FileItem> RenameAsyncCore(int fileId, string newFileName)
+    {
+        ValidateFileName(newFileName);
+        using var lease = await MutationGate.AcquireAsync(_dbFactory);
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var file = await db.Files.AsNoTracking().FirstOrDefaultAsync(f => f.Id == fileId)
+            ?? throw new OperationException("文件记录不存在。");
+        await LocationService.ResolveAsync(db, files: new[] { file });
+        var source = file.AbsolutePath;
+        if (!File.Exists(source)) throw new OperationException("文件已失效，请先通过「重新定位」指定实际位置。");
+        var target = LocationService.Normalize(Path.Combine(Path.GetDirectoryName(source)!, newFileName));
+        if (string.Equals(source, target, StringComparison.Ordinal)) return file;
+        if (await db.Files.AnyAsync(f => f.Id != fileId && EF.Functions.Collate(f.AbsolutePath, "NOCASE") == target))
+            throw new OperationException("该名称对应的路径已有文件记录，请使用其他名称。");
+        if (Directory.Exists(target)) throw new OperationException("同一目录中已有同名文件夹，请使用其他名称。");
+        if (File.Exists(target) && !string.Equals(source, target, StringComparison.OrdinalIgnoreCase))
+            throw new OperationException("同一目录中已有同名文件，请使用其他名称。");
+
+        try
+        {
+            if (BeforePhysicalOperationAsync is not null) await BeforePhysicalOperationAsync(new[] { source });
+            await new FileOperationExecutor(_dbFactory).RenameFileAsync(fileId, target);
+        }
+        catch (OperationException) { throw; }
+        catch (PathTooLongException ex) { throw new OperationException("文件名或完整路径过长，请缩短名称。", ex); }
+        catch (UnauthorizedAccessException ex) { throw new OperationException("没有权限重命名该文件，请检查目录权限。", ex); }
+        catch (IOException ex) when ((ex.HResult & 0xffff) is 32 or 33
+            || ex.InnerException is System.ComponentModel.Win32Exception { NativeErrorCode: 32 or 33 })
+        { throw new OperationException("文件正在被其他程序使用，请关闭占用它的程序后重试。", ex); }
+        catch (Exception ex) { throw new OperationException($"重命名失败：{ex.Message}", ex); }
+
+        Log.Information("文件重命名: {Old} -> {New};文件 {FileId}", source, target, fileId);
+        return await GetByIdAsync(fileId) ?? throw new OperationException("重命名后的文件记录不存在。");
+    }
+
+    private static void ValidateFileName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name is "." or "..")
+            throw new OperationException("文件名不能为空，也不能为 . 或 ..。");
+        if (name.Length > 255) throw new OperationException("文件名过长，请缩短至 255 个字符以内。");
+        if (name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            throw new OperationException("文件名不能包含 \\ / : * ? \" < > | 或控制字符。");
+        if (name.EndsWith('.') || name.EndsWith(' '))
+            throw new OperationException("文件名不能以空格或句点结尾。");
+        var stem = name.Split('.')[0].TrimEnd(' ').ToUpperInvariant();
+        if (stem is "CON" or "PRN" or "AUX" or "NUL" or "CONIN$" or "CONOUT$"
+            || stem.Length == 4 && (stem.StartsWith("COM") || stem.StartsWith("LPT"))
+                && "123456789¹²³".Contains(stem[3]))
+            throw new OperationException("文件名不能使用 Windows 保留的设备名称。");
+    }
+
     // ---------- 重新定位 ----------
 
     /// <summary>外部移动/改名导致文件失效时,由用户手动指定新位置。</summary>

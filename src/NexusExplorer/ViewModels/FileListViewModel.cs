@@ -33,6 +33,7 @@ public partial class FileListViewModel : ObservableObject
 
     /// <summary>重新定位文件对话框。返回新路径或 null。</summary>
     public Func<string, Task<string?>>? PickRelocateFile { get; set; }
+    public Func<string, Task<string?>>? ShowRenameFileDialog { get; set; }
 
     public Action<string>? ShowError { get; set; }
     public Func<string, Task>? ShowErrorAsync { get; set; }
@@ -156,6 +157,27 @@ public partial class FileListViewModel : ObservableObject
     public Task RemoveFileAsync(FileItem? file) => DeleteManyAsync(file is null ? Array.Empty<FileItem>() : new[] { file }, true);
     [RelayCommand]
     public Task DeleteFileAsync(FileItem? file) => DeleteManyAsync(file is null ? Array.Empty<FileItem>() : new[] { file }, false);
+
+    [RelayCommand]
+    public async Task RenameFileAsync(FileItem? file)
+    {
+        if (file is null || ShowRenameFileDialog is null) return;
+        var name = await ShowRenameFileDialog(file.FileName);
+        if (name is null || string.Equals(name, file.FileName, StringComparison.Ordinal)) return;
+        try
+        {
+            var renamed = await _fileService.RenameAsync(file.Id, name);
+            await _main.RefreshOrganizationStatesAsync();
+            await _main.RefreshFilesAsync();
+            ShowInfo?.Invoke($"已重命名为「{renamed.FileName}」。");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "文件重命名失败;文件 {FileId}", file.Id);
+            await _main.RefreshFilesAsync();
+            await ReportErrorAsync(ex is OperationException ? ex.Message : $"重命名失败：{ex.Message}");
+        }
+    }
 
     [RelayCommand]
     public async Task RelocateFileAsync(FileItem? file)

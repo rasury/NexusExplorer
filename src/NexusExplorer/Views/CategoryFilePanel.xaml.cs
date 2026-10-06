@@ -61,6 +61,7 @@ public partial class CategoryFilePanel : UserControl
             var dialog = new OpenFileDialog { Title = $"重新定位「{name}」" };
             return Task.FromResult(dialog.ShowDialog() == true ? dialog.FileName : null);
         };
+        FileListVm.ShowRenameFileDialog = name => InputDialog.ShowAsync("重命名文件", "文件名（含扩展名）", name, selectFileStem: true);
         main.CategoryTreeChanged += RefreshTree; main.FileListChanged += RefreshFileList;
         main.CurrentFileChanged += OnCurrentFileChanged;
         Unloaded += OnUnloaded;
@@ -202,7 +203,7 @@ public partial class CategoryFilePanel : UserControl
     {
         if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject)?.DataContext is not FileItem f) { e.Handled = true; return; }
         if (!FileListBox.SelectedItems.Contains(f)) { FileListBox.SelectedItems.Clear(); FileListBox.SelectedItems.Add(f); }
-        if (FileListBox.ContextMenu?.Items[1] is MenuItem relocate) relocate.IsEnabled = FileListBox.SelectedItems.Count == 1;
+        RelocateFileMenu.IsEnabled = RenameFileMenu.IsEnabled = FileListBox.SelectedItems.Count == 1;
     }
     private async Task CategoryActionAsync(Func<Category, Task> action)
     { if (_contextMenuCategory is { } c) await RunAsync(() => action(c)); }
@@ -241,6 +242,8 @@ public partial class CategoryFilePanel : UserControl
     private async void OnDeleteFile(object sender, RoutedEventArgs e) => await RunAsync(() => FileListVm.DeleteManyAsync(SelectedFiles(), false));
     private async void OnRelocateFile(object sender, RoutedEventArgs e)
     { if (FileListBox.SelectedItems.Count == 1 && FileListBox.SelectedItem is FileItem f) await RunAsync(() => FileListVm.RelocateFileAsync(f)); }
+    private async void OnRenameFile(object sender, RoutedEventArgs e)
+    { if (FileListBox.SelectedItems.Count == 1 && FileListBox.SelectedItem is FileItem f) await RunAsync(() => FileListVm.RenameFileAsync(f)); }
 
     private async Task OrganizeAsync(Category? category)
     {
