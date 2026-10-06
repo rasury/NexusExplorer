@@ -18,7 +18,7 @@
     <SolidColorBrush x:Key="BrushStatusOrganized" Color="#237D4E"/>
     <SolidColorBrush x:Key="BrushDanger" Color="#B3261E"/>
     <SolidColorBrush x:Key="BrushPlayerBg" Color="Black"/>
-    <FontFamily x:Key="FontFamilyMain">Segoe UI, Microsoft YaHei UI</FontFamily>
+    <FontFamily x:Key="FontFamilyMain">HYWenHei 85W, Segoe UI, Microsoft YaHei UI</FontFamily>
     <Style x:Key="ButtonPrimary" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
         <Setter Property="md:ButtonAssist.CornerRadius" Value="20"/>
         <Setter Property="md:ElevationAssist.Elevation" Value="Dp0"/>
