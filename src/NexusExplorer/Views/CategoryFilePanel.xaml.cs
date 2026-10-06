@@ -37,8 +37,8 @@ public partial class CategoryFilePanel : UserControl
     private UiStateStore _state = new();
     private CancellationTokenSource? _organizing;
     private readonly DragWheelScroller _dragWheel = new();
-    private AsyncRelayCommand? _organizeCommand;
-    public ICommand OrganizeCommand => _organizeCommand ??= new AsyncRelayCommand(OrganizeAsync, () => _main?.CurrentCategory is not null && _organizing is null);
+    private AsyncRelayCommand<Category>? _organizeCommand;
+    public ICommand OrganizeCommand => _organizeCommand ??= new AsyncRelayCommand<Category>(OrganizeAsync, category => category is not null && _organizing is null);
 
     public CategoryFilePanel() { InitializeComponent(); DataContext = this; _filePreview = new(FileListBox); }
     public void Initialize(MainViewModel main, IRecycleBinService recycleBin)
@@ -173,6 +173,7 @@ public partial class CategoryFilePanel : UserControl
     private void OnCategoryTreeContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         _contextMenuCategory = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.Header as Category;
+        OrganizeCategoryMenu.IsEnabled = OrganizeCommand.CanExecute(_contextMenuCategory);
         if (_contextMenuCategory is null) e.Handled = true;
     }
     internal Category? GetContextMenuCategory() => _contextMenuCategory;
@@ -187,6 +188,10 @@ public partial class CategoryFilePanel : UserControl
     private async Task CategoryActionAsync(Func<Category, Task> action)
     { if (_contextMenuCategory is { } c) await RunAsync(() => action(c)); }
     private async void OnCreateChild(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.CreateChildAsync);
+    private async void OnAddCategoryFiles(object sender, RoutedEventArgs e) => await CategoryActionAsync(FileListVm.AddFilesToCategoryAsync);
+    private async void OnAddCategoryFolder(object sender, RoutedEventArgs e) => await CategoryActionAsync(FileListVm.AddFolderToCategoryAsync);
+    private void OnOrganizeCategory(object sender, RoutedEventArgs e)
+    { if (OrganizeCommand.CanExecute(_contextMenuCategory)) OrganizeCommand.Execute(_contextMenuCategory); }
     private async void OnRenameCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.RenameAsync);
     private async void OnRemoveCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.RemoveAsync);
     private async void OnDeleteCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.DeleteAsync);
@@ -218,9 +223,9 @@ public partial class CategoryFilePanel : UserControl
     private async void OnRelocateFile(object sender, RoutedEventArgs e)
     { if (FileListBox.SelectedItems.Count == 1 && FileListBox.SelectedItem is FileItem f) await RunAsync(() => FileListVm.RelocateFileAsync(f)); }
 
-    private async Task OrganizeAsync()
+    private async Task OrganizeAsync(Category? category)
     {
-        var category = _main.CurrentCategory; if (category is null || _organizing is not null) return;
+        if (category is null || _organizing is not null) return;
         _organizing = new(); var statusRefreshed = false;
         CancelOrganizeButton.Visibility = Visibility.Visible; _organizeCommand?.NotifyCanExecuteChanged();
         try
@@ -288,7 +293,7 @@ public partial class CategoryFilePanel : UserControl
     private void OnTreeDragOver(object sender, DragEventArgs e)
     {
         BeginTreeDragScroll(e.Data);
-        e.Effects = DropTarget(e) is null ? DragDropEffects.None :
+        e.Effects = DropTarget(e) is null ? (CanDropCategoryAtRoot(e.Data, e.OriginalSource as DependencyObject) ? DragDropEffects.Move : DragDropEffects.None) :
             e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy :
             e.Data.GetDataPresent(FilesFormat) || e.Data.GetDataPresent(CategoryFormat) ? DragDropEffects.Move : DragDropEffects.None;
         e.Handled = true;
@@ -296,22 +301,21 @@ public partial class CategoryFilePanel : UserControl
     private async void OnTreeDrop(object sender, DragEventArgs e)
     {
         _dragWheel.Dispose();
-        e.Handled = true; var target = DropTarget(e); if (target is null) return;
-        if (e.Data.GetData(DataFormats.FileDrop) is string[] externalPaths) { QueueExternalImport(externalPaths, target); return; }
+        e.Handled = true; var target = DropTarget(e);
+        if (target is null && !CanDropCategoryAtRoot(e.Data, e.OriginalSource as DependencyObject)) return;
+        if (target is not null && e.Data.GetData(DataFormats.FileDrop) is string[] externalPaths) { QueueExternalImport(externalPaths, target); return; }
         await RunAsync(async () =>
         {
             if (e.Data.GetData(CategoryFormat) is int id && await _main.Categories.GetByIdAsync(id) is { } c) await CategoryVm.MoveAsync(c, target);
-            else if (e.Data.GetData(FilesFormat) is int[] ids)
+            else if (target is not null && e.Data.GetData(FilesFormat) is int[] ids)
             {
                 var files = new List<FileItem>(); foreach (var fileId in ids) if (await _main.Files.GetByIdAsync(fileId) is { } f) files.Add(f);
                 await FileListVm.RecategorizeManyAsync(files, target);
             }
         });
     }
-    private void OnRootDragOver(object sender, DragEventArgs e)
-    { e.Effects = e.Data.GetDataPresent(CategoryFormat) ? DragDropEffects.Move : DragDropEffects.None; e.Handled = true; }
-    private async void OnRootDrop(object sender, DragEventArgs e)
-    { e.Handled = true; if (e.Data.GetData(CategoryFormat) is int id) await RunAsync(async () => { if (await _main.Categories.GetByIdAsync(id) is { } c) await CategoryVm.MoveAsync(c, null); }); }
+    internal static bool CanDropCategoryAtRoot(IDataObject data, DependencyObject? source) =>
+        data.GetDataPresent(CategoryFormat) && !IsControlChrome(source) && FindAncestor<TreeViewItem>(source) is null;
 
     protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
     {

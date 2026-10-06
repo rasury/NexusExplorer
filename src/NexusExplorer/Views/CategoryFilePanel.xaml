@@ -45,51 +45,17 @@
             <RowDefinition Height="*" MinHeight="80" />
         </Grid.RowDefinitions>
 
-        <!-- 工具栏:WrapPanel 自动换行,窄面板下"整理"等按钮不再被裁剪 -->
-        <Border Grid.Row="0"
-                Background="{DynamicResource BrushPanelBg}"
-                BorderBrush="{DynamicResource BrushDivider}"
-                BorderThickness="0,0,0,1"
-                Padding="16">
-            <StackPanel>
-            <UniformGrid Columns="2">
-                <Button Style="{StaticResource ButtonPrimary}"
-                        Content="新建分类"
-                        Padding="16,0"
-                        Command="{Binding CategoryVmBinding.CreateRootCommand}"
-                        Margin="0,0,8,8" />
-                <Button Style="{StaticResource ButtonGhost}"
-                        Content="添加文件"
-                        Padding="16,0"
-                        Command="{Binding FileListVmBinding.AddFilesCommand}"
-                        Margin="0,0,8,8" />
-                <Button Style="{StaticResource ButtonGhost}"
-                        Content="添加文件夹"
-                        Padding="16,0"
-                        Command="{Binding FileListVmBinding.AddFolderCommand}"
-                        Margin="0,0,8,8" />
-                <Button Style="{StaticResource ButtonSecondary}"
-                        Content="整理"
-                        Padding="16,0"
-                        Command="{Binding OrganizeCommand}"
-                        Margin="0,0,8,8"
-                         ToolTip="整理当前打开分类及全部子分类" />
-            </UniformGrid>
-            <DockPanel Margin="0,8,0,0">
-                <Button Style="{StaticResource ButtonText}" x:Name="CancelOrganizeButton" DockPanel.Dock="Right" Content="取消整理" Click="OnCancelOrganize" Visibility="Collapsed" />
-                <TextBlock Style="{StaticResource TextCaption}" x:Name="OperationStatus" TextWrapping="Wrap" MaxHeight="64" ClipToBounds="True" />
+        <!-- One reserved status row; classification controls live in the header/context menu. -->
+        <Border Grid.Row="0" Height="40" Background="{DynamicResource BrushPanelBg}" BorderBrush="{DynamicResource BrushDivider}" BorderThickness="0,0,0,1" Padding="16,0">
+            <DockPanel VerticalAlignment="Center">
+                <Button Style="{StaticResource ButtonText}" x:Name="CancelOrganizeButton" DockPanel.Dock="Right" Content="取消整理" Click="OnCancelOrganize" Visibility="Collapsed" Margin="8,0,0,0" />
+                <TextBlock Style="{StaticResource TextCaption}" x:Name="OperationStatus" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
             </DockPanel>
-            </StackPanel>
         </Border>
-
         <!-- 分类树 -->
-        <Grid Grid.Row="1" Margin="8">
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Border x:Name="RootDropZone" Background="{DynamicResource BrushAccentBlueLight}" CornerRadius="16" Padding="16,8" Margin="0,0,0,8" AllowDrop="True" DragOver="OnRootDragOver" Drop="OnRootDrop">
-            <TextBlock Text="⌂ 顶层" Style="{StaticResource TextCaption}" />
-        </Border>
         <TreeView x:Name="CategoryTree"
                   Grid.Row="1"
+                  Margin="8,0,8,8"
                   Padding="8"
                   VirtualizingPanel.IsVirtualizing="True"
                   AllowDrop="True"
@@ -104,6 +70,9 @@
                     <MenuItem Header="在资源管理器中打开" Click="OnOpenCategoryInExplorer" />
                     <MenuItem Header="📌 钉到底栏" Click="OnPinCategory" />
                     <MenuItem Header="新建子分类" Click="OnCreateChild" />
+                    <MenuItem Header="添加文件" Click="OnAddCategoryFiles" />
+                    <MenuItem Header="添加文件夹" Click="OnAddCategoryFolder" />
+                    <MenuItem x:Name="OrganizeCategoryMenu" Header="整理" Click="OnOrganizeCategory" ToolTip="整理此分类及全部子分类" />
                     <Separator />
                     <MenuItem Header="重命名" Click="OnRenameCategory" />
                     <MenuItem Header="重新定位目录…" Click="OnRelocateCategory" />
@@ -117,7 +86,6 @@
                 </ContextMenu>
             </TreeView.ContextMenu>
         </TreeView>
-        </Grid>
 
         <!-- 分割线 + 文件列表标题 -->
         <Border Grid.Row="2"

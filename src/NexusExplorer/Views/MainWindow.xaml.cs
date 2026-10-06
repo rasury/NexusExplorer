@@ -20,6 +20,7 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         _main = main;
+        CreateRootCategoryButton.Command = main.Category.CreateRootCommand;
 
         // 注入面板依赖
         LeftPanel.Initialize(_main, recycleBin);

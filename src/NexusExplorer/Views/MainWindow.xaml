@@ -11,7 +11,10 @@
       <Button Style="{StaticResource IconButton}" Click="OnAppearanceClick" ToolTip="外观设置"><md:PackIcon Kind="PaletteOutline" Width="24" Height="24"/></Button>
      </StackPanel>
      <Button DockPanel.Dock="Left" Style="{StaticResource IconButton}" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板" Margin="0,0,16,0"><md:PackIcon Kind="Menu" Width="24" Height="24"/></Button>
-     <TextBlock Text="NexusExplorer" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource BrushPrimaryText}" VerticalAlignment="Center"/>
+     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+      <TextBlock Text="NexusExplorer" FontSize="22" FontWeight="SemiBold" Foreground="{DynamicResource BrushPrimaryText}" VerticalAlignment="Center"/>
+      <Button x:Name="CreateRootCategoryButton" Style="{StaticResource IconButton}" Margin="8,0,0,0" ToolTip="新建分类" AutomationProperties.Name="新建分类"><md:PackIcon Kind="Plus" Width="24" Height="24"/></Button>
+     </StackPanel>
     </DockPanel>
    </md:ColorZone>
    <md:DrawerHost x:Name="NavigationDrawer" Grid.Row="1" OpenMode="Standard" IsLeftDrawerOpen="True" LeftDrawerCloseOnClickAway="False">

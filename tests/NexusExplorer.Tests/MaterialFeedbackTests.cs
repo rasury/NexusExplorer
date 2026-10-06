@@ -46,7 +46,7 @@ public class MaterialFeedbackTests
     }
 
     [Fact]
-    public async Task RootDropZoneHasEightPixelGapBeforeCategoryList()
+    public async Task CategoryListStartsAfterSingleStatusRowWithoutToolbarOrRootStrip()
     {
         using var host = new TestHost();
         await WpfTestHost.RunAsync(() =>
@@ -54,12 +54,14 @@ public class MaterialFeedbackTests
             var main = new MainViewModel(host.Categories, host.Files, host.Organization, new FakePlaybackEngine());
             var panel = new CategoryFilePanel(); panel.Initialize(main, host.RecycleBin);
             panel.Measure(new Size(400, 800)); panel.Arrange(new Rect(0, 0, 400, 800)); panel.UpdateLayout();
-            var root = (Border)panel.FindName("RootDropZone");
+            Assert.Null(panel.FindName("RootDropZone"));
+            var status = (TextBlock)panel.FindName("OperationStatus");
             var tree = (TreeView)panel.FindName("CategoryTree");
-            var rootBottom = root.TranslatePoint(new Point(0, root.ActualHeight), panel).Y;
             var treeTop = tree.TranslatePoint(new Point(), panel).Y;
-            Assert.InRange(treeTop - rootBottom, 8, 9);
-            Assert.True(tree.ActualHeight > 80);
+            Assert.Equal(TextWrapping.NoWrap, status.TextWrapping);
+            Assert.Equal(TextTrimming.CharacterEllipsis, status.TextTrimming);
+            Assert.InRange(treeTop, 40, 41);
+            Assert.True(tree.ActualHeight > 350);
         });
     }
 

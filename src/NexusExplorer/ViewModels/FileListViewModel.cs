@@ -69,9 +69,10 @@ public partial class FileListViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task AddFilesAsync()
+    public Task AddFilesAsync() => AddFilesToCategoryAsync(_main.CurrentCategory);
+    public async Task AddFilesToCategoryAsync(Category? target)
     {
-        if (_main.CurrentCategory is null)
+        if (target is null)
         {
             await ReportErrorAsync("请先选择一个分类。");
             return;
@@ -81,16 +82,17 @@ public partial class FileListViewModel : ObservableObject
         var paths = await PickFiles();
         if (paths.Count == 0) return;
 
-        var result = await _fileService.AddRangeAsync(paths, _main.CurrentCategory.Id);
+        var result = await _fileService.AddRangeAsync(paths, target.Id);
         await _main.RefreshOrganizationStatesAsync();
-        await _main.RefreshFilesAsync();
+        if (_main.CurrentCategory?.Id == target.Id) await _main.RefreshFilesAsync();
         await ReportBatchResultAsync(result);
     }
 
     [RelayCommand]
-    public async Task AddFolderAsync()
+    public Task AddFolderAsync() => AddFolderToCategoryAsync(_main.CurrentCategory);
+    public async Task AddFolderToCategoryAsync(Category? target)
     {
-        if (_main.CurrentCategory is null)
+        if (target is null)
         {
             await ReportErrorAsync("请先选择一个分类。");
             return;
@@ -102,7 +104,7 @@ public partial class FileListViewModel : ObservableObject
 
         try
         {
-            var result = await _fileService.ImportDirectoryAsync(directory, _main.CurrentCategory.Id, _categoryService);
+            var result = await _fileService.ImportDirectoryAsync(directory, target.Id, _categoryService);
             await _main.RefreshTreeAsync();
             await _main.RefreshFilesAsync();
             await ReportBatchResultAsync(result);
