@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace NexusExplorer.Views;
 
-/// <summary>Paint only our native host's uncovered area; VLC owns its child renderer.</summary>
+/// <summary>Paint only our native host's uncovered area; mpv owns its child renderer.</summary>
 internal sealed class NativeVideoBackground : IDisposable
 {
     private const uint WmPaint = 0x000F, WmEraseBackground = 0x0014, WmPrintClient = 0x0318, WmDestroy = 0x0082;

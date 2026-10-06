@@ -1,4 +1,4 @@
-<UserControl x:Class="NexusExplorer.Views.PlayerPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+<UserControl x:Class="NexusExplorer.Views.PlayerPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:NexusExplorer.Views" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
  <UserControl.Resources>
   <Style x:Key="PlayerIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
    <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
@@ -20,7 +20,7 @@
   <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <md:Card x:Name="PreviewCard" Background="Black" UniformCornerRadius="16" md:ElevationAssist.Elevation="Dp0" ClipContent="True">
    <Grid Background="Black">
-    <vlc:VideoView x:Name="VideoView" Background="Black" Visibility="Collapsed"><Grid x:Name="VideoClickSurface" Background="#02000000" MouseLeftButtonUp="OnVideoAreaClick"/></vlc:VideoView>
+    <views:MpvVideoHost x:Name="VideoView" Visibility="Hidden"/>
     <ScrollViewer x:Name="ImageScroll" Visibility="Collapsed" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="Black" SizeChanged="OnImageSizeChanged">
      <Image x:Name="ImageDisplay" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality" MouseWheel="OnImageWheel" MouseLeftButtonDown="OnImageMouseDown" MouseLeftButtonUp="OnImageMouseUp" MouseMove="OnImageMouseMove" Cursor="SizeAll"/>
     </ScrollViewer>

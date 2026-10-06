@@ -1,0 +1,12 @@
+{
+  "engine": "libmpv",
+  "architecture": "win-x64",
+  "version": "v0.41.0-1100-gc15296420",
+  "apiVersion": "2.5",
+  "commit": "c1529642089bfebfc928a1c1664638a7a5d219ba",
+  "url": "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261005/mpv-dev-x86_64-20261005-git-c152964208.7z",
+  "archiveSha256": "7d9dd506da6b77e6054f56052f7423d9f7eed764f85154a6221925aba37dbfb2",
+  "dll": "libmpv-2.dll",
+  "dllSha256": "704b75444726add17add8278a9cb5031ad20f01718989d8fe8dd34a1c2faab8c",
+  "source": "https://github.com/mpv-player/mpv/tree/c1529642089bfebfc928a1c1664638a7a5d219ba"
+}

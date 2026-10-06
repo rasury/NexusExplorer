@@ -1,3 +1,4 @@
+using NexusExplorer.Infrastructure.Playback.Mpv;
 using System.IO;
 using System.Windows;
 using NexusExplorer.Services;
@@ -17,7 +18,7 @@ public class WindowLifecycleTests
         var file = await host.Files.AddAsync(path, category.Id);
         await WpfTestHost.RunAsync(async () =>
         {
-            using var engine = new MediaPlayerService(System.Windows.Threading.Dispatcher.CurrentDispatcher) { HardwareDecoding = false };
+            using var engine = new MpvPlaybackEngine(System.Windows.Threading.Dispatcher.CurrentDispatcher) { HardwareDecoding = false };
             var main = new MainViewModel(host.Categories, host.Files, host.Organization, engine);
             var window = new MainWindow(main, host.Categories, host.Files, host.Organization, host.RecycleBin, engine)
             { ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -5000, Top = -5000 };

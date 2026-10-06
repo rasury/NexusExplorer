@@ -8,9 +8,6 @@
     <UseWPF>true</UseWPF>
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
-    <VlcWindowsX64Enabled>true</VlcWindowsX64Enabled>
-    <VlcWindowsX86Enabled>false</VlcWindowsX86Enabled>
-    <VlcWindowsArm64Enabled>false</VlcWindowsArm64Enabled>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <AssemblyName>NexusExplorer</AssemblyName>
@@ -27,38 +24,18 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
-  <!-- VLC 原生库不能进单文件(插件目录必须与 libvlc.dll 同级留在磁盘),
-       打包时排除,发布后从 NuGet 包完整复制 libvlc\win-x64 -->
+  <Target Name="RestoreMpvNative" BeforeTargets="PrepareForBuild" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\Restore-Mpv.ps1&quot;" />
+  </Target>
   <ItemGroup>
-    <None Include="libvlc\**\*.*" Exclude="libvlc\win-x86\**\*.*" Pack="false" />
+    <None Include="..\..\native\mpv\win-x64\libmpv-2.dll" Link="native\mpv\win-x64\libmpv-2.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\..\native\mpv\win-x64\runtime-manifest.json" Link="native\mpv\win-x64\runtime-manifest.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Update="Assets\Mpv\input.conf" TargetPath="native\mpv\input.conf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\..\LICENSE" Link="licenses\NexusExplorer-GPL-2.0.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Include="..\..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
-
-  <Target Name="RestoreLibVlcNative" AfterTargets="Publish">
-    <PropertyGroup>
-      <LibVlcPackageDir>$(PkgVideoLAN_LibVLC_Windows)\build\x64</LibVlcPackageDir>
-    </PropertyGroup>
-    <Error Condition="!Exists('$(LibVlcPackageDir)\libvlc.dll')" Text="VLC x64 原生库缺失，请先还原 NuGet 依赖。" />
-    <ItemGroup>
-      <LibVlcFiles Include="$(LibVlcPackageDir)\**\*.*" Exclude="$(LibVlcPackageDir)\include\**\*.*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(LibVlcFiles)"
-          DestinationFiles="@(LibVlcFiles->'$(PublishDir)libvlc\win-x64\%(RecursiveDir)%(Filename)%(Extension)')" />
-    <Message Text="已复制 VLC 原生库: @(LibVlcFiles->Count()) 个文件" Importance="high" />
-  </Target>
-
-  <!-- Generate the cache from this exact native SDK after copying it; verify in a fresh process. -->
-  <Target Name="PrepareLibVlcPluginCache" AfterTargets="RestoreLibVlcNative" Condition="'$(OS)' == 'Windows_NT'">
-    <PropertyGroup>
-      <VlcCacheScript>$(MSBuildProjectDirectory)\..\..\scripts\Prepare-VlcCache.ps1</VlcCacheScript>
-      <VlcPublishedNativeDirectory>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(PublishDir)', 'libvlc', 'win-x64'))</VlcPublishedNativeDirectory>
-    </PropertyGroup>
-    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(VlcCacheScript)&quot; -NativeDirectory &quot;$(VlcPublishedNativeDirectory)&quot;" />
-    <Exec Command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(VlcCacheScript)&quot; -NativeDirectory &quot;$(VlcPublishedNativeDirectory)&quot; -VerifyOnly" />
-  </Target>
-
-  <!-- 发布后清理:VLC win-x86 目录(x64 目标用不到)与 createdump.exe -->
+  <!-- 发布后清理不需要的开发文件 -->
   <Target Name="CleanPublishOutput" AfterTargets="Publish">
-    <RemoveDir Directories="$(PublishDir)libvlc\win-x86" Condition="Exists('$(PublishDir)libvlc\win-x86')" />
     <Delete Files="$(PublishDir)createdump.exe" Condition="Exists('$(PublishDir)createdump.exe')" />
     <Delete Files="$(PublishDir)NexusExplorer.pdb" Condition="Exists('$(PublishDir)NexusExplorer.pdb')" />
   </Target>
@@ -66,14 +43,12 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
     <PackageReference Include="MaterialDesignThemes" Version="5.3.2" />
-    <PackageReference Include="LibVLCSharp.WPF" Version="3.9.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
-    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.24" GeneratePathProperty="true" />
   </ItemGroup>
 
   <ItemGroup>

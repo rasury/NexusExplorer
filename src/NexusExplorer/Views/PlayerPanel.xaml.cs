@@ -16,67 +16,52 @@ public partial class PlayerPanel : UserControl
 {
     private MainViewModel _main = null!;
     private PlayerViewModel Vm => _main.Player;
-    private MediaPlayerService? Native => Vm.Engine as MediaPlayerService;
+    private IMediaPlaybackControls? Controls => Vm.Engine as IMediaPlaybackControls;
+    private IPlaybackLifetime? Lifetime => Vm.Engine as IPlaybackLifetime;
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private bool _dragging;
     private bool _initialized;
     private bool _panning;
     private bool _dialogCovered;
-    private Window? _suspendedForeground;
     internal void SetDialogCovered(bool covered)
     {
         _dialogCovered = covered;
         if (covered) VolumePopup.IsPopupOpen = false;
-        VideoClickSurface.Visibility = covered ? Visibility.Collapsed : Visibility.Visible;
-        if (covered)
-        {
-            var foreground = Window.GetWindow(VideoClickSurface);
-            if (foreground is not null && foreground != Window.GetWindow(this) && foreground.IsVisible)
-            { _suspendedForeground = foreground; foreground.Hide(); }
-        }
-        else if (_suspendedForeground is { } foreground)
-        {
-            _suspendedForeground = null;
-            if (Vm.Kind == MediaKind.Video && IsLoaded) foreground.Show();
-        }
         UpdateUi();
     }
     private Point _panStart;
     private double _effectiveScale = 1;
-    private readonly NativeVideoBackground _nativeBackground = new();
     public PlayerPanel()
     {
         InitializeComponent();
-        VideoView.Loaded += (_, _) => ApplyNativeBackground();
-        VideoView.SizeChanged += (_, _) => ApplyNativeBackground();
+        VideoView.SurfaceCreated += hwnd => { if (_main is not null) Lifetime?.AttachSurface(hwnd); };
     }
     public void Initialize(MainViewModel main)
     {
         _main = main; Vm.ShowErrorAsync = async m => { await MessageDialog.ShowAsync(m, "播放", DialogButtons.Ok, DialogSeverity.Warning); };
         Vm.StateChanged += UpdateUi;
-        if (Native is not null) Native.PlayerReady += AttachNativePlayer;
-        HardwareCheck.IsChecked = Native?.HardwareDecoding ?? true; VolumeSlider.Value = Vm.Volume; UpdateVolumeUi(Vm.Volume); _initialized = true;
+        if (Controls is not null) Controls.VideoClicked += OnNativeVideoClick;
+        HardwareCheck.IsChecked = Controls?.HardwareDecoding ?? true; VolumeSlider.Value = Vm.Volume; UpdateVolumeUi(Vm.Volume); _initialized = true;
         ProgressSlider.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, _) => _dragging = true), true);
         AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(OnProgressReleased), true);
         _timer.Tick += Poll; _timer.Start();
         Loaded += OnLoaded; Unloaded += OnUnloaded; UpdateUi();
     }
     private async void OnLoaded(object sender, RoutedEventArgs e)
-    { if (Native is not null) await RunAsync(async () => { await Native.InitializeAsync(); AttachNativePlayer(); }); }
-    private void AttachNativePlayer()
-    { VideoView.MediaPlayer = Native?.NativePlayer; ApplyNativeBackground(); }
-    private void ApplyNativeBackground() => _nativeBackground.Attach(VideoView.MediaPlayer?.Hwnd ?? IntPtr.Zero);
+    { if (Lifetime is not null) await RunAsync(async () => { Lifetime.AttachSurface(VideoView.Handle); await Lifetime.InitializeAsync(); }); }
+    private async void OnNativeVideoClick()
+    { if (!_dialogCovered && Vm.Kind == MediaKind.Video) await RunAsync(Vm.TogglePlayPauseAsync); }
     public void Detach()
     {
         VolumePopup.IsPopupOpen = false;
-        _timer.Stop(); _nativeBackground.Dispose(); VideoView.MediaPlayer = null;
+        _timer.Stop(); Lifetime?.AttachSurface(IntPtr.Zero);
         if (_initialized) Vm.ReleaseImagePreview();
         ImageDisplay.Source = null;
     }
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         Detach(); Vm.StateChanged -= UpdateUi;
-        if (Native is not null) Native.PlayerReady -= AttachNativePlayer;
+        if (Controls is not null) Controls.VideoClicked -= OnNativeVideoClick;
         _timer.Tick -= Poll; Loaded -= OnLoaded; Unloaded -= OnUnloaded;
     }
     private async Task RunAsync(Func<Task> action)
@@ -88,6 +73,11 @@ public partial class PlayerPanel : UserControl
     {
         if (Vm.Kind is not (MediaKind.Video or MediaKind.Audio)) return;
         var state = Vm.Engine.Snapshot;
+        if (Controls is { } controls)
+            HardwareCheck.ToolTip = !controls.HardwareDecoding ? "硬件解码：已关闭；下次打开媒体生效"
+                : controls.ActiveHardwareDecoder is null ? "硬件解码：已请求开启；等待媒体就绪"
+                : controls.ActiveHardwareDecoder == "no" ? "硬件解码：已请求开启，但当前媒体使用软件解码"
+                : $"硬件解码：已开启（{controls.ActiveHardwareDecoder}）；修改后下次打开媒体生效";
         if (!Vm.PlaybackCompleted) { Vm.IsPlaying = state.IsPlaying; Vm.Duration = state.Duration; Vm.Position = state.Position; }
         PlayPauseIcon.Kind = Vm.PlaybackCompleted ? PackIconKind.Replay : state.IsPlaying ? PackIconKind.Pause : PackIconKind.Play;
         PlayPauseButton.ToolTip = Vm.PlaybackCompleted ? "重播" : state.IsPlaying ? "暂停" : "播放";
@@ -104,8 +94,7 @@ public partial class PlayerPanel : UserControl
     private void UpdateUi()
     {
         var media = Vm.Kind is MediaKind.Video or MediaKind.Audio;
-        VideoView.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Collapsed;
-        if (Vm.Kind == MediaKind.Video) Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)ApplyNativeBackground);
+        VideoView.Visibility = Vm.Kind == MediaKind.Video && !_dialogCovered ? Visibility.Visible : Visibility.Hidden;
         ImageScroll.Visibility = Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         AudioLayer.Visibility = Vm.Kind == MediaKind.Audio ? Visibility.Visible : Visibility.Collapsed;
         AudioTitle.Text = Vm.MediaTitle ?? "";
@@ -143,25 +132,26 @@ public partial class PlayerPanel : UserControl
     }
     private async void OnHardwareChanged(object sender, RoutedEventArgs e)
     {
-        if (!_initialized || Native is null) return;
-        Native.HardwareDecoding = HardwareCheck.IsChecked == true;
+        if (!_initialized || Controls is null) return;
+        Controls.HardwareDecoding = HardwareCheck.IsChecked == true;
         try
         {
             var config = Infrastructure.AppConfig.LoadOrDefault(Infrastructure.AppPaths.SettingsPath);
-            config.Playback.HardwareDecoding = Native.HardwareDecoding;
+            config.Playback.HardwareDecoding = Controls.HardwareDecoding;
             config.Save(Infrastructure.AppPaths.SettingsPath);
         }
         catch (Exception ex) { Log.Error(ex, "保存播放配置失败"); await MessageDialog.ShowAsync(ex.Message, "播放", severity: DialogSeverity.Warning); }
     }
     private async void OnAudioTracks(object sender, RoutedEventArgs e)
     {
-        var native = Native?.NativePlayer; if (native is null) return;
-        Native!.LogAudioDiagnostics();
-        var path = Native.CurrentPath;
-        var choices = native.AudioTrackDescription.Select(t => new DialogChoice<int>(t.Id == -1 ? "禁用音轨" : t.Name, t.Id)).ToList();
-        if (choices.Count == 0) { await MessageDialog.ShowAsync("无可用音轨", "音轨"); return; }
-        var selected = await ChoiceDialog.ShowAsync("选择音轨", "音轨", choices, Native.SelectedAudioTrack);
-        if (selected.Confirmed && path == Native.CurrentPath) await RunAsync(() => Native.SetAudioTrackAsync(selected.Value));
+        var controls = Controls; if (controls is null) return;
+        var token = controls.CurrentToken;
+        var tracks = controls.AudioTracks;
+        if (tracks.Count == 0) { await MessageDialog.ShowAsync("无可用音轨", "音轨"); return; }
+        var choices = new List<DialogChoice<long>> { new("禁用音轨", -1) };
+        choices.AddRange(tracks.Select(t => new DialogChoice<long>(t.Name, t.Id)));
+        var selected = await ChoiceDialog.ShowAsync("选择音轨", "音轨", choices, controls.SelectedAudioTrack);
+        if (selected.Confirmed && token == controls.CurrentToken) await RunAsync(() => controls.SetAudioTrackAsync(selected.Value, token));
     }
     internal static double FitScale(double width, double height, double viewportWidth, double viewportHeight) =>
         width <= 0 || height <= 0 ? 1 : Math.Max(0.001, Math.Min(1, Math.Min(Math.Max(1, viewportWidth) / width, Math.Max(1, viewportHeight) / height)));

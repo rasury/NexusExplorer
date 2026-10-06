@@ -1,3 +1,4 @@
+using NexusExplorer.Infrastructure.Playback.Mpv;
 using System.IO;
 using System.Collections.Concurrent;
 using System.Windows;
@@ -92,28 +93,25 @@ public class AacDurationTests
         {
             await WpfTestHost.RunAsync(async () =>
             {
-                using var engine = new MediaPlayerService(); await engine.InitializeAsync();
+                using var engine = new MpvPlaybackEngine(); await engine.InitializeAsync();
                 var ended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 engine.MediaEnded += () => ended.TrySetResult();
                 await engine.PlayAsync(path, true);
-                await Until(() => engine.Snapshot.IsPlaying && !engine.Snapshot.IsDurationPending && engine.NativePlayer!.Time > 0);
+                await Until(() => engine.Snapshot.IsPlaying && !engine.Snapshot.IsDurationPending && engine.Snapshot.Position > TimeSpan.Zero);
                 Assert.False(engine.Snapshot.IsDurationEstimated);
                 for (var i = 0; i < 4; i++)
                 { Assert.InRange(Math.Abs(engine.Snapshot.Duration.TotalMilliseconds - expected.TotalMilliseconds), 0, 1); await Task.Delay(100); }
                 var track = engine.SelectedAudioTrack;
-                await engine.SetAudioTrackAsync(-1); Assert.Equal(-1, engine.SelectedAudioTrack);
-                await engine.SetAudioTrackAsync(track); Assert.Equal(track, engine.SelectedAudioTrack);
-                Assert.False(engine.NativePlayer!.Mute);
+                await engine.SetAudioTrackAsync(-1, engine.CurrentToken); Assert.Equal(-1, engine.SelectedAudioTrack);
+                await engine.SetAudioTrackAsync(track, engine.CurrentToken); Assert.Equal(track, engine.SelectedAudioTrack);
+                Assert.Equal("no", await engine.ReadNativeForVerificationAsync("mute"));
                 await engine.SeekAsync(.5f); await Until(() => engine.Snapshot.Position.TotalSeconds >= 3 && engine.Snapshot.Position.TotalSeconds < 4.5);
                 await engine.TogglePauseAsync(); await Until(() => engine.Snapshot.IsPaused);
                 Assert.InRange(Math.Abs(engine.Snapshot.Duration.TotalMilliseconds - expected.TotalMilliseconds), 0, 1);
                 await engine.TogglePauseAsync(); await engine.SeekAsync(.9f);
                 await ended.Task.WaitAsync(TimeSpan.FromSeconds(5));
                 Assert.InRange(engine.Snapshot.Position.TotalSeconds, expected.TotalSeconds - .3, expected.TotalSeconds + .3);
-                Assert.Contains(logs.Messages, m => m.Contains("using demux module \"avcodec\""));
-                Assert.Contains(logs.Messages, m => m.Contains("using audio decoder module \"avcodec\""));
-                Assert.Contains(logs.Messages, m => m.Contains("using aout stream module \"wasapi\""));
-                Assert.Contains(logs.Messages, m => m.Contains("using audio resampler module \"speex_resampler\""));
+                Assert.Contains(logs.Messages, m => m.Contains("wasapi"));
                 var wave = SyntheticMedia.WriteWave(Path.Combine(host.RootDir, "next.wav"), silent: true);
                 await engine.PlayAsync(wave, true); Assert.False(engine.Snapshot.IsDurationPending);
                 using (var exclusive = File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }

@@ -1,0 +1,22 @@
+NexusExplorer is licensed under GNU GPL version 2 or later (SPDX: GPL-2.0-or-later).
+The corresponding NexusExplorer source is provided as NexusExplorer-source.zip in this directory.
+Repository: https://github.com/rasury/NexusExplorer
+The exact application commit is recorded in release.json.
+
+Pinned native component: libmpv-2.dll, Windows x86_64, git build 20261005.
+mpv commit: c1529642089bfebfc928a1c1664638a7a5d219ba
+mpv source: https://github.com/mpv-player/mpv/tree/c1529642089bfebfc928a1c1664638a7a5d219ba
+mpv source archive: https://github.com/mpv-player/mpv/archive/c1529642089bfebfc928a1c1664638a7a5d219ba.tar.gz
+Native binary and build workflow: https://github.com/shinchiro/mpv-winbuild-cmake/releases/tag/20261005
+Build recipe repository at release: https://github.com/shinchiro/mpv-winbuild-cmake/tree/05a60b3
+Build workflow: https://github.com/shinchiro/mpv-winbuild-cmake/actions/runs/37245752254
+Native binary checksum and acquisition information: native/mpv/win-x64/runtime-manifest.json
+
+FFmpeg reported by the fixed binary: N-127203-ga35c87999
+FFmpeg source: https://github.com/FFmpeg/FFmpeg/tree/a35c87999
+FFmpeg licensing: https://ffmpeg.org/legal.html
+libplacebo reported by the fixed binary: v7.374.0 (v7.360.0-149-g92b5ac6-dirty)
+libplacebo source: https://code.videolan.org/videolan/libplacebo
+Other enabled components and build patches are described by the fixed build recipes above.
+The mpv Copyright notice identifies its source file licenses; client API headers use ISC,
+which does not replace the licensing of the mpv core or its compiled dependencies.

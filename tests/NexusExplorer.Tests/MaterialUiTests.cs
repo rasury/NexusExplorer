@@ -1,3 +1,4 @@
+using NexusExplorer.Infrastructure.Playback.Mpv;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -53,7 +54,7 @@ public class MaterialUiTests
         await WpfTestHost.RunAsync(async()=>
         {
             UiThemeService.Apply(mode);
-            using var native=new MediaPlayerService();using var fake=new FakePlaybackEngine();
+            using var native=new MpvPlaybackEngine();using var fake=new FakePlaybackEngine();
             var main=new MainViewModel(host.Categories,host.Files,host.Organization,fake);
             var window=new MainWindow(main,host.Categories,host.Files,host.Organization,host.RecycleBin,native)
                 {Width=width,Height=height,ShowActivated=false,ShowInTaskbar=false};
@@ -87,7 +88,7 @@ public class MaterialUiTests
         using var host=new TestHost();
         await WpfTestHost.RunAsync(async()=>
         {
-            using var native=new MediaPlayerService();var main=new MainViewModel(host.Categories,host.Files,host.Organization,new FakePlaybackEngine());
+            using var native=new MpvPlaybackEngine();var main=new MainViewModel(host.Categories,host.Files,host.Organization,new FakePlaybackEngine());
             var window=new MainWindow(main,host.Categories,host.Files,host.Organization,host.RecycleBin,native){ShowActivated=false,ShowInTaskbar=false};
             window.Show();await Dispatcher.Yield(DispatcherPriority.Loaded);
             try
@@ -114,7 +115,7 @@ public class MaterialUiTests
         var file=await host.Files.AddAsync(path,category.Id);
         await WpfTestHost.RunAsync(async()=>
         {
-            using var engine=new MediaPlayerService(){HardwareDecoding=false};
+            using var engine=new MpvPlaybackEngine(){HardwareDecoding=false};
             var main=new MainViewModel(host.Categories,host.Files,host.Organization,engine);
             var window=new MainWindow(main,host.Categories,host.Files,host.Organization,host.RecycleBin,engine){ShowActivated=false,ShowInTaskbar=false};
             window.Show();await Dispatcher.Yield(DispatcherPriority.Loaded);
@@ -123,8 +124,8 @@ public class MaterialUiTests
                 await main.SelectCategoryAsync(category);await main.SelectFileAsync(file);await BoundedDialogTests.Until(()=>engine.Snapshot.Position.TotalMilliseconds>100);
                 var player=(PlayerPanel)window.FindName("PlayerArea");var video=(FrameworkElement)player.FindName("VideoView");
                 var prompt=MessageDialog.ShowAsync("视频播放期间的提示","提示");var root=(DialogHost)window.FindName("RootDialog");await BoundedDialogTests.Until(()=>root.IsOpen);
-                Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
-                ((DialogSurface)root.DialogContent!).Complete(DialogAnswer.Ok);await prompt;
+                Assert.Equal(Visibility.Hidden,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
+                ((DialogSurface)root.DialogContent!).Complete(DialogAnswer.Ok);await prompt;await BoundedDialogTests.Until(()=>video.Visibility==Visibility.Visible);
                 Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
                 await engine.StopAndReleaseAsync();using var exclusive=File.Open(path,FileMode.Open,FileAccess.ReadWrite,FileShare.None);
             }

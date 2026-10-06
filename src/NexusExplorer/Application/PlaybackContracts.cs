@@ -16,3 +16,27 @@ public interface IPlaybackEngine : IDisposable
     Task SetVolumeAsync(int volume);
     PlaybackSnapshot Snapshot { get; }
 }
+
+public readonly record struct PlaybackToken(long EngineEpoch, long MediaGeneration);
+public sealed record AudioTrackInfo(long Id, string Name, string? Language, string? Codec, bool IsSelected);
+public interface IMediaPlaybackControls
+{
+    bool HardwareDecoding { get; set; }
+    string? ActiveHardwareDecoder { get; }
+    PlaybackToken CurrentToken { get; }
+    IReadOnlyList<AudioTrackInfo> AudioTracks { get; }
+    long SelectedAudioTrack { get; }
+    Task SetAudioTrackAsync(long id, PlaybackToken token);
+    event Action? VideoClicked;
+}
+public interface IPlaybackLifetime
+{
+    Task InitializeAsync();
+    Task ShutdownAsync();
+    string? EngineVersion { get; }
+    void AttachSurface(IntPtr hwnd);
+}
+public interface IPlaybackDiagnostics
+{
+    Task RecordDiagnosticsAsync();
+}

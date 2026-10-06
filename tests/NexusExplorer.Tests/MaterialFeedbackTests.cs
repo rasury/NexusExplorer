@@ -1,3 +1,4 @@
+using NexusExplorer.Infrastructure.Playback.Mpv;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -202,7 +203,7 @@ public class MaterialFeedbackTests
         var file=await host.Files.AddAsync(path,category.Id);
         await WpfTestHost.RunAsync(async()=>
         {
-            using var engine=new MediaPlayerService(){HardwareDecoding=false};
+            using var engine=new MpvPlaybackEngine(){HardwareDecoding=false};
             var main=new MainViewModel(host.Categories,host.Files,host.Organization,engine);
             var window=new MainWindow(main,host.Categories,host.Files,host.Organization,host.RecycleBin,engine){ShowInTaskbar=false,ShowActivated=false};
             window.Show();await Dispatcher.Yield(DispatcherPriority.Loaded);
@@ -210,18 +211,18 @@ public class MaterialFeedbackTests
             {
                 await main.SelectFileAsync(file);await BoundedDialogTests.Until(()=>engine.Snapshot.Position.TotalMilliseconds>100);
                 var player=(PlayerPanel)window.FindName("PlayerArea");var video=(FrameworkElement)player.FindName("VideoView");
-                var clickSurface=(FrameworkElement)player.FindName("VideoClickSurface");var foreground=Window.GetWindow(clickSurface);
-                Assert.NotNull(foreground);Assert.NotSame(window,foreground);Assert.True(foreground.IsVisible);
+                var videoHost=(MpvVideoHost)video;
+                Assert.NotEqual(IntPtr.Zero,videoHost.Handle);
                 var volume=(PopupBox)player.FindName("VolumePopup");volume.IsPopupOpen=true;
                 var slider=(Slider)player.FindName("VolumeSlider");await BoundedDialogTests.Until(()=>slider.IsVisible && slider.ActualHeight>100);
                 var volumeSource=(HwndSource)PresentationSource.FromVisual(slider);
                 var volumePoint=slider.TranslatePoint(new Point(slider.ActualWidth/2,slider.ActualHeight/2),(UIElement)volumeSource.RootVisual);
                 Assert.Same(slider,CategoryFilePanel.FindAncestor<Slider>(((UIElement)volumeSource.RootVisual).InputHitTest(volumePoint) as DependencyObject));
                 slider.Value=50;Assert.Equal(50,main.Player.Volume);Assert.True(engine.Snapshot.IsPlaying);
-                var choices=engine.NativePlayer!.AudioTrackDescription.Select(t=>new DialogChoice<int>(t.Name,t.Id)).ToList();
+                var choices=engine.AudioTracks.Select(t=>new DialogChoice<long>(t.Name,t.Id)).Prepend(new DialogChoice<long>("禁用音轨",-1)).ToList();
                 var result=ChoiceDialog.ShowAsync("音轨","音轨",choices,engine.SelectedAudioTrack);
                 var root=(DialogHost)window.FindName("RootDialog");await BoundedDialogTests.Until(()=>root.IsOpen && root.DialogContent is DialogSurface s && s.IsLoaded);
-                await Task.Delay(350);Assert.False(volume.IsPopupOpen);Assert.False(foreground.IsVisible);Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
+                await Task.Delay(350);Assert.False(volume.IsPopupOpen);Assert.Equal(Visibility.Hidden,video.Visibility);Assert.True(engine.Snapshot.IsPlaying);
                 var view=(DialogSurface)root.DialogContent!;
                 var box=Descendants<ComboBox>(view).Single();var apply=Descendants<Button>(view).Single(b=>b.Content is string text && text=="应用");
                 var popupSource=(HwndSource)PresentationSource.FromVisual(apply);
@@ -233,7 +234,7 @@ public class MaterialFeedbackTests
                 box.IsDropDownOpen=true;await Dispatcher.Yield(DispatcherPriority.Render);Assert.True(box.IsDropDownOpen);
                 box.SelectedItem=choices.Single(c=>c.Value==-1);box.IsDropDownOpen=false;
                 apply.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));var picked=await result;
-                Assert.True(picked.Confirmed);Assert.Equal(-1,picked.Value);Assert.True(foreground.IsVisible);Assert.Equal(Visibility.Visible,video.Visibility);
+                Assert.True(picked.Confirmed);Assert.Equal(-1,picked.Value);Assert.Equal(Visibility.Visible,video.Visibility);
             }
             finally{MaterialDialogService.CancelAll();await engine.StopAndReleaseAsync();window.PrepareForVerificationExit();window.Close();}
         });

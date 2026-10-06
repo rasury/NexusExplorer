@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NexusExplorer.Services;
 using NexusExplorer.ViewModels;
 using NexusExplorer.Infrastructure;
+using NexusExplorer.ApplicationLayer;
 using MaterialDesignThemes.Wpf;
 
 namespace NexusExplorer.Views;
@@ -14,7 +15,7 @@ public partial class MainWindow : Window
 
     public MainWindow(MainViewModel main, CategoryService categoryService,
         FileService fileService, OrganizationService organizationService,
-        IRecycleBinService recycleBin, MediaPlayerService mediaPlayer)
+        IRecycleBinService recycleBin, IPlaybackEngine mediaPlayer)
     {
         InitializeComponent();
 
@@ -32,6 +33,11 @@ public partial class MainWindow : Window
         RootDialog.Identifier = "Nexus." + Guid.NewGuid().ToString("N");
         RootDialog.Loaded += (_, _) => MaterialDialogService.Register(RootDialog);
         RootDialog.Unloaded += (_, _) => MaterialDialogService.Unregister(RootDialog);
+        PreviewKeyDown += async (_, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.F6 && _main.Player.Engine is IPlaybackDiagnostics diagnostics)
+            { e.Handled = true; await diagnostics.RecordDiagnosticsAsync(); }
+        };
 
         Loaded += async (_, _) =>
         {
@@ -45,8 +51,18 @@ public partial class MainWindow : Window
             if (_closingStarted) return;
             _closingStarted = true; IsEnabled = false;
             MaterialDialogService.CancelAll();
-            try { await LeftPanel.PrepareForCloseAsync(); LeftPanel.SaveUiState(); await mediaPlayer.StopAndReleaseAsync(); PlayerArea.Detach(); }
-            catch (Exception ex) { Serilog.Log.Error(ex, "退出时停止播放失败"); }
+            try
+            {
+                await LeftPanel.PrepareForCloseAsync(); LeftPanel.SaveUiState();
+                if (mediaPlayer is IPlaybackLifetime lifetime) await lifetime.ShutdownAsync();
+                else await mediaPlayer.StopAndReleaseAsync();
+                PlayerArea.Detach();
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Error(ex, "退出时停止播放失败"); _closingStarted = false; IsEnabled = true;
+                await MessageDialog.ShowAsync("播放器尚未释放资源，请保留日志并稍后重试关闭。", "关闭失败"); return;
+            }
             _closingFinished = true; Close();
         };
     }

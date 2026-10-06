@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$OutputDirectory = 'artifacts/NexusExplorer-2.0.4-preview-win-x64',
     # Supply an existing publish directory to reuse a build or test the copy step.
@@ -46,7 +46,7 @@ if (-not $PublishedDirectory) {
 }
 $taskSource = Resolve-UpdatePath $PublishedDirectory $taskRepository
 Assert-NoJunction $taskSource
-foreach ($taskRequired in @('NexusExplorer.exe', 'libvlc/win-x64/libvlc.dll', 'libvlc/win-x64/libvlccore.dll', 'libvlc/win-x64/plugins/plugins.dat')) {
+foreach ($taskRequired in @('NexusExplorer.exe', 'native/mpv/win-x64/libmpv-2.dll', 'native/mpv/win-x64/runtime-manifest.json', 'native/mpv/input.conf')) {
     if (-not (Test-Path -LiteralPath (Join-Path $taskSource $taskRequired) -PathType Leaf)) {
         throw "发布文件不完整，固定目录未修改：$taskRequired"
     }
@@ -86,45 +86,34 @@ foreach ($taskFile in Get-ChildItem -LiteralPath $taskSource -File) {
         Add-ProgramCopy $taskFile.FullName $taskFile.Name
     }
 }
-foreach ($taskFile in Get-ChildItem -LiteralPath (Join-Path $taskSource 'libvlc') -File -Recurse) {
-    Add-ProgramCopy $taskFile.FullName ([IO.Path]::GetRelativePath($taskSource, $taskFile.FullName))
-}
-foreach ($taskDocument in @('docs/ACCEPTANCE.md', 'docs/VERIFICATION.md', 'docs/FEEDBACK-2.0.1.md', 'docs/ORGANIZATION-STATUS-2.0.2.md', 'docs/SDK-INTEGRATION-LESSONS.md', 'docs/AUDIO-TRACK-RESTORE.md', 'README.md', 'HANDOVER.md')) {
-    $taskDocumentSource = Join-Path $taskRepository $taskDocument
-    # Ignored local documents are optional in a fresh Git checkout.
-    if (Test-Path -LiteralPath $taskDocumentSource -PathType Leaf) {
-        Add-ProgramCopy $taskDocumentSource $taskDocument
+foreach ($taskProgramTree in @('native', 'licenses')) {
+    $taskTreeSource = Join-Path $taskSource $taskProgramTree
+    if (Test-Path -LiteralPath $taskTreeSource -PathType Container) {
+        foreach ($taskFile in Get-ChildItem -LiteralPath $taskTreeSource -File -Recurse) {
+            Add-ProgramCopy $taskFile.FullName ([IO.Path]::GetRelativePath($taskSource, $taskFile.FullName))
+        }
     }
 }
 if (-not ($taskCopies | Where-Object { $_.Destination -eq $taskExecutable })) {
     throw '程序目标与受保护数据路径冲突，固定目录未修改。'
 }
-# An SDK upgrade must not leave removed native DLLs alongside the new plugins.
-$taskNativeOutput = Resolve-UpdatePath 'libvlc/win-x64' $taskOutput
-$taskNativeSource = Join-Path $taskSource 'libvlc/win-x64'
-$taskNativeFiles = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-foreach ($taskFile in Get-ChildItem -LiteralPath $taskNativeSource -File -Recurse) {
-    [void]$taskNativeFiles.Add([IO.Path]::GetRelativePath($taskNativeSource, $taskFile.FullName))
-}
-foreach ($taskRequired in @('libvlc.dll', 'libvlccore.dll', 'plugins/plugins.dat')) {
-    if (Test-Protected (Join-Path $taskNativeOutput $taskRequired)) {
-        throw 'VLC 必需文件与受保护数据路径冲突，固定目录未修改。'
-    }
-}
+# Only bounded SDK DLLs are removed; configured user roots and DB sidecars remain protected.
 $taskStaleNative = [Collections.Generic.List[string]]::new()
-if (Test-Path -LiteralPath $taskNativeOutput) {
-    Assert-NoJunction $taskNativeOutput
-    foreach ($taskFile in Get-ChildItem -LiteralPath $taskNativeOutput -Filter '*.dll' -File -Recurse) {
+foreach ($taskSdkRelative in @('native/mpv/win-x64', 'libvlc/win-x64')) {
+    $taskSdkOutput = Resolve-UpdatePath $taskSdkRelative $taskOutput
+    $taskSdkSource = Join-Path $taskSource $taskSdkRelative
+    if (-not (Test-Path -LiteralPath $taskSdkOutput -PathType Container)) { continue }
+    Assert-NoJunction $taskSdkOutput
+    foreach ($taskFile in Get-ChildItem -LiteralPath $taskSdkOutput -Filter '*.dll' -File -Recurse) {
         $taskPath = [IO.Path]::GetFullPath($taskFile.FullName)
-        if (-not (Test-Within $taskPath $taskNativeOutput) -or -not (Test-Within $taskPath $taskOutput)) {
-            throw '旧 VLC 文件越出程序目录，停止更新。'
-        }
+        if (-not (Test-Within $taskPath $taskSdkOutput) -or -not (Test-Within $taskPath $taskOutput)) { throw '旧 SDK 文件越出程序目录，停止更新。' }
         if (Test-Protected $taskPath) { continue }
-        if (-not $taskNativeFiles.Contains([IO.Path]::GetRelativePath($taskNativeOutput, $taskPath))) {
-            Assert-NoJunction $taskPath
-            $taskStaleNative.Add($taskPath)
-        }
+        $taskMatching = Join-Path $taskSdkSource ([IO.Path]::GetRelativePath($taskSdkOutput, $taskPath))
+        if (-not (Test-Path -LiteralPath $taskMatching -PathType Leaf)) { Assert-NoJunction $taskPath; $taskStaleNative.Add($taskPath) }
     }
+}
+foreach ($taskRequired in @('native/mpv/win-x64/libmpv-2.dll', 'native/mpv/win-x64/runtime-manifest.json', 'native/mpv/input.conf')) {
+    if (Test-Protected (Join-Path $taskOutput $taskRequired)) { throw 'mpv 必需文件与受保护数据路径冲突，固定目录未修改。' }
 }
 # Detect locked program files before replacing any file. Do not stop a user process.
 foreach ($taskCopy in $taskCopies) {

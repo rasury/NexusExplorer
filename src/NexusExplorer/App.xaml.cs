@@ -1,5 +1,6 @@
 using NexusExplorer.Views.Dialogs;
 using NexusExplorer.ApplicationLayer;
+using NexusExplorer.Infrastructure.Playback.Mpv;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
@@ -75,12 +76,12 @@ public partial class App : Application
             Log.Information("自检：构建界面与状态");
             await _services.GetRequiredService<MainViewModel>().RefreshTreeAsync();
             mainWindow.Measure(new Size(1280, 800)); mainWindow.Arrange(new Rect(0, 0, 1280, 800)); mainWindow.UpdateLayout();
-            await _services.GetRequiredService<MediaPlayerService>().InitializeAsync();
-            Log.Information("自检：VLC 原生库已加载");
+            await _services.GetRequiredService<MpvPlaybackEngine>().InitializeAsync();
+            Log.Information("自检：mpv 原生库已加载");
             File.WriteAllText(Path.Combine(AppPaths.AppRoot, "startup-verification.json"),
-                System.Text.Json.JsonSerializer.Serialize(new { Success = true, SchemaVersion = DatabaseInitializer.SchemaVersion, Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(), NativeVlc = _services.GetRequiredService<MediaPlayerService>().VlcVersion }));
+                System.Text.Json.JsonSerializer.Serialize(new { Success = true, SchemaVersion = DatabaseInitializer.SchemaVersion, Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(), NativeEngine = _services.GetRequiredService<MpvPlaybackEngine>().EngineVersion }));
             mainWindow.PrepareForVerificationExit();
-            await _services.GetRequiredService<MediaPlayerService>().StopAndReleaseAsync();
+            await _services.GetRequiredService<MpvPlaybackEngine>().ShutdownAsync();
             Log.Information("自检：资源已释放，即将退出");
             Shutdown(0); return;
         }
@@ -113,8 +114,8 @@ public partial class App : Application
         services.AddSingleton<CategoryService>();
         services.AddSingleton<FileService>();
         services.AddSingleton<OrganizationService>();
-        services.AddSingleton(new MediaPlayerService(System.Windows.Threading.Dispatcher.FromThread(System.Threading.Thread.CurrentThread)) { HardwareDecoding = config.Playback.HardwareDecoding });
-        services.AddSingleton<IPlaybackEngine>(p => p.GetRequiredService<MediaPlayerService>());
+        services.AddSingleton(new MpvPlaybackEngine(System.Windows.Threading.Dispatcher.FromThread(System.Threading.Thread.CurrentThread)) { HardwareDecoding = config.Playback.HardwareDecoding });
+        services.AddSingleton<IPlaybackEngine>(p => p.GetRequiredService<MpvPlaybackEngine>());
 
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<MainWindow>();

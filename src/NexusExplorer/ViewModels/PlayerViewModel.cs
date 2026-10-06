@@ -90,7 +90,7 @@ public partial class PlayerViewModel : ObservableObject
             else if (Kind is MediaKind.Video or MediaKind.Audio)
             {
                 await Engine.PlayAsync(file.AbsolutePath, Kind == MediaKind.Audio, token);
-                if (version == Interlocked.Read(ref _version)) IsPlaying = true;
+                if (version == Interlocked.Read(ref _version)) IsPlaying = Engine.Snapshot.IsPlaying;
             }
             else await ReportErrorAsync("暂不支持预览该文件类型。");
         }
