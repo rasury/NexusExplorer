@@ -33,14 +33,14 @@ Windows x64 分类文件管理与媒体查看软件，使用 WPF、SQLite、EF C
 
 - [src/NexusExplorer](src/NexusExplorer)：应用源码、配置模板及图标。
 - [tests](tests)：自动化检查及随仓库提供的测试素材。
-- [scripts](scripts)：固定目录更新与固定 mpv 原生依赖还原脚本。
+- [scripts](scripts)：便携包发布、解压目录安全更新与固定 mpv 原生依赖还原脚本。
 - `NexusExplorer.sln`、`README.md` 和 `.gitignore`：解决方案、使用说明及忽略规则。
 
 以下内容仅保留在本地，不随 Git 仓库分发：`docs/`、`outputs/user-visible-text/`、`tools/`、`AGENTS.md`、`HANDOVER.md` 和 `NexusExplorer V1.0 开发文档.md`。重新克隆仓库不会包含这些开发资料、文案清单或诊断工具；需要时单独保存、传递。运行数据、日志、旧程序和发布产物同样不提交到仓库，具体规则见 [.gitignore](.gitignore)。
 
 ## 构建、测试和发布
 
-需要 Windows x64 与 .NET 8 SDK。Visual Studio 解决方案使用 x64 配置。
+需要 Windows x64 与 .NET 8 SDK；便携打包另需 Python 3.10 以上（只使用标准库）。Visual Studio 解决方案使用 x64 配置。
 
 ```powershell
 dotnet restore NexusExplorer.sln -r win-x64
@@ -50,11 +50,15 @@ dotnet test NexusExplorer.sln -c Release --no-restore --filter "FullyQualifiedNa
 .\scripts\Update-Preview.ps1
 ```
 
-后续固定沿用 `artifacts/NexusExplorer-2.0.4-preview-win-x64`，目录名不随版本变化。[更新脚本](scripts/Update-Preview.ps1)先发布到固定临时目录 `artifacts/publish-staging`，检查程序是否关闭及文件是否可替换，再只复制 EXE、依赖库、发布元数据和本地存在的说明文档。文档和实验工具不进入便携运行包。保留原位置的 Storage、数据库（含 WAL/SHM/备份）、界面状态、appsettings.json 和日志；也识别配置中显式指定的数据位置。不会复制、搬迁、重绑定或清空用户数据，不再逐次创建版本目录。便携包含自包含 EXE、WPF/SQLite 原生 DLL 与固定版本 native/mpv 运行目录、必要许可与对应项目源码，须保留完整程序文件。
+每次提交后执行 [Update-Preview.ps1](scripts/Update-Preview.ps1)：先构建并生成 `artifacts/NexusExplorer_new.zip`，校验完整性后覆盖同名包；再从 ZIP 解压得到的文件更新 `artifacts/NexusExplorer_new/`。ZIP 内直接包含 EXE、native 和 licenses，不额外套一层目录。发布与解压校验的中间副本在结束后自动清理，不积累历史版本目录；清空 artifacts 后也可重新生成这两个产物。
+
+[package_portable.py](scripts/package_portable.py)校验便携配置、必要文件、ZIP CRC、原生库哈希和解压文件哈希。包内包含自包含 EXE、WPF/SQLite 原生 DLL、固定 native/mpv 运行目录及必要许可和对应项目源码；不包含运行数据库、Storage、日志、普通文档或测试程序。
+
+[Install-Portable.ps1](scripts/Install-Portable.ps1)和[validate_fixed_update.ps1](scripts/validate_fixed_update.ps1)保留解压目录中已有的 Storage、数据库（含 WAL/SHM/备份）、界面状态、appsettings.json 和日志，也保护配置显式指定的位置；新目录首次安装才写入默认配置。不会搬迁、重绑定或清空用户数据。发布前关闭该目录中的程序，脚本不会自动结束进程。
 
 构建时 [Restore-Mpv.ps1](scripts/Restore-Mpv.ps1) 从固定发布下载开发包，核对 archive 与 DLL 的 SHA256，缓存于被忽略的 native/ 目录；运行时也核对固定 DLL。首次构建需要网络，以及支持 7z 的 Windows tar.exe；以后复用已校验缓存。完整版本、下载源和哈希记录在 [mpv-runtime.json](scripts/mpv-runtime.json)。
 
-更新脚本的最小验证：`.\tests\Update-Preview.Tests.ps1`。已有发布产物可通过 `-PublishedDirectory` 复用。更新前先关闭固定目录中的程序；脚本不会自动结束用户进程。
+发布相关最小验证：`python -B .\tests\Package-Portable.Tests.py`、`.\tests\Update-Preview.Tests.ps1` 和 `.\tests\Publish-Portable.Tests.ps1`。已有发布产物可通过 `-PublishedDirectory` 复用；Python 路径可通过 `-PythonExecutable` 指定。原生下载归档缓存于 `native/mpv/cache`，不占 artifacts 的发布产物目录。
 
 ```powershell
 # 此命令会打开数据库并执行必要的迁移；数据库兼容验收只对独立副本执行。

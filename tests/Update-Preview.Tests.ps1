@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
 $taskRepository = Split-Path -Parent $PSScriptRoot
-$taskFixture = Join-Path $taskRepository ('artifacts/update-validation/' + [Guid]::NewGuid().ToString('N'))
+$taskFixture = Join-Path $taskRepository ('artifacts/.update-test-' + [Guid]::NewGuid().ToString('N'))
 $taskSource = Join-Path $taskFixture 'published'
 $taskOutput = Join-Path $taskFixture 'fixed'
 function Write-Fixture([string]$Relative, [string]$Text) {
@@ -11,6 +11,7 @@ function Write-Fixture([string]$Relative, [string]$Text) {
 function Assert-Equal($Expected, $Actual, [string]$Message) {
     if ($Expected -ne $Actual) { throw $Message }
 }
+try {
 Write-Fixture 'published/NexusExplorer.exe' 'NEW EXE'
 Write-Fixture 'published/native.dll' 'NEW DLL'
 Write-Fixture 'published/release.json' '{"version":"NEW"}'
@@ -56,7 +57,7 @@ function Assert-Protected {
         Assert-Equal $taskSnapshot[$taskRelative][1] (Get-Item -LiteralPath $taskPath).LastWriteTimeUtc.Ticks "数据文件被触碰：$taskRelative"
     }
 }
-& (Join-Path $taskRepository 'scripts/Update-Preview.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput
+& (Join-Path $taskRepository 'scripts/Install-Portable.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput
 Assert-Equal 'NEW EXE' ([IO.File]::ReadAllText((Join-Path $taskOutput 'NexusExplorer.exe'))) 'EXE 未更新'
 Assert-Equal 'NEW DLL' ([IO.File]::ReadAllText((Join-Path $taskOutput 'native.dll'))) '依赖未更新'
 Assert-Equal 'NEW' ((Get-Content -Raw -LiteralPath (Join-Path $taskOutput 'release.json') | ConvertFrom-Json).version) '发布元数据未更新'
@@ -69,7 +70,7 @@ Write-Fixture 'published/NexusExplorer.exe' 'NEXT EXE'
 $taskLocked = [IO.File]::Open((Join-Path $taskOutput 'native.dll'), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
 try {
     $taskFailed = $false
-    try { & (Join-Path $taskRepository 'scripts/Update-Preview.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput }
+    try { & (Join-Path $taskRepository 'scripts/Install-Portable.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput }
     catch { $taskFailed = $true }
     Assert-Equal $true $taskFailed '文件占用时未停止更新'
     Assert-Equal 'NEW EXE' ([IO.File]::ReadAllText((Join-Path $taskOutput 'NexusExplorer.exe'))) '占用失败前已替换 EXE'
@@ -82,7 +83,7 @@ Write-Fixture 'fixed/native/mpv/win-x64/plugins/locked-obsolete.dll' 'LOCKED OLD
 $taskLocked = [IO.File]::Open((Join-Path $taskOutput 'native/mpv/win-x64/plugins/locked-obsolete.dll'), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
 try {
     $taskFailed = $false
-    try { & (Join-Path $taskRepository 'scripts/Update-Preview.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput }
+    try { & (Join-Path $taskRepository 'scripts/Install-Portable.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput }
     catch { $taskFailed = $true }
     Assert-Equal $true $taskFailed '旧 SDK 模块占用时未停止更新'
     Assert-Equal 'NEW EXE' ([IO.File]::ReadAllText((Join-Path $taskOutput 'NexusExplorer.exe'))) '旧模块锁检查前已更新 EXE'
@@ -92,11 +93,23 @@ finally { $taskLocked.Dispose() }
 Write-Output 'PASS: 旧 SDK 模块占用时先停止更新；SDK 区域内配置保护的用户目录保持。'
 
 # Simulate a fresh checkout containing the tracked script and README only.
-Write-Fixture 'checkout/scripts/Update-Preview.ps1' ([IO.File]::ReadAllText((Join-Path $taskRepository 'scripts/Update-Preview.ps1')))
+Write-Fixture 'checkout/scripts/Install-Portable.ps1' ([IO.File]::ReadAllText((Join-Path $taskRepository 'scripts/Install-Portable.ps1')))
 Write-Fixture 'checkout/README.md' 'CHECKOUT README'
 $taskCheckout = Join-Path $taskFixture 'checkout'
-& (Join-Path $taskCheckout 'scripts/Update-Preview.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput
+& (Join-Path $taskCheckout 'scripts/Install-Portable.ps1') -PublishedDirectory $taskSource -OutputDirectory $taskOutput
 Assert-Equal 'NEXT EXE' ([IO.File]::ReadAllText((Join-Path $taskOutput 'NexusExplorer.exe'))) '缺少本地资料时 EXE 未更新'
 Assert-Equal $false (Test-Path -LiteralPath (Join-Path $taskOutput 'README.md')) '不必要的文档进入运行目录'
 Assert-Protected
 Write-Output 'PASS: 不含 docs、tools、HANDOVER 的检出仍可更新，用户数据保持不变。'
+
+}
+finally {
+    $taskFull = [IO.Path]::GetFullPath($taskFixture)
+    $taskParent = [IO.Path]::GetFullPath((Join-Path $taskRepository 'artifacts')).TrimEnd('\') + '\'
+    if (-not $taskFull.StartsWith($taskParent, [StringComparison]::OrdinalIgnoreCase) -or
+        [IO.Path]::GetFileName($taskFull) -notmatch '^\.update-test-[0-9a-f]{32}$') { throw '测试临时目录边界检查失败。' }
+    if (Test-Path -LiteralPath $taskFull) {
+        if ((Get-Item -LiteralPath $taskFull -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw '测试目录变成链接，停止清理。' }
+        Remove-Item -LiteralPath $taskFull -Recurse -Force
+    }
+}
