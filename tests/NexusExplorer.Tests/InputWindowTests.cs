@@ -47,6 +47,26 @@ public sealed class InputWindowTests
                 }
                 var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)shell.ActualWidth, (int)shell.ActualHeight, 96, 96, PixelFormats.Pbgra32);
                 bitmap.Render((Visual)shell.Content);
+                var pixels = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4];
+                bitmap.CopyPixels(pixels, bitmap.PixelWidth * 4, 0);
+                // A rounded shadow must fade to transparency before the HWND
+                // bounds instead of being cut off as a rectangular silhouette.
+                for (var x = 0; x < bitmap.PixelWidth; x++)
+                {
+                    Assert.Equal(0, pixels[x * 4 + 3]);
+                    Assert.Equal(0, pixels[((bitmap.PixelHeight - 1) * bitmap.PixelWidth + x) * 4 + 3]);
+                }
+                for (var y = 0; y < bitmap.PixelHeight; y++)
+                {
+                    Assert.Equal(0, pixels[y * bitmap.PixelWidth * 4 + 3]);
+                    Assert.Equal(0, pixels[(y * bitmap.PixelWidth + bitmap.PixelWidth - 1) * 4 + 3]);
+                }
+                var dialogHost = (DialogHost)shell.Content;
+                var card = (Card)dialogHost.Template.FindName("PART_PopupContentElement", dialogHost);
+                var topLeft = card.TranslatePoint(new Point(0, 0), dialogHost);
+                var centerX = (int)(topLeft.X + card.ActualWidth / 2);
+                var shadowY = (int)(topLeft.Y + card.ActualHeight + 8);
+                Assert.InRange(pixels[(shadowY * bitmap.PixelWidth + centerX) * 4 + 3], 1, 254);
                 var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
                 var folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "nexus-feature-checks"); System.IO.Directory.CreateDirectory(folder);
                 using (var image = System.IO.File.Create(System.IO.Path.Combine(folder, "input-card.png"))) encoder.Save(image);

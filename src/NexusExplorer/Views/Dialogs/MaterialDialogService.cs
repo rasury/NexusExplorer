@@ -58,9 +58,11 @@ internal static class MaterialDialogService
                     shell.Background = System.Windows.Media.Brushes.Transparent;
                     host.Background = System.Windows.Media.Brushes.Transparent;
                     host.OverlayBackground = System.Windows.Media.Brushes.Transparent;
-                    host.DialogMargin = new Thickness(8);
+                    // Dp24's 49px blur and 12.5px offset must fit inside the
+                    // transparent HWND; otherwise its edges clip the rounded shadow.
+                    host.DialogMargin = new Thickness(64);
                     host.SetResourceReference(DialogHost.DialogBackgroundProperty, "BrushPanelBg");
-                    shell.Width = view.Width + view.Margin.Left + view.Margin.Right + 16;
+                    shell.Width = view.Width + view.Margin.Left + view.Margin.Right + host.DialogMargin.Left + host.DialogMargin.Right;
                 }
                 var area = SystemParameters.WorkArea;
                 shell.MaxWidth = Math.Max(1, area.Width - 32); shell.MaxHeight = Math.Max(1, area.Height - 32);
