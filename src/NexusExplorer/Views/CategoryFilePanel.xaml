@@ -72,8 +72,8 @@
                     <MenuItem Header="在资源管理器中打开" Click="OnOpenCategoryInExplorer" />
                     <MenuItem Header="📌 钉到底栏" Click="OnPinCategory" />
                     <MenuItem Header="新建子分类" Click="OnCreateChild" />
-                    <MenuItem Header="添加文件" Click="OnAddCategoryFiles" />
-                    <MenuItem Header="添加文件夹" Click="OnAddCategoryFolder" />
+                    <MenuItem Header="导入文件" Click="OnAddCategoryFiles" />
+                    <MenuItem Header="导入文件夹" Click="OnAddCategoryFolder" />
                     <MenuItem x:Name="OrganizeCategoryMenu" Header="整理" Click="OnOrganizeCategory" ToolTip="整理此分类及全部子分类" />
                     <Separator />
                     <MenuItem Header="重命名" Click="OnRenameCategory" />

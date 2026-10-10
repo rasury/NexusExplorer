@@ -8,6 +8,7 @@ namespace NexusExplorer.Views.Dialogs;
 internal sealed class DialogSurface : Grid
 {
     public Action<object?> Complete { get; set; } = _ => { };
+    internal bool RequiresInputWindow { get; set; }
     public DialogSurface(string title, UIElement body, FrameworkElement actions, double width = 560)
     {
         Width = width; Margin = new Thickness(24);

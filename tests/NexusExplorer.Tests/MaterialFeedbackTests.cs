@@ -371,9 +371,9 @@ public class MaterialFeedbackTests
                 var video=(MpvVideoHost)((PlayerPanel)window.FindName("PlayerArea")).FindName("VideoView");
                 var token=engine.CurrentToken;var position=engine.Snapshot.Position;
                 var rename=main.FileList.RenameFileAsync(file);
-                var root=(DialogHost)window.FindName("RootDialog");
-                await BoundedDialogTests.Until(()=>root.IsOpen && root.DialogContent is DialogSurface {IsLoaded:true});
-                var view=(DialogSurface)root.DialogContent!;var box=Descendants<TextBox>(view).Single();
+                DialogHost? root=null;
+                await BoundedDialogTests.Until(()=>(root=System.Windows.Application.Current.Windows.OfType<Window>().Where(w=>ReferenceEquals(w.Owner,window)).Select(w=>w.Content).OfType<DialogHost>().FirstOrDefault()) is {IsOpen:true,DialogContent:DialogSurface {IsLoaded:true}});
+                var view=(DialogSurface)root!.DialogContent!;var box=Descendants<TextBox>(view).Single();
                 await BoundedDialogTests.Until(()=>box.SelectedText=="pending");
                 await Task.Delay(350);
                 Assert.Equal(Visibility.Visible,video.Visibility);Assert.True(IsWindowVisible(video.Handle));

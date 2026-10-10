@@ -30,7 +30,8 @@ public partial class MainWindow : Window
         UiThemeService.Changed += OnThemeChanged;
         SourceInitialized += (_, _) => WindowAppearance.Apply(this);
         MaterialDialogService.NoticeRequested += OnNotice;
-        Closed += (_, _) => { UiThemeService.Changed -= OnThemeChanged; MaterialDialogService.NoticeRequested -= OnNotice; TaskSnackbar.MessageQueue.Dispose(); };
+        MaterialDialogService.InputWindowStateChanged += OnInputWindowStateChanged;
+        Closed += (_, _) => { UiThemeService.Changed -= OnThemeChanged; MaterialDialogService.NoticeRequested -= OnNotice; MaterialDialogService.InputWindowStateChanged -= OnInputWindowStateChanged; TaskSnackbar.MessageQueue.Dispose(); };
         RootDialog.Identifier = "Nexus." + Guid.NewGuid().ToString("N");
         RootDialog.Loaded += (_, _) => MaterialDialogService.Register(RootDialog);
         RootDialog.Unloaded += (_, _) => MaterialDialogService.Unregister(RootDialog);
@@ -79,6 +80,8 @@ public partial class MainWindow : Window
     private void OnToggleDrawer(object sender, RoutedEventArgs e) => NavigationDrawer.IsLeftDrawerOpen = !NavigationDrawer.IsLeftDrawerOpen;
     private void OnDialogOpened(object sender, DialogOpenedEventArgs e) => PlayerArea.SetDialogCovered(true);
     private void OnDialogClosed(object sender, DialogClosedEventArgs e) => PlayerArea.SetDialogCovered(false);
+    private void OnInputWindowStateChanged(Window owner, bool covered)
+    { if (ReferenceEquals(owner, this)) PlayerArea.SetDialogCovered(covered); }
     private async void OnAppearanceClick(object sender, RoutedEventArgs e)
     {
         try

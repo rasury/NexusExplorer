@@ -11,13 +11,14 @@ using SixLabors.ImageSharp;
 using Image = SixLabors.ImageSharp.Image;
 
 namespace NexusExplorer.ViewModels;
-public enum MediaKind { None, Video, Audio, Image, Unsupported }
+public enum MediaKind { None, Video, Audio, Image, Text, Markdown, Unsupported }
 public partial class PlayerViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
     public IPlaybackEngine Engine { get; }
     private CancellationTokenSource? _opening;
     private long _version;
+    internal long PreviewVersion => Interlocked.Read(ref _version);
     private readonly Random _random = new();
     private readonly SemaphoreSlim _ended = new(1, 1);
     private ImageAnimation? _animation;
@@ -49,7 +50,9 @@ public partial class PlayerViewModel : ObservableObject
         var ext = Path.GetExtension(name).ToLowerInvariant();
         if (new[] { ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpg", ".mpeg", ".ts", ".3gp" }.Contains(ext)) return MediaKind.Video;
         if (new[] { ".mp3", ".flac", ".wav", ".aac", ".ogg", ".wma", ".m4a", ".ape", ".opus" }.Contains(ext)) return MediaKind.Audio;
-        if (new[] { ".jpg", ".jpeg", ".png", ".apng", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".ico" }.Contains(ext)) return MediaKind.Image;
+        if (new[] { ".jpg", ".jpeg", ".jfif", ".png", ".apng", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".ico" }.Contains(ext)) return MediaKind.Image;
+        if (ext == ".txt") return MediaKind.Text;
+        if (ext == ".md") return MediaKind.Markdown;
         return MediaKind.Unsupported;
     }
     public async Task PlayFileAsync(FileItem? file)
@@ -93,7 +96,7 @@ public partial class PlayerViewModel : ObservableObject
                 await Engine.PlayAsync(file.AbsolutePath, Kind == MediaKind.Audio, token);
                 if (version == Interlocked.Read(ref _version)) IsPlaying = Engine.Snapshot.IsPlaying;
             }
-            else await ReportErrorAsync("暂不支持预览该文件类型。");
+            else if (Kind is not (MediaKind.Text or MediaKind.Markdown)) await ReportErrorAsync("暂不支持预览该文件类型。");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { if (version == Interlocked.Read(ref _version)) OnPlaybackError(file.AbsolutePath, ex.Message); }

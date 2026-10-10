@@ -24,6 +24,7 @@
     <ScrollViewer x:Name="ImageScroll" Visibility="Collapsed" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="Black" SizeChanged="OnImageSizeChanged">
      <Image x:Name="ImageDisplay" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality" MouseWheel="OnImageWheel" MouseLeftButtonDown="OnImageMouseDown" MouseLeftButtonUp="OnImageMouseUp" MouseMove="OnImageMouseMove" Cursor="SizeAll"/>
     </ScrollViewer>
+    <views:DocumentPreview x:Name="DocumentArea" Visibility="Collapsed"/>
     <StackPanel x:Name="AudioLayer" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" MouseLeftButtonUp="OnVideoAreaClick" Margin="24">
      <md:Card Width="128" Height="128" UniformCornerRadius="32" Background="{DynamicResource BrushAccentBlueLight}" md:ElevationAssist.Elevation="Dp0">
       <md:PackIcon Kind="MusicNote" Width="64" Height="64" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource BrushOnPrimaryContainer}"/>
@@ -74,6 +75,10 @@
      <Button Style="{StaticResource PlayerIconButton}" Click="OnZoomOut" ToolTip="缩小"><md:PackIcon Kind="MagnifyMinusOutline" Width="24" Height="24"/></Button>
      <Button Style="{StaticResource PlayerIconButton}" Click="OnZoomOriginal" ToolTip="原始尺寸（1:1）"><md:PackIcon Kind="ImageSizeSelectActual" Width="24" Height="24"/></Button>
      <Button Style="{StaticResource PlayerIconButton}" Click="OnNext" ToolTip="下一张"><md:PackIcon Kind="SkipNext" Width="24" Height="24"/></Button>
+    </StackPanel>
+    <StackPanel x:Name="DocumentButtonsRow" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Center" Visibility="Collapsed">
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnPrevious" ToolTip="上一项"><md:PackIcon Kind="SkipPrevious" Width="24" Height="24"/></Button>
+     <Button Style="{StaticResource PlayerIconButton}" Click="OnNext" ToolTip="下一项"><md:PackIcon Kind="SkipNext" Width="24" Height="24"/></Button>
     </StackPanel>
    </Grid>
   </md:Card>

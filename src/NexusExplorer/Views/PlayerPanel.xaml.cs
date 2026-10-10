@@ -76,6 +76,7 @@ public partial class PlayerPanel : UserControl
         _timer.Stop(); Lifetime?.AttachSurface(IntPtr.Zero);
         if (_initialized) Vm.ReleaseImagePreview();
         ImageDisplay.Source = null;
+        DocumentArea.Clear();
     }
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
@@ -113,13 +114,18 @@ public partial class PlayerPanel : UserControl
     private void UpdateUi()
     {
         var media = Vm.Kind is MediaKind.Video or MediaKind.Audio;
+        var document = Vm.Kind is MediaKind.Text or MediaKind.Markdown;
         // Material dialogs use their own popup HWND above the native video.
         // Keep rendering underneath; _dialogCovered still blocks video clicks.
         VideoView.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Hidden;
         ImageScroll.Visibility = Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
+        DocumentArea.Visibility = document ? Visibility.Visible : Visibility.Collapsed;
+        if (document && Vm.MediaPath is not null) DocumentArea.SetFile(Vm.MediaPath, Vm.Kind == MediaKind.Markdown, Vm.PreviewVersion);
+        else DocumentArea.Clear();
         AudioLayer.Visibility = Vm.Kind == MediaKind.Audio ? Visibility.Visible : Visibility.Collapsed;
         AudioTitle.Text = Vm.MediaTitle ?? "";
-        ControlsBar.Visibility = media || Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
+        ControlsBar.Visibility = media || document || Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
+        DocumentButtonsRow.Visibility = document ? Visibility.Visible : Visibility.Collapsed;
         ProgressRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         MediaButtonsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         MediaSettingsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;

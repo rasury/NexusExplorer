@@ -12,6 +12,7 @@ internal static class MaterialDialogService
     private static DialogSession? _session;
     private static bool _closing;
     public static event Action<string>? NoticeRequested;
+    public static event Action<Window, bool>? InputWindowStateChanged;
     public static void Notice(string message) => NoticeRequested?.Invoke(message);
     internal static void BeginSession() => _closing = false;
     public static void Register(DialogHost host) { _root = new(host); _closing = false; }
@@ -24,6 +25,8 @@ internal static class MaterialDialogService
     {
         await Queue.WaitAsync();
         Window? shell = null;
+        Window? owner = null;
+        bool ownerWasEnabled = false;
         var app = System.Windows.Application.Current;
         var previousMain = app.MainWindow; var previousMode = app.ShutdownMode;
         try
@@ -31,20 +34,31 @@ internal static class MaterialDialogService
             if (_closing) return null;
             DialogHost? host = null;
             if (_root is not null && _root.TryGetTarget(out var root) && root.IsLoaded) host = root;
-            if (host is null)
+            if (host is null || view.RequiresInputWindow)
             {
-                // Startup/recovery errors also use asynchronous DialogHost, before MainWindow exists.
+                // Text input uses a real owned HWND: Popup's IME context can lose
+                // the caret anchor after refocusing. Keep DialogHost inside it.
+                owner = host is not null ? Window.GetWindow(host) : null;
                 app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 host = new DialogHost { Identifier = Guid.NewGuid().ToString("N"), CloseOnClickAway = false, DialogContentUniformCornerRadius = 28 };
                 host.SetResourceReference(FrameworkElement.StyleProperty, "MaterialDesignEmbeddedDialogHost");
                 shell = new Window { Title = "NexusExplorer", Width = 720, Height = 520, Content = host,
-                    WindowStartupLocation = WindowStartupLocation.CenterScreen, Icon = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/NexusExplorer;component/Assets/AppIcon.ico")) };
+                    Owner = owner, WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
+                    ShowInTaskbar = false, UseLayoutRounding = true,
+                    Icon = new System.Windows.Media.Imaging.BitmapImage(new Uri("pack://application:,,,/NexusExplorer;component/Assets/AppIcon.ico")) };
+                if (view.RequiresInputWindow) { shell.Width = view.Width + 96; shell.Height = view.Width <= 480 ? 400 : 560; }
                 shell.SetResourceReference(FrameworkElement.StyleProperty, "MaterialDesignWindow");
                 shell.SetResourceReference(Window.BackgroundProperty, "BrushPrimaryBg");
+                shell.SetResourceReference(Window.FontFamilyProperty, "FontFamilyMain");
                 var area = SystemParameters.WorkArea;
                 shell.MaxWidth = Math.Max(1, area.Width - 32); shell.MaxHeight = Math.Max(1, area.Height - 32);
                 shell.Width = Math.Min(shell.Width, shell.MaxWidth); shell.Height = Math.Min(shell.Height, shell.MaxHeight);
                 shell.Closing += (_, _) => { if (_session is { IsEnded: false }) _session.Close(null); };
+                if (owner is not null)
+                {
+                    ownerWasEnabled = owner.IsEnabled; owner.IsEnabled = false;
+                    InputWindowStateChanged?.Invoke(owner, true);
+                }
                 var loaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 host.Loaded += (_, _) => loaded.TrySetResult(); shell.Show(); await loaded.Task;
             }
@@ -66,6 +80,12 @@ internal static class MaterialDialogService
             {
                 if (ReferenceEquals(app.MainWindow, shell)) app.MainWindow = previousMain;
                 shell.Close(); app.ShutdownMode = previousMode;
+                if (owner is not null)
+                {
+                    owner.IsEnabled = ownerWasEnabled;
+                    InputWindowStateChanged?.Invoke(owner, false);
+                    if (owner.IsVisible) owner.Activate();
+                }
             }
             Queue.Release();
         }

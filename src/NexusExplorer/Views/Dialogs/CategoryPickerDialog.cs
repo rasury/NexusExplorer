@@ -37,7 +37,7 @@ internal static class CategoryPickerDialog
                 view.Complete(category);
         };
         actions.Children.Add(select);
-        view = new DialogSurface($"子分类（{categories.Count} 个）", body, actions);
+        view = new DialogSurface($"子分类（{categories.Count} 个）", body, actions) { RequiresInputWindow = true };
         return view;
     }
 }

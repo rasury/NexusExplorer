@@ -14,7 +14,7 @@ public static class InputDialog
         var accept = new Button { Content = "确定", MinWidth = 80, Margin = new Thickness(8, 0, 0, 8), IsDefault = true };
         accept.SetResourceReference(FrameworkElement.StyleProperty, "ButtonPrimary"); accept.Click += (_, _) => view.Complete(box.Text);
         footer.Children.Add(cancel); footer.Children.Add(accept);
-        view = new DialogSurface(title, box, footer, 480);
+        view = new DialogSurface(title, box, footer, 480) { RequiresInputWindow = true };
         box.Loaded += (_, _) => box.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
         {
             box.Focus();
