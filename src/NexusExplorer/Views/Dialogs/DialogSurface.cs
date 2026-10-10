@@ -22,8 +22,11 @@ internal sealed class DialogSurface : Grid
         actions.Margin = new Thickness(0, 24, 0, 0); SetRow(actions, 1); Children.Add(actions);
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; Complete(null); } };
     }
-    public void Constrain(double width, double height)
-    { MaxWidth = Math.Max(1, width - 96); MaxHeight = Math.Max(1, height - 96); }
+    public void Constrain(double width, double height, Thickness hostMargin = default)
+    {
+        MaxWidth = Math.Max(1, width - hostMargin.Left - hostMargin.Right - Margin.Left - Margin.Right);
+        MaxHeight = Math.Max(1, height - hostMargin.Top - hostMargin.Bottom - Margin.Top - Margin.Bottom);
+    }
     public static Button Action(string text, string style, object? result, Func<DialogSurface> view)
     {
         var button = new Button { Content = text, MinWidth = 80, Margin = new Thickness(8, 0, 0, 8) };

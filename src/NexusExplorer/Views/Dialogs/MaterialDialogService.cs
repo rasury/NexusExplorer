@@ -50,6 +50,18 @@ internal static class MaterialDialogService
                 shell.SetResourceReference(FrameworkElement.StyleProperty, "MaterialDesignWindow");
                 shell.SetResourceReference(Window.BackgroundProperty, "BrushPrimaryBg");
                 shell.SetResourceReference(Window.FontFamilyProperty, "FontFamilyMain");
+                if (view.RequiresInputWindow)
+                {
+                    shell.WindowStyle = WindowStyle.None;
+                    shell.ResizeMode = ResizeMode.NoResize;
+                    shell.AllowsTransparency = true;
+                    shell.Background = System.Windows.Media.Brushes.Transparent;
+                    host.Background = System.Windows.Media.Brushes.Transparent;
+                    host.OverlayBackground = System.Windows.Media.Brushes.Transparent;
+                    host.DialogMargin = new Thickness(8);
+                    host.SetResourceReference(DialogHost.DialogBackgroundProperty, "BrushPanelBg");
+                    shell.Width = view.Width + view.Margin.Left + view.Margin.Right + 16;
+                }
                 var area = SystemParameters.WorkArea;
                 shell.MaxWidth = Math.Max(1, area.Width - 32); shell.MaxHeight = Math.Max(1, area.Height - 32);
                 shell.Width = Math.Min(shell.Width, shell.MaxWidth); shell.Height = Math.Min(shell.Height, shell.MaxHeight);
@@ -62,14 +74,19 @@ internal static class MaterialDialogService
                 var loaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 host.Loaded += (_, _) => loaded.TrySetResult(); shell.Show(); await loaded.Task;
             }
-            void Bounds(object? sender, SizeChangedEventArgs e) => view.Constrain(host.ActualWidth, host.ActualHeight);
-            view.Constrain(host.ActualWidth, host.ActualHeight); host.SizeChanged += Bounds;
+            void Bounds(object? sender, SizeChangedEventArgs e) => view.Constrain(host.ActualWidth, host.ActualHeight, host.DialogMargin);
+            view.Constrain(host.ActualWidth, host.ActualHeight, host.DialogMargin); host.SizeChanged += Bounds;
             try
             {
                 return await DialogHost.Show(view, host.Identifier!, new DialogOpenedEventHandler((_, e) =>
                 {
                     _session = e.Session;
                     view.Complete = result => { if (!e.Session.IsEnded) e.Session.Close(result); };
+                    if (view.RequiresInputWindow && shell is not null)
+                    {
+                        view.Measure(new Size(view.Width + view.Margin.Left + view.Margin.Right, double.PositiveInfinity));
+                        shell.Height = Math.Min(shell.MaxHeight, view.DesiredSize.Height + host.DialogMargin.Top + host.DialogMargin.Bottom);
+                    }
                 }));
             }
             finally { host.SizeChanged -= Bounds; host.DialogContent = null; _session = null; }

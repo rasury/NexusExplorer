@@ -18,7 +18,7 @@ public partial class DocumentPreview : UserControl
     private long _request;
     private long _mediaVersion = -1;
     private string? _path;
-    private bool _markdown, _ready, _renderAllowed;
+    private bool _markdown, _ready, _renderAllowed, _previewMode;
     private int _limit = TextPreviewReader.InitialBytes;
     private string? _renderedText;
     internal Task LoadingTask { get; private set; } = Task.CompletedTask;
@@ -40,7 +40,7 @@ public partial class DocumentPreview : UserControl
         if (_path == path && _mediaVersion == mediaVersion) return;
         Clear(); _path = path; _mediaVersion = mediaVersion; _markdown = markdown;
         DocumentTitle.Text = Path.GetFileName(path); DocumentTitle.ToolTip = path;
-        _ready = false; EncodingBox.SelectedIndex = 0; PreviewToggle.IsChecked = markdown; _ready = true;
+        _ready = false; EncodingBox.SelectedIndex = 0; _previewMode = markdown; _ready = true;
         PreviewToggle.Visibility = markdown ? Visibility.Visible : Visibility.Collapsed;
         LoadingTask = LoadAsync();
     }
@@ -70,7 +70,7 @@ public partial class DocumentPreview : UserControl
             _renderedText = null; MarkdownViewer.Document = null;
             _renderAllowed = preview.Text.Length <= 100_000 && preview.Text.Count(c => c == '\n') <= 3000;
             PreviewToggle.IsEnabled = _renderAllowed;
-            if (!_renderAllowed) PreviewToggle.IsChecked = false;
+            if (!_renderAllowed) _previewMode = false;
             LoadMoreButton.Visibility = preview.Truncated && _limit < TextPreviewReader.MaximumBytes ? Visibility.Visible : Visibility.Collapsed;
             DocumentStatus.Text = $"{preview.EncodingName} · {preview.TotalBytes:N0} 字节"
                 + (preview.Truncated ? $" · 当前预览前 {_limit / 1024 / 1024} MiB" : "")
@@ -94,14 +94,14 @@ public partial class DocumentPreview : UserControl
     {
         if (_ready)
         {
-            PreviewToggle.Content = PreviewToggle.IsChecked == true ? "排版预览" : "查看原文";
+            _previewMode = !_previewMode;
             ApplyMode();
         }
     }
 
     private void ApplyMode()
     {
-        var render = _markdown && _renderAllowed && PreviewToggle.IsChecked == true;
+        var render = _markdown && _renderAllowed && _previewMode;
         PreviewToggle.Content = render ? "排版预览" : "查看原文";
         SourceEditor.Visibility = render ? Visibility.Collapsed : Visibility.Visible;
         MarkdownViewer.Visibility = render ? Visibility.Visible : Visibility.Collapsed;
@@ -136,7 +136,7 @@ public partial class DocumentPreview : UserControl
         }
         catch (Exception ex)
         {
-            PreviewToggle.IsChecked = false;
+            _previewMode = false; ApplyMode();
             DocumentStatus.Text = $"排版预览失败，已显示原文：{ex.Message}";
         }
     }

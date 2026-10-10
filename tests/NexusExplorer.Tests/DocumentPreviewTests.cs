@@ -93,7 +93,7 @@ public sealed class DocumentPreviewTests
                 var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
                 var folder = Path.Combine(Path.GetTempPath(), "nexus-feature-checks"); Directory.CreateDirectory(folder);
                 using (var screenshot = File.Create(Path.Combine(folder, $"markdown-{theme}.png"))) encoder.Save(screenshot);
-                ((System.Windows.Controls.Primitives.ToggleButton)view.FindName("PreviewToggle")).IsChecked = false;
+                ((Button)view.FindName("PreviewToggle")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Assert.Equal(Visibility.Collapsed, rendered.Visibility);
                 Assert.Equal(await File.ReadAllTextAsync(path), view.SourceText);
                 Assert.True(((ICSharpCode.AvalonEdit.TextEditor)view.FindName("SourceEditor")).IsReadOnly);
@@ -112,7 +112,7 @@ public sealed class DocumentPreviewTests
         {
             var view = new DocumentPreview();
             view.SetFile(first, true, 1); await view.LoadingTask;
-            Assert.False(((System.Windows.Controls.Primitives.ToggleButton)view.FindName("PreviewToggle")).IsEnabled);
+            Assert.False(((Button)view.FindName("PreviewToggle")).IsEnabled);
             view.SetFile(first, true, 2); var old = view.LoadingTask;
             view.SetFile(second, false, 3); await view.LoadingTask; await old;
             Assert.Equal("最新文档", view.SourceText);

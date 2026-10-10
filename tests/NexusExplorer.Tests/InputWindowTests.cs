@@ -31,9 +31,25 @@ public sealed class InputWindowTests
                 var input = body.Children.OfType<TextBox>().Single();
                 await BoundedDialogTests.Until(() => input.SelectionLength == input.Text.Length);
                 Assert.False(owner.IsEnabled);
+                Assert.Equal(WindowStyle.None, shell.WindowStyle);
+                Assert.Equal(ResizeMode.NoResize, shell.ResizeMode);
+                shell.UpdateLayout();
+                await Task.Delay(350); shell.UpdateLayout();
+                Assert.True(input.TranslatePoint(new Point(input.ActualWidth, 0), surface).X <= surface.ActualWidth + .1);
                 var hwnd = new WindowInteropHelper(shell).Handle;
                 Assert.Equal(hwnd, ((HwndSource)PresentationSource.FromVisual(input)).Handle);
                 var actions = ((Panel)surface.Children[1]).Children.OfType<Button>().ToList();
+                foreach (var button in actions)
+                {
+                    var right = button.TranslatePoint(new Point(button.ActualWidth, button.ActualHeight), surface);
+                    Assert.True(right.X <= surface.ActualWidth + .1);
+                    Assert.True(right.Y <= surface.ActualHeight + .1);
+                }
+                var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)shell.ActualWidth, (int)shell.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render((Visual)shell.Content);
+                var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+                var folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "nexus-feature-checks"); System.IO.Directory.CreateDirectory(folder);
+                using (var image = System.IO.File.Create(System.IO.Path.Combine(folder, "input-card.png"))) encoder.Save(image);
                 actions[0].Focus(); input.Focus(); input.CaretIndex = 2;
                 await Dispatcher.Yield(DispatcherPriority.Input);
                 Assert.True(input.IsKeyboardFocused); Assert.Equal(2, input.CaretIndex);
