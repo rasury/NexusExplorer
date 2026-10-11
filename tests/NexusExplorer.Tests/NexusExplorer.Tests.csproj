@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <UseWPF>true</UseWPF>
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
@@ -25,6 +25,7 @@
     <None Update="Assets\seek-h264-aac.mp4" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Assets\Gif\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Assets\Apng\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Assets\Pdf\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Assets\Aac\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

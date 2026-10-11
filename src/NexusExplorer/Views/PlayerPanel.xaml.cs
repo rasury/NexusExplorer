@@ -58,6 +58,7 @@ public partial class PlayerPanel : UserControl
     public void Initialize(MainViewModel main)
     {
         _main = main; Vm.ShowErrorAsync = async m => { await MessageDialog.ShowAsync(m, "播放", DialogButtons.Ok, DialogSeverity.Warning); };
+        Vm.ReleaseDocumentPreviewAsync = PdfArea.ClearAsync;
         Vm.StateChanged += UpdateUi;
         if (Controls is not null) Controls.VideoClicked += OnNativeVideoClick;
         HardwareCheck.IsChecked = Controls?.HardwareDecoding ?? true; VolumeSlider.Value = Vm.Volume; UpdateVolumeUi(Vm.Volume); _initialized = true;
@@ -77,10 +78,12 @@ public partial class PlayerPanel : UserControl
         if (_initialized) Vm.ReleaseImagePreview();
         ImageDisplay.Source = null;
         DocumentArea.Clear();
+        _ = PdfArea.ClearAsync();
     }
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
         Detach(); Vm.StateChanged -= UpdateUi;
+        Vm.ReleaseDocumentPreviewAsync = null;
         if (Controls is not null) Controls.VideoClicked -= OnNativeVideoClick;
         _timer.Tick -= Poll; Loaded -= OnLoaded; Unloaded -= OnUnloaded;
     }
@@ -115,6 +118,7 @@ public partial class PlayerPanel : UserControl
     {
         var media = Vm.Kind is MediaKind.Video or MediaKind.Audio;
         var document = Vm.Kind is MediaKind.Text or MediaKind.Markdown;
+        var pdf = Vm.Kind == MediaKind.Pdf;
         // Material dialogs use their own popup HWND above the native video.
         // Keep rendering underneath; _dialogCovered still blocks video clicks.
         VideoView.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Hidden;
@@ -122,10 +126,13 @@ public partial class PlayerPanel : UserControl
         DocumentArea.Visibility = document ? Visibility.Visible : Visibility.Collapsed;
         if (document && Vm.MediaPath is not null) DocumentArea.SetFile(Vm.MediaPath, Vm.Kind == MediaKind.Markdown, Vm.PreviewVersion);
         else DocumentArea.Clear();
+        PdfArea.Visibility = pdf ? Visibility.Visible : Visibility.Collapsed;
+        if (pdf && Vm.MediaPath is not null) PdfArea.SetFile(Vm.MediaPath, Vm.PreviewVersion);
+        else _ = PdfArea.ClearAsync();
         AudioLayer.Visibility = Vm.Kind == MediaKind.Audio ? Visibility.Visible : Visibility.Collapsed;
         AudioTitle.Text = Vm.MediaTitle ?? "";
-        ControlsBar.Visibility = media || document || Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
-        DocumentButtonsRow.Visibility = document ? Visibility.Visible : Visibility.Collapsed;
+        ControlsBar.Visibility = media || document || pdf || Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
+        DocumentButtonsRow.Visibility = document || pdf ? Visibility.Visible : Visibility.Collapsed;
         ProgressRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         MediaButtonsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         MediaSettingsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;

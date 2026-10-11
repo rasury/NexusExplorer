@@ -1,0 +1,2 @@
+# PDF offsets and encrypted streams must survive checkout without newline conversion.
+*.pdf binary

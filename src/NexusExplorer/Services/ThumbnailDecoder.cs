@@ -19,6 +19,7 @@ internal static class ThumbnailDecoder
     internal static BitmapSource? Decode(string path)
     {
         var kind = PlayerViewModel.GetMediaKind(path);
+        if (kind == MediaKind.Pdf) return PdfPreviewSession.ThumbnailAsync(path).GetAwaiter().GetResult();
         if (kind == MediaKind.Image)
         {
             try { return DecodeImage(path); }

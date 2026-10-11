@@ -25,6 +25,7 @@
      <Image x:Name="ImageDisplay" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality" MouseWheel="OnImageWheel" MouseLeftButtonDown="OnImageMouseDown" MouseLeftButtonUp="OnImageMouseUp" MouseMove="OnImageMouseMove" Cursor="SizeAll"/>
     </ScrollViewer>
     <views:DocumentPreview x:Name="DocumentArea" Visibility="Collapsed"/>
+    <views:PdfPreview x:Name="PdfArea" Visibility="Collapsed"/>
     <StackPanel x:Name="AudioLayer" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" MouseLeftButtonUp="OnVideoAreaClick" Margin="24">
      <md:Card Width="128" Height="128" UniformCornerRadius="32" Background="{DynamicResource BrushAccentBlueLight}" md:ElevationAssist.Elevation="Dp0">
       <md:PackIcon Kind="MusicNote" Width="64" Height="64" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource BrushOnPrimaryContainer}"/>

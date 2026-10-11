@@ -11,7 +11,7 @@ using SixLabors.ImageSharp;
 using Image = SixLabors.ImageSharp.Image;
 
 namespace NexusExplorer.ViewModels;
-public enum MediaKind { None, Video, Audio, Image, Text, Markdown, Unsupported }
+public enum MediaKind { None, Video, Audio, Image, Text, Markdown, Pdf, Unsupported }
 public partial class PlayerViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
@@ -37,6 +37,7 @@ public partial class PlayerViewModel : ObservableObject
     [ObservableProperty] private double _imageScale; // 0 means fit; effective scale is computed by the view.
     public Action<string>? ShowError { get; set; }
     public Func<string, Task>? ShowErrorAsync { get; set; }
+    internal Func<Task>? ReleaseDocumentPreviewAsync { get; set; }
     private async Task ReportErrorAsync(string message)
     { if (ShowErrorAsync is not null) await ShowErrorAsync(message); else ShowError?.Invoke(message); }
     public event Action? StateChanged;
@@ -53,6 +54,7 @@ public partial class PlayerViewModel : ObservableObject
         if (new[] { ".jpg", ".jpeg", ".jfif", ".png", ".apng", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".ico" }.Contains(ext)) return MediaKind.Image;
         if (ext == ".txt") return MediaKind.Text;
         if (ext == ".md") return MediaKind.Markdown;
+        if (ext == ".pdf") return MediaKind.Pdf;
         return MediaKind.Unsupported;
     }
     public async Task PlayFileAsync(FileItem? file)
@@ -60,6 +62,7 @@ public partial class PlayerViewModel : ObservableObject
         var version = Interlocked.Increment(ref _version);
         _opening?.Cancel(); _opening?.Dispose(); _opening = new CancellationTokenSource(); var token = _opening.Token;
         ClearImageAnimation();
+        if (ReleaseDocumentPreviewAsync is not null) await ReleaseDocumentPreviewAsync();
         await Engine.StopAndReleaseAsync();
         if (version != Interlocked.Read(ref _version)) return;
         ImageSource = null; ImageScale = 0; Position = TimeSpan.Zero; Duration = TimeSpan.Zero; IsPlaying = false; PlaybackCompleted = false;
@@ -96,7 +99,7 @@ public partial class PlayerViewModel : ObservableObject
                 await Engine.PlayAsync(file.AbsolutePath, Kind == MediaKind.Audio, token);
                 if (version == Interlocked.Read(ref _version)) IsPlaying = Engine.Snapshot.IsPlaying;
             }
-            else if (Kind is not (MediaKind.Text or MediaKind.Markdown)) await ReportErrorAsync("暂不支持预览该文件类型。");
+            else if (Kind is not (MediaKind.Text or MediaKind.Markdown or MediaKind.Pdf)) await ReportErrorAsync("暂不支持预览该文件类型。");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { if (version == Interlocked.Read(ref _version)) OnPlaybackError(file.AbsolutePath, ex.Message); }
@@ -177,7 +180,12 @@ public partial class PlayerViewModel : ObservableObject
         if (Engine.Snapshot.IsPlaying || Engine.Snapshot.IsPaused) await Engine.TogglePauseAsync();
         else if (_main.CurrentFile is not null) await PlayFileAsync(_main.CurrentFile);
     }
-    public async Task StopPlaybackAsync() { PlaybackCompleted = false; ReleaseImagePreview(); await Engine.StopAndReleaseAsync(); IsPlaying = false; Position = TimeSpan.Zero; StateChanged?.Invoke(); }
+    public async Task StopPlaybackAsync()
+    {
+        PlaybackCompleted = false; ReleaseImagePreview();
+        if (ReleaseDocumentPreviewAsync is not null) await ReleaseDocumentPreviewAsync();
+        await Engine.StopAndReleaseAsync(); IsPlaying = false; Position = TimeSpan.Zero; StateChanged?.Invoke();
+    }
     private async Task FinishPlaybackAsync(PlaybackSnapshot state)
     {
         var version = Interlocked.Read(ref _version); var fileId = _main.CurrentFile?.Id;
