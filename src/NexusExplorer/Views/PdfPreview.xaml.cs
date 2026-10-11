@@ -24,6 +24,8 @@ public partial class PdfPreview : UserControl
     private int _page, _rotation;
     private double _scale = 1;
     private int _fit; // 0: page, 1: width, 2: manual
+    private bool _continuous;
+    internal bool IsContinuous => _continuous;
     internal Task LoadingTask { get; private set; } = Task.CompletedTask;
     internal Task RenderingTask { get; private set; } = Task.CompletedTask;
     internal int PageNumber => _page + 1;
@@ -33,6 +35,14 @@ public partial class PdfPreview : UserControl
     public PdfPreview()
     {
         InitializeComponent();
+        ContinuousArea.CurrentPageChanged += page =>
+        {
+            if (!_continuous || _session is null) return;
+            _page = page;
+            if (!PageBox.IsKeyboardFocused) PageBox.Text = PageNumber.ToString();
+            PreviousPageButton.IsEnabled = page > 0; NextPageButton.IsEnabled = page + 1 < PageCount;
+            DocumentStatus.Text = $"第 {PageNumber} 页，共 {PageCount} 页";
+        };
         _debounce = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(180) };
         _debounce.Tick += (_, _) => { _debounce.Stop(); RenderingTask = RenderPageAsync(); };
         Unloaded += async (_, _) => await ClearAsync();
@@ -42,7 +52,7 @@ public partial class PdfPreview : UserControl
     {
         if (_path == path && _mediaVersion == mediaVersion) return;
         _release = ClearAsync(); _path = path; _mediaVersion = mediaVersion;
-        _page = _rotation = _fit = 0; _scale = 1;
+        _page = _rotation = 0; _fit = _continuous ? 1 : 0; _scale = 1;
         DocumentTitle.Text = Path.GetFileName(path); DocumentTitle.ToolTip = path;
         LoadingTask = OpenAsync(null);
     }
@@ -54,6 +64,7 @@ public partial class PdfPreview : UserControl
         _rendering?.Cancel(); _rendering?.Dispose(); _rendering = null;
         var opening = _nativeOpen; _nativeOpen = null;
         var session = _session; _session = null;
+        ContinuousArea.Clear();
         _path = null; _mediaVersion = -1; PageImage.Source = null;
         ReadingControls.IsEnabled = false; PasswordButton.Visibility = Visibility.Collapsed;
         PageCountText.Text = "/ 0"; DocumentStatus.Text = "";
@@ -105,6 +116,7 @@ public partial class PdfPreview : UserControl
         if (_session is null) return;
         if (number < 1 || number > _session.PageCount)
         { DocumentStatus.Text = $"请输入 1～{_session.PageCount} 的页码。"; PageBox.Text = PageNumber.ToString(); return; }
+        if (_continuous) { _page = number - 1; PageBox.Text = number.ToString(); ContinuousArea.GoToPage(_page); return; }
         if (_page == number - 1 && PageImage.Source is not null) return;
         _page = number - 1; PageImage.Source = null; PageScroll.ScrollToHome();
         ScheduleRender(false);
@@ -130,13 +142,19 @@ public partial class PdfPreview : UserControl
             if (!Current()) return;
             var rotated = _rotation % 180 != 0;
             var width = rotated ? size.Height : size.Width; var height = rotated ? size.Width : size.Height;
-            var viewportWidth = Math.Max(1, PageScroll.ViewportWidth > 0 ? PageScroll.ViewportWidth : PageScroll.ActualWidth);
-            var viewportHeight = Math.Max(1, PageScroll.ViewportHeight > 0 ? PageScroll.ViewportHeight : PageScroll.ActualHeight);
+            var viewportWidth = Math.Max(1, _continuous ? ContinuousArea.ActualWidth - 32 : PageScroll.ViewportWidth > 0 ? PageScroll.ViewportWidth : PageScroll.ActualWidth);
+            var viewportHeight = Math.Max(1, _continuous ? ContinuousArea.ActualHeight - 16 : PageScroll.ViewportHeight > 0 ? PageScroll.ViewportHeight : PageScroll.ActualHeight);
             if (_fit != 2) _scale = Math.Clamp(_fit == 1 ? viewportWidth / width : Math.Min(viewportWidth / width, viewportHeight / height), .05, 8);
             PageImage.Width = size.Width * _scale; PageImage.Height = size.Height * _scale;
             PageImage.LayoutTransform = new RotateTransform(_rotation);
             ZoomText.Text = $"{_scale:P0}"; PageBox.Text = PageNumber.ToString();
             PreviousPageButton.IsEnabled = _page > 0; NextPageButton.IsEnabled = _page + 1 < session.PageCount;
+            if (_continuous)
+            {
+                await ContinuousArea.ShowAsync(session, _scale, _rotation, size, page);
+                if (Current()) DocumentStatus.Text = $"第 {PageNumber} 页，共 {session.PageCount} 页";
+                return;
+            }
             var dpi = VisualTreeHelper.GetDpi(this);
             var pixels = PixelSize(size, _scale, dpi.DpiScaleX, dpi.DpiScaleY);
             var bitmap = await session.RenderAsync(page, pixels.Width, pixels.Height, token);
@@ -192,6 +210,16 @@ public partial class PdfPreview : UserControl
     private void OnFitPage(object sender, RoutedEventArgs e) { _fit = 0; ScheduleRender(false); }
     private void OnFitWidth(object sender, RoutedEventArgs e) { _fit = 1; ScheduleRender(false); }
     private void OnRotate(object sender, RoutedEventArgs e) { _rotation = (_rotation + 90) % 360; ScheduleRender(false); }
+    private void OnViewMode(object sender, RoutedEventArgs e)
+    {
+        _continuous = !_continuous;
+        ViewModeButton.Content = _continuous ? "连续阅读" : "单页";
+        PageScroll.Visibility = _continuous ? Visibility.Collapsed : Visibility.Visible;
+        ContinuousArea.Visibility = _continuous ? Visibility.Visible : Visibility.Collapsed;
+        if (!_continuous) ContinuousArea.Clear();
+        _fit = _continuous ? 1 : 0;
+        UpdateLayout(); ScheduleRender(false);
+    }
     private void OnViewportChanged(object sender, SizeChangedEventArgs e) { if (_fit != 2) ScheduleRender(); }
     private void SubmitPage()
     { if (int.TryParse(PageBox.Text, out var page)) GoToPage(page); else { DocumentStatus.Text = "请输入有效页码。"; PageBox.Text = PageNumber.ToString(); } }

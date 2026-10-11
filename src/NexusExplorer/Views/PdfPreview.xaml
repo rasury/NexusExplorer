@@ -1,6 +1,6 @@
 <UserControl x:Class="NexusExplorer.Views.PdfPreview"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes" Background="{DynamicResource BrushPanelBg}">
+ xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes" xmlns:views="clr-namespace:NexusExplorer.Views" Background="{DynamicResource BrushPanelBg}">
  <UserControl.Resources>
   <Style x:Key="PdfButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
    <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
@@ -11,6 +11,7 @@
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <TextBlock x:Name="DocumentTitle" Style="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"/>
   <WrapPanel x:Name="ReadingControls" Grid.Row="1" Margin="0,0,0,8" IsEnabled="False">
+   <Button x:Name="ViewModeButton" Content="单页" Style="{StaticResource ButtonText}" md:ButtonAssist.CornerRadius="10" Padding="8,0" Margin="0,0,8,0" Background="{DynamicResource BrushAccentBlueLight}" Foreground="{DynamicResource BrushOnPrimaryContainer}" ToolTip="切换单页／连续阅读" Click="OnViewMode"/>
    <Button x:Name="PreviousPageButton" Style="{StaticResource PdfButton}" ToolTip="上一页" Click="OnPreviousPage"><md:PackIcon Kind="ChevronLeft" Width="24" Height="24"/></Button>
    <TextBox x:Name="PageBox" Width="56" Height="40" MinHeight="40" Padding="4,0" Text="1" TextAlignment="Center" VerticalContentAlignment="Center" FontFamily="{StaticResource FontFamilyMain}" Foreground="{DynamicResource BrushPrimaryText}" Background="Transparent" ToolTip="输入页码并按 Enter 跳转" AutomationProperties.Name="PDF 页码" KeyDown="OnPageKeyDown" LostKeyboardFocus="OnPageFocusLost"/>
    <TextBlock x:Name="PageCountText" Style="{StaticResource TextPrimary}" Text="/ 0" VerticalAlignment="Center" Margin="8,0"/>
@@ -25,6 +26,7 @@
   <ScrollViewer x:Name="PageScroll" Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="{DynamicResource BrushSecondaryBg}" SizeChanged="OnViewportChanged" PreviewMouseWheel="OnPageWheel">
    <Image x:Name="PageImage" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality"/>
   </ScrollViewer>
+  <views:PdfContinuousView x:Name="ContinuousArea" Grid.Row="2" Visibility="Collapsed" PreviewMouseWheel="OnPageWheel" SizeChanged="OnViewportChanged"/>
   <DockPanel Grid.Row="3" Margin="0,8,0,0">
    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
     <Button x:Name="PasswordButton" Content="输入密码" Style="{StaticResource ButtonText}" Visibility="Collapsed" Click="OnPassword"/>

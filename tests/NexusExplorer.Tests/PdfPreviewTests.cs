@@ -143,6 +143,63 @@ public sealed class PdfPreviewTests
         });
     }
 
+    [Theory]
+    [InlineData(UiThemeMode.Light)]
+    [InlineData(UiThemeMode.Dark)]
+    public async Task ContinuousReadingVirtualizesScrollsZoomsAndSwitchesBack(UiThemeMode theme)
+    {
+        using var host = new TestHost(); var path = CopyFixture(host);
+        await WpfTestHost.RunAsync(async () =>
+        {
+            UiThemeService.Apply(theme);
+            var view = new PdfPreview(); var window = new Window { Content = view, Width = 800, Height = 650, ShowInTaskbar = false };
+            window.Show(); window.UpdateLayout();
+            try
+            {
+                view.SetFile(path, 1); await view.LoadingTask;
+                var toggle = (Button)view.FindName("ViewModeButton");
+                toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                await Task.Delay(300); await view.RenderingTask; view.UpdateLayout();
+                var continuous = (PdfContinuousView)view.FindName("ContinuousArea");
+                Assert.True(view.IsContinuous);
+                Assert.Equal(12, ((ListBox)continuous.FindName("Pages")).Items.Count);
+                var diagnostics = string.Join(";", continuous.RealizedPages.Select(t => $"{t.PageIndex}:{t.ActualWidth}x{t.ActualHeight}:loaded={t.IsLoaded}:visible={t.IsVisible}"));
+                var scrollInfo = PdfContinuousView.Descendants<ScrollViewer>(continuous).First();
+                Assert.True(continuous.RealizedPages.Count is >= 1 and <= 5, $"{diagnostics}; viewport={scrollInfo.ViewportHeight}, extent={scrollInfo.ExtentHeight}, canContentScroll={scrollInfo.CanContentScroll}, scale={continuous.Scale}");
+                await Task.WhenAll(continuous.RealizedPages.Select(t => t.RenderingTask));
+                Assert.Contains(continuous.RealizedPages, tile => tile.Image is not null);
+                view.GoToPage(12); view.UpdateLayout();
+                await Task.Delay(150); await Task.WhenAll(continuous.RealizedPages.Select(t => t.RenderingTask));
+                Assert.Contains(continuous.RealizedPages, tile => tile.PageIndex == 11 && tile.Image is not null);
+                Assert.InRange(continuous.RealizedPages.Count, 1, 5);
+                var zoomOut = ((Panel)view.FindName("ReadingControls")).Children.OfType<Button>().Single(b => Equals(b.ToolTip, "缩小"));
+                for (var i = 0; i < 5; i++) zoomOut.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                await Task.Delay(300); await view.RenderingTask; view.UpdateLayout();
+                view.GoToPage(1); view.UpdateLayout();
+                await Task.Delay(150); await Task.WhenAll(continuous.RealizedPages.Select(t => t.RenderingTask));
+                Assert.True(continuous.RealizedPages.Count >= 2);
+                Assert.Contains(continuous.RealizedPages, tile => tile.PageIndex == 0 && tile.Image is not null);
+                var image = new RenderTargetBitmap(800, 650, 96, 96, PixelFormats.Pbgra32); image.Render(view);
+                var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
+                var folder = Path.Combine(Path.GetTempPath(), "nexus-feature-checks"); Directory.CreateDirectory(folder);
+                using (var output = File.Create(Path.Combine(folder, $"pdf-continuous-{theme}.png"))) encoder.Save(output);
+                view.GoToPage(3); view.UpdateLayout();
+                toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                await Task.Delay(250); await view.RenderingTask;
+                Assert.False(view.IsContinuous); Assert.NotNull(view.DisplayedImage);
+                Assert.Equal(3, view.PageNumber);
+                Assert.Empty(continuous.RealizedPages);
+                toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                await Task.Delay(250); await view.RenderingTask;
+                view.SetFile(host.CreateTestFile("invalid.pdf", "not PDF"), 2); await view.LoadingTask;
+                Assert.Empty(continuous.RealizedPages);
+                await view.ClearAsync();
+                using var exclusive = File.Open(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            }
+            finally { await view.ClearAsync(); window.Close(); UiThemeService.Apply(UiThemeMode.Light); }
+        });
+    }
+
     [Fact]
     public async Task PdfClassificationAdvancesQueueAndPhysicalRenameDeleteReleasePreview()
     {
