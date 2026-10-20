@@ -93,7 +93,7 @@
 
         <GridSplitter x:Name="CategoryFileSplitter" Grid.Row="2"
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                      ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" ShowsPreview="True"
+                      ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" ShowsPreview="False"
                       KeyboardIncrement="16" Cursor="SizeNS" Focusable="True"
                       Background="{DynamicResource BrushPanelBg}"
                       ToolTip="上下拖动调整分类和文件区域大小" AutomationProperties.Name="调整分类和文件区域大小">

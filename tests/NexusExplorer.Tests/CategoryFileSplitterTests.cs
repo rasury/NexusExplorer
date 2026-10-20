@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -31,8 +32,13 @@ public sealed class CategoryFileSplitterTests
                 var tree = (TreeView)panel.FindName("CategoryTree");
                 var files = (ListBox)panel.FindName("FileListBox");
                 Assert.True(CategoryFilePanel.IsControlChrome(splitter));
-                Assert.True(splitter.ShowsPreview);
+                Assert.False(splitter.ShowsPreview);
                 var before = grid.RowDefinitions[1].ActualHeight;
+                splitter.RaiseEvent(new DragStartedEventArgs(0, 0) { RoutedEvent = Thumb.DragStartedEvent });
+                splitter.RaiseEvent(new DragDeltaEventArgs(0, 24) { RoutedEvent = Thumb.DragDeltaEvent });
+                window.UpdateLayout();
+                Assert.True(grid.RowDefinitions[1].ActualHeight > before);
+                splitter.RaiseEvent(new DragCompletedEventArgs(0, 24, false) { RoutedEvent = Thumb.DragCompletedEvent });
                 splitter.Focus(); await Dispatcher.Yield(DispatcherPriority.Input);
                 void Move(Key key)
                 {
