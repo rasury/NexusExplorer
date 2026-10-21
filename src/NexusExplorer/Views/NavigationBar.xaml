@@ -3,9 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:models="clr-namespace:NexusExplorer.Models"
-             Background="{DynamicResource BrushPanelBg}"
+             Background="Transparent"
              BorderBrush="{DynamicResource BrushDivider}"
-             BorderThickness="0,1,0,0">
+             BorderThickness="0">
 
     <UserControl.Resources>
         <DataTemplate x:Key="CategoryNavigationContent" DataType="{x:Type models:Category}">
@@ -51,7 +51,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid Margin="24,16">
+    <Grid Margin="16,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />

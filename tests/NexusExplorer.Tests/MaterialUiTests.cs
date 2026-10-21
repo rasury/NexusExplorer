@@ -64,7 +64,7 @@ public class MaterialUiTests
                 await main.SelectFileAsync((await host.Files.GetByCategoryAsync(audio.Id))[0]);main.Player.MediaTitle="BigRicePiano - Limerence";
                 fake.SetSnapshot(new(true,TimeSpan.FromSeconds(98),TimeSpan.FromSeconds(569)));
                 main.Player.ResetZoom();await Dispatcher.Yield(DispatcherPriority.Loaded);window.UpdateLayout();
-                var drawer=(DrawerHost)window.FindName("NavigationDrawer");Assert.Equal(DrawerHostOpenMode.Standard,drawer.OpenMode);Assert.True(drawer.IsLeftDrawerOpen);
+                var drawer=(PrismCard)window.FindName("LibraryCard");Assert.Equal(Visibility.Visible,drawer.Visibility);
                 var player=(PlayerPanel)window.FindName("PlayerArea");
                 foreach(var name in new[]{"ControlsBar","ProgressRow","MediaButtonsRow","MediaSettingsRow"})
                 {

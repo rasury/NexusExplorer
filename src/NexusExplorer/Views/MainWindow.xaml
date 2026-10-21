@@ -1,32 +1,42 @@
-<Window x:Class="NexusExplorer.Views.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:NexusExplorer.Views" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
- Title="NexusExplorer" Icon="/NexusExplorer;component/Assets/AppIcon.ico" Width="1280" Height="880" MinWidth="960" MinHeight="680" WindowStartupLocation="CenterScreen"
- Style="{StaticResource MaterialDesignWindow}" Background="{DynamicResource BrushPrimaryBg}" FontFamily="{StaticResource FontFamilyMain}" UseLayoutRounding="True">
- <md:DialogHost x:Name="RootDialog" Identifier="Nexus.Main" CloseOnClickAway="False" DialogContentUniformCornerRadius="28"
-  DialogOpened="OnDialogOpened" DialogClosed="OnDialogClosed">
-  <Grid>
-   <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-   <md:ColorZone Mode="Standard" Background="{DynamicResource BrushSecondaryBg}" Padding="16,8">
-    <DockPanel LastChildFill="True">
-     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-      <Button Style="{StaticResource IconButton}" Click="OnAppearanceClick" ToolTip="外观设置"><md:PackIcon Kind="PaletteOutline" Width="24" Height="24"/></Button>
+<Window x:Class="NexusExplorer.Views.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:NexusExplorer.Views" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes" xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+ Title="NexusExplorer" Icon="/NexusExplorer;component/Assets/AppIcon.ico" Width="1360" Height="900" MinWidth="960" MinHeight="680" WindowStartupLocation="CenterScreen"
+ WindowStyle="None" ResizeMode="CanResize" Style="{StaticResource MaterialDesignWindow}" Background="{DynamicResource BrushPrimaryBg}" FontFamily="{StaticResource FontFamilyMain}" UseLayoutRounding="True">
+ <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="64" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/></shell:WindowChrome.WindowChrome>
+ <Grid>
+  <Grid x:Name="WallpaperScene" IsHitTestVisible="False"><Grid.Background><ImageBrush ImageSource="/NexusExplorer;component/Assets/PrismBackground.png" Stretch="UniformToFill"/></Grid.Background><Border Background="{DynamicResource BrushWallpaperShade}"/></Grid>
+  <md:DialogHost x:Name="RootDialog" Identifier="Nexus.Main" CloseOnClickAway="False" DialogContentUniformCornerRadius="24" DialogBackground="{DynamicResource BrushPrismDialog}" OverlayBackground="#20456775" DialogOpened="OnDialogOpened" DialogClosed="OnDialogClosed">
+   <Grid x:Name="WindowLayout" Margin="6">
+    <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <DockPanel x:Name="TitleBar" Margin="16,0,4,0">
+     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+      <Button Style="{StaticResource IconButton}" Click="OnAppearanceClick" ToolTip="外观设置"><md:PackIcon Kind="PaletteOutline" Width="22" Height="22"/></Button>
+      <Button Style="{StaticResource IconButton}" Click="OnMinimize" ToolTip="最小化" AutomationProperties.Name="最小化"><md:PackIcon Kind="Minus" Width="20" Height="20"/></Button>
+      <Button x:Name="MaximizeButton" Style="{StaticResource IconButton}" Click="OnMaximize" ToolTip="最大化" AutomationProperties.Name="最大化或还原"><md:PackIcon x:Name="MaximizeIcon" Kind="WindowMaximize" Width="18" Height="18"/></Button>
+      <Button Style="{StaticResource IconButton}" Click="OnCloseWindow" ToolTip="关闭" AutomationProperties.Name="关闭"><md:PackIcon Kind="Close" Width="22" Height="22"/></Button>
      </StackPanel>
-     <Grid Height="40" VerticalAlignment="Center" HorizontalAlignment="Left">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
-      <Button x:Name="DrawerToggleButton" Grid.Column="0" Style="{StaticResource IconButton}" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板"><md:PackIcon Kind="Menu" Width="24" Height="24"/></Button>
-      <TextBlock x:Name="AppTitle" Grid.Column="1" Text="NexusExplorer" FontSize="22" FontWeight="SemiBold" Margin="16,0,8,0" Foreground="{DynamicResource BrushPrimaryText}" VerticalAlignment="Center">
-       <TextBlock.RenderTransform><TranslateTransform Y="-2"/></TextBlock.RenderTransform>
-      </TextBlock>
-      <Button x:Name="CreateRootCategoryButton" Grid.Column="2" Style="{StaticResource IconButton}" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" ToolTip="新建分类" AutomationProperties.Name="新建分类"><md:PackIcon Kind="PlusBox" Width="24" Height="24"/></Button>
-     </Grid>
+     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+      <Button x:Name="DrawerToggleButton" Style="{StaticResource IconButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板"><md:PackIcon Kind="Menu" Width="22" Height="22"/></Button>
+      <TextBlock x:Name="AppTitle" Text="NexusExplorer" FontSize="23" FontWeight="SemiBold" Margin="12,0" Foreground="{DynamicResource BrushPrimaryText}" VerticalAlignment="Center"/>
+     </StackPanel>
     </DockPanel>
-   </md:ColorZone>
-   <md:DrawerHost x:Name="NavigationDrawer" Grid.Row="1" OpenMode="Standard" IsLeftDrawerOpen="True" LeftDrawerCloseOnClickAway="False">
-    <!-- Standard drawer measures across Auto rows; constrain its content to the viewport to preserve virtualization. -->
-    <md:DrawerHost.LeftDrawerContent><views:CategoryFilePanel x:Name="LeftPanel" Width="360" Height="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType=md:DrawerHost}, FallbackValue=0}"/></md:DrawerHost.LeftDrawerContent>
-    <views:PlayerPanel x:Name="PlayerArea" Margin="8,0,8,8"/>
-   </md:DrawerHost>
-   <md:ColorZone Grid.Row="2" Mode="Standard" Background="{DynamicResource BrushSecondaryBg}"><views:NavigationBar x:Name="NavBar"/></md:ColorZone>
-   <md:Snackbar x:Name="TaskSnackbar" Grid.Row="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="24" MaxWidth="560"/>
-  </Grid>
- </md:DialogHost>
+    <Grid Grid.Row="1" Margin="20,8,8,16">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <views:PrismCard x:Name="LibraryCard" Width="300" Margin="0,64,20,0" Padding="12,16">
+      <Grid><Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+       <DockPanel Margin="8,0"><Button x:Name="CreateRootCategoryButton" DockPanel.Dock="Right" Style="{StaticResource IconButton}" ToolTip="新建分类" AutomationProperties.Name="新建分类"><md:PackIcon Kind="Plus" Width="22" Height="22"/></Button><TextBlock Text="分类列表" Style="{StaticResource TextHeader}" VerticalAlignment="Center"/></DockPanel>
+       <views:CategoryFilePanel x:Name="LeftPanel" Grid.Row="1"/>
+      </Grid>
+     </views:PrismCard>
+     <Grid Grid.Column="1"><Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <views:PrismCard x:Name="SearchCard" Padding="16,4" Height="46" MaxWidth="540" Margin="0,0,24,18" HorizontalAlignment="Stretch"><DockPanel><md:PackIcon Kind="Magnify" Width="20" Height="20" VerticalAlignment="Center" Foreground="{DynamicResource BrushSecondaryText}" Margin="0,0,12,0"/><TextBox x:Name="FileSearch" Background="Transparent" BorderThickness="0" VerticalContentAlignment="Center" md:HintAssist.Hint="搜索当前分类文件…" TextChanged="OnSearchChanged" Foreground="{DynamicResource BrushPrimaryText}"/></DockPanel></views:PrismCard>
+      <views:PlayerPanel x:Name="PlayerArea" Grid.Row="1"/>
+      <views:PrismCard x:Name="NavigationCard" Grid.Row="2" Margin="0,16,24,0" Padding="4"><views:NavigationBar x:Name="NavBar"/></views:PrismCard>
+     </Grid>
+    </Grid>
+    <Border x:Name="NoticeCard" Grid.RowSpan="2" VerticalAlignment="Top" HorizontalAlignment="Center" MaxWidth="560" Margin="24,12,24,0" Padding="20,14" CornerRadius="16" Background="{DynamicResource BrushPrismDialog}" BorderBrush="{DynamicResource BrushPrismRim}" BorderThickness="1" Visibility="Collapsed" IsHitTestVisible="False">
+     <Border.RenderTransform><TranslateTransform x:Name="NoticeTransform" Y="-160"/></Border.RenderTransform><TextBlock x:Name="NoticeText" TextWrapping="Wrap" Style="{StaticResource TextPrimary}"/>
+    </Border>
+   </Grid>
+  </md:DialogHost>
+ </Grid>
 </Window>

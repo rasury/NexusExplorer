@@ -1,0 +1,41 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:NexusExplorer.Views" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+ <LinearGradientBrush x:Key="BrushPrismSurface" StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#80FFFFFF"/><GradientStop Color="#26FFFFFF" Offset="0.45"/><GradientStop Color="#38E8FAFF" Offset="1"/></LinearGradientBrush>
+ <SolidColorBrush x:Key="BrushPrismRim" Color="#B3FFFFFF"/>
+ <SolidColorBrush x:Key="BrushWallpaperShade" Color="Transparent"/>
+ <SolidColorBrush x:Key="BrushPrismDialog" Color="#D9E4F0F3"/>
+ <Style x:Key="PrismCardStyle" TargetType="views:PrismCard">
+  <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="views:PrismCard">
+   <Grid>
+    <Border CornerRadius="24" Background="#01345A70" IsHitTestVisible="False"><Border.Effect><DropShadowEffect Color="#345A70" BlurRadius="24" ShadowDepth="8" Opacity="0.16"/></Border.Effect></Border>
+    <Grid x:Name="PART_Clip">
+     <Border x:Name="PART_Backdrop" Margin="-18" IsHitTestVisible="False"><Border.Effect><BlurEffect Radius="18" RenderingBias="Performance"/></Border.Effect></Border>
+     <Border CornerRadius="24" Background="{DynamicResource BrushPrismSurface}" BorderBrush="{DynamicResource BrushPrismRim}" BorderThickness="2" IsHitTestVisible="False"/>
+     <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+    </Grid>
+   </Grid>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <Style x:Key="PrismScrollBar" TargetType="ScrollBar">
+  <Setter Property="Background" Value="Transparent"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar">
+   <Grid Background="Transparent">
+    <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True">
+     <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+     <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="Thumb"><Border x:Name="Grip" Width="4" CornerRadius="2" Background="{DynamicResource BrushSecondaryText}" Opacity="0.5"/><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Grip" Property="Opacity" Value="1"/><Setter TargetName="Grip" Property="Width" Value="6"/></Trigger><Trigger Property="IsDragging" Value="True"><Setter TargetName="Grip" Property="Opacity" Value="1"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+     <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
+    </Track>
+   </Grid>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <!-- Overlay bars share the content viewport: appearing never changes its width. -->
+ <Style x:Key="PrismOverlayScrollViewer" TargetType="ScrollViewer">
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollViewer">
+   <Grid Background="{TemplateBinding Background}">
+    <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Margin="{TemplateBinding Padding}" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" CanContentScroll="{TemplateBinding CanContentScroll}"/>
+    <ScrollBar x:Name="PART_VerticalScrollBar" Style="{StaticResource PrismScrollBar}" Orientation="Vertical" HorizontalAlignment="Right" Width="10" Margin="0,12,2,12" Minimum="0" Maximum="{TemplateBinding ScrollableHeight}" ViewportSize="{TemplateBinding ViewportHeight}" Value="{Binding VerticalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+    <ScrollBar x:Name="PART_HorizontalScrollBar" Orientation="Horizontal" VerticalAlignment="Bottom" Height="10" Margin="12,0,12,2" Minimum="0" Maximum="{TemplateBinding ScrollableWidth}" ViewportSize="{TemplateBinding ViewportWidth}" Value="{Binding HorizontalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}" Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
+   </Grid>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+</ResourceDictionary>

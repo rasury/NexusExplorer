@@ -124,14 +124,24 @@ public partial class CategoryFilePanel : UserControl
         _ = Dispatcher.BeginInvoke(() => FindChild<ScrollViewer>(CategoryTree)?.ScrollToVerticalOffset(offset));
         _organizeCommand?.NotifyCanExecuteChanged();
     }
+    private string _fileFilter = "";
+    public void SetFileFilter(string query)
+    {
+        _fileFilter = query.Trim();
+        if (FileListBox.ItemsSource is not null)
+        {
+            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListBox.ItemsSource);
+            view.Filter = string.IsNullOrEmpty(_fileFilter) ? null : item => item is FileItem f && f.FileName.Contains(_fileFilter, StringComparison.CurrentCultureIgnoreCase);
+        }
+    }
     private void RefreshFileList()
     {
         _filePreview.Cancel();
         var timing = Stopwatch.StartNew();
         var ids = FileListBox.SelectedItems.Cast<FileItem>().Select(f => f.Id).ToHashSet();
         var offset = FindChild<ScrollViewer>(FileListBox)?.VerticalOffset ?? 0;
-        FileListBox.ItemsSource = FileListVm.Files; FileListVm.UpdateHeader();
-        foreach (var f in FileListVm.Files.Where(f => ids.Contains(f.Id))) FileListBox.SelectedItems.Add(f);
+        FileListBox.ItemsSource = FileListVm.Files; SetFileFilter(_fileFilter); FileListVm.UpdateHeader();
+        foreach (var f in FileListBox.Items.Cast<FileItem>().Where(f => ids.Contains(f.Id))) FileListBox.SelectedItems.Add(f);
         _ = Dispatcher.BeginInvoke(() => FindChild<ScrollViewer>(FileListBox)?.ScrollToVerticalOffset(offset));
         _organizeCommand?.NotifyCanExecuteChanged();
         var source = FileListBox.ItemsSource;

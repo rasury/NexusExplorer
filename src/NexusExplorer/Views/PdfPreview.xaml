@@ -9,7 +9,7 @@
  </UserControl.Resources>
  <Grid Margin="16">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <TextBlock x:Name="DocumentTitle" Style="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"/>
+  <TextBlock x:Name="DocumentTitle" Visibility="Collapsed" Style="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" Margin="0,0,0,8"/>
   <WrapPanel x:Name="ReadingControls" Grid.Row="1" Margin="0,0,0,8" IsEnabled="False">
    <Button x:Name="ViewModeButton" Content="单页" Style="{StaticResource ButtonText}" md:ButtonAssist.CornerRadius="10" Padding="8,0" Margin="0,0,8,0" Background="{DynamicResource BrushAccentBlueLight}" Foreground="{DynamicResource BrushOnPrimaryContainer}" ToolTip="切换单页／连续阅读" Click="OnViewMode"/>
    <Button x:Name="PreviousPageButton" Style="{StaticResource PdfButton}" ToolTip="上一页" Click="OnPreviousPage"><md:PackIcon Kind="ChevronLeft" Width="24" Height="24"/></Button>

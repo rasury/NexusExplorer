@@ -34,7 +34,7 @@ public class DrawerVirtualizationTests
             var window = (Window)XamlReader.Parse(xaml);
             window.ShowActivated = false; window.ShowInTaskbar = false;
             window.WindowStartupLocation = WindowStartupLocation.Manual; window.Left = -5000; window.Top = -5000;
-            var drawer = (DrawerHost)window.FindName("NavigationDrawer");
+            var drawer = (PrismCard)window.FindName("LibraryCard");
             var panel = (CategoryFilePanel)window.FindName("LeftPanel");
             var list = (ListBox)panel.FindName("FileListBox");
             var player = (PlayerPanel)window.FindName("PlayerArea");
@@ -69,19 +69,17 @@ public class DrawerVirtualizationTests
                 var offset = viewer.VerticalOffset;
                 var originalHeight = panel.ActualHeight;
                 var button = Descendants<Button>(window).Single(b => b.ToolTip is string text && text == "显示或隐藏分类面板");
-                button.Click += (_, _) => drawer.IsLeftDrawerOpen = !drawer.IsLeftDrawerOpen;
+                button.Click += (_, _) => drawer.Visibility = drawer.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
                 for (var cycle = 0; cycle < 2; cycle++)
                 {
                     foreach (var open in new[] { false, true })
                     {
                         var timing = Stopwatch.StartNew();
                         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                        var surface = (FrameworkElement)drawer.Template.FindName("PART_LeftDrawer", drawer);
-                        await BoundedDialogTests.Until(() => Math.Abs(surface.Margin.Left - (open ? 0 : -surface.ActualWidth)) < .5);
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
                         report.Add($"count={count} cycle={cycle} open={open} settledMs={timing.Elapsed.TotalMilliseconds:F1} maxRows={maxRealized}");
                         Assert.InRange(maxRealized, 1, Math.Min(count, 50));
-                        Assert.InRange(Math.Abs(panel.ActualHeight - drawer.ActualHeight), 0, 1);
+                        if (open) Assert.InRange(drawer.ActualHeight - panel.ActualHeight, 70, 75);
                         Assert.Same(itemsSource, list.ItemsSource);
                         Assert.Equal(selected, list.SelectedItems.Cast<FileItem>().Select(f => f.Id).Order().ToArray());
                         Assert.Equal(offset, viewer.VerticalOffset);
@@ -94,7 +92,7 @@ public class DrawerVirtualizationTests
                         window.Height = 720; window.Width = 960;
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
                         Assert.True(panel.ActualHeight < originalHeight);
-                        Assert.InRange(Math.Abs(panel.ActualHeight - drawer.ActualHeight), 0, 1);
+                        Assert.InRange(drawer.ActualHeight - panel.ActualHeight, 70, 75);
                         offset = viewer.VerticalOffset;
                     }
                 }
@@ -102,7 +100,7 @@ public class DrawerVirtualizationTests
             finally
             {
                 player.Detach(); window.Close();
-                var directory = Path.GetFullPath("../../../../../artifacts/drawer-analysis", AppContext.BaseDirectory);
+                var directory = Path.Combine(Path.GetTempPath(), "nexus-feature-checks", "drawer-analysis");
                 Directory.CreateDirectory(directory); File.WriteAllLines(Path.Combine(directory, $"fixed-{count}.txt"), report);
             }
         });

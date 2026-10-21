@@ -40,3 +40,9 @@ public interface IPlaybackDiagnostics
 {
     Task RecordDiagnosticsAsync();
 }
+
+/// <summary>Optional native-surface UI gestures, separate from playback commands.</summary>
+public interface IVideoSurfaceGestures
+{
+    event Action? VideoDoubleClicked;
+}

@@ -20,7 +20,7 @@
     <SolidColorBrush x:Key="BrushPlayerBg" Color="Black"/>
     <FontFamily x:Key="FontFamilyMain">HYWenHei 85W, Segoe UI, Microsoft YaHei UI</FontFamily>
     <Style x:Key="ButtonPrimary" TargetType="Button" BasedOn="{StaticResource MaterialDesignRaisedButton}">
-        <Setter Property="md:ButtonAssist.CornerRadius" Value="20"/>
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="10"/>
         <Setter Property="md:ElevationAssist.Elevation" Value="Dp0"/>
         <Setter Property="Height" Value="40"/><Setter Property="MinWidth" Value="64"/>
         <Setter Property="Padding" Value="16,0"/>
@@ -31,18 +31,18 @@
         <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
     </Style>
     <Style x:Key="ButtonGhost" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
-        <Setter Property="md:ButtonAssist.CornerRadius" Value="20"/>
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="10"/>
         <Setter Property="Height" Value="40"/><Setter Property="Padding" Value="16,0"/>
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
     </Style>
     <Style x:Key="ButtonText" TargetType="Button" BasedOn="{StaticResource MaterialDesignFlatButton}">
-        <Setter Property="md:ButtonAssist.CornerRadius" Value="20"/>
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="10"/>
         <Setter Property="Height" Value="40"/><Setter Property="Padding" Value="16,0"/>
         <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
     </Style>
     <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
         <Setter Property="Width" Value="40"/><Setter Property="Height" Value="40"/>
-        <Setter Property="md:ButtonAssist.CornerRadius" Value="20"/>
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="10"/>
     </Style>
     <Style x:Key="TextBoxStandard" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignOutlinedTextBox}">
         <Setter Property="MinHeight" Value="56"/>

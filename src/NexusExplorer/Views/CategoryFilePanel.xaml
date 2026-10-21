@@ -4,9 +4,10 @@
              xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:models="clr-namespace:NexusExplorer.Models"
              AllowDrop="True"
-             Background="{DynamicResource BrushSecondaryBg}">
+             Background="Transparent">
 
     <UserControl.Resources>
+        <Style TargetType="ScrollViewer" BasedOn="{StaticResource PrismOverlayScrollViewer}"/>
         <!-- 分类树节点模板 -->
         <HierarchicalDataTemplate DataType="{x:Type models:Category}" ItemsSource="{Binding Children}">
             <StackPanel Orientation="Horizontal">
@@ -46,7 +47,7 @@
         </Grid.RowDefinitions>
 
         <!-- One reserved status row; classification controls live in the header/context menu. -->
-        <Border Grid.Row="0" Height="40" Background="{DynamicResource BrushPanelBg}" BorderBrush="{DynamicResource BrushDivider}" BorderThickness="0,0,0,1" Padding="16,0">
+        <Border Grid.Row="0" Height="40" Background="Transparent" BorderBrush="{DynamicResource BrushDivider}" BorderThickness="0,0,0,1" Padding="16,0">
             <DockPanel VerticalAlignment="Center">
                 <Button Style="{StaticResource ButtonText}" x:Name="CancelOrganizeButton" DockPanel.Dock="Right" Content="取消整理" Click="OnCancelOrganize" Visibility="Collapsed" Margin="8,0,0,0" />
                 <TextBlock Style="{StaticResource TextCaption}" x:Name="OperationStatus" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
@@ -95,7 +96,7 @@
                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
                       ResizeDirection="Rows" ResizeBehavior="PreviousAndNext" ShowsPreview="False"
                       KeyboardIncrement="16" Cursor="SizeNS" Focusable="True"
-                      Background="{DynamicResource BrushPanelBg}"
+                      Background="Transparent"
                       ToolTip="上下拖动调整分类和文件区域大小" AutomationProperties.Name="调整分类和文件区域大小">
             <GridSplitter.Style>
                 <Style TargetType="GridSplitter">
@@ -120,7 +121,7 @@
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
             <!-- 文件列表标题与列表一起调整高度 -->
             <Border Grid.Row="0"
-                    Background="{DynamicResource BrushPanelBg}"
+                    Background="Transparent"
                     BorderBrush="{DynamicResource BrushDivider}"
                     BorderThickness="0,1,0,1"
                     Padding="16,0">

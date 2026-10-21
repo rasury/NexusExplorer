@@ -10,11 +10,44 @@ using NexusExplorer.Services;
 using NexusExplorer.ViewModels;
 using Serilog;
 using MaterialDesignThemes.Wpf;
+using System.Windows.Media.Animation;
+using NexusExplorer.Models;
 
 namespace NexusExplorer.Views;
 
 public partial class PlayerPanel : UserControl
 {
+    public event Action? FocusPreviewRequested;
+    private readonly DispatcherTimer _videoClickTimer = new();
+    private PlaybackToken _clickToken;
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
+    private readonly DispatcherTimer _inspectorTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private void OnInspectorEnter(object sender, MouseEventArgs e) { _inspectorTimer.Stop(); if (InspectorPin.IsChecked != true) _inspectorTimer.Start(); }
+    private void OnInspectorLeave(object sender, MouseEventArgs e) { _inspectorTimer.Stop(); if (InspectorPin.IsChecked != true) ShowInspector(false); }
+    private void OnInspectorOpen(object sender, RoutedEventArgs e) => ShowInspector(true);
+    private void OnInspectorPin(object sender, RoutedEventArgs e) { _inspectorTimer.Stop(); ShowInspector(InspectorPin.IsChecked == true); }
+    internal void ShowInspector(bool open)
+    {
+        InspectorBody.Visibility = open ? Visibility.Visible : Visibility.Hidden;
+        InspectorBody.IsHitTestVisible = open;
+        InspectorSlot.BeginAnimation(WidthProperty, new DoubleAnimation(open ? 260 : 24, TimeSpan.FromMilliseconds(450)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+    }
+    private void UpdateDetails(FileItem? file)
+    {
+        DetailName.Text = file?.FileName ?? "尚未打开文件";
+        DetailFormat.Text = file?.Extension.TrimStart('.').ToUpperInvariant() ?? "—";
+        DetailCategory.Text = file is null ? "—" : _main.Category.FlatCategories.FirstOrDefault(c => c.Id == file.CategoryId)?.Name ?? "—";
+        DetailPath.Text = file?.AbsolutePath ?? "—";
+        DetailDate.Text = file?.CreatedAt.ToString("yyyy-MM-dd HH:mm") ?? "—";
+    }
+    private void OnPreviewDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2 && CategoryFilePanel.FindAncestor<System.Windows.Controls.Primitives.ButtonBase>(e.OriginalSource as DependencyObject) is null
+            && CategoryFilePanel.FindAncestor<System.Windows.Controls.Primitives.ScrollBar>(e.OriginalSource as DependencyObject) is null)
+        { e.Handled = true; FocusPreviewRequested?.Invoke(); }
+    }
+    internal void SetFocusPreview(bool focus)
+    { InspectorSlot.Visibility = focus ? Visibility.Collapsed : Visibility.Visible; }
     private MainViewModel _main = null!;
     private PlayerViewModel Vm => _main.Player;
     private IMediaPlaybackControls? Controls => Vm.Engine as IMediaPlaybackControls;
@@ -36,6 +69,9 @@ public partial class PlayerPanel : UserControl
     public PlayerPanel()
     {
         InitializeComponent();
+        _videoClickTimer.Interval = TimeSpan.FromMilliseconds(GetDoubleClickTime());
+        _videoClickTimer.Tick += async (_, _) => { _videoClickTimer.Stop(); if (!_dialogCovered && Controls?.CurrentToken == _clickToken && Vm.Kind == MediaKind.Video) await RunAsync(Vm.TogglePlayPauseAsync); };
+        _inspectorTimer.Tick += (_, _) => { _inspectorTimer.Stop(); if (InspectorSlot.IsMouseOver) ShowInspector(true); };
         VolumeSlider.AddHandler(Mouse.LostMouseCaptureEvent, new MouseEventHandler(OnVolumeSliderLostCapture), true);
         VolumePopup.Closed += OnVolumePopupClosed;
         VideoView.SurfaceCreated += hwnd => { if (_main is not null) Lifetime?.AttachSurface(hwnd); };
@@ -57,10 +93,11 @@ public partial class PlayerPanel : UserControl
     }
     public void Initialize(MainViewModel main)
     {
-        _main = main; Vm.ShowErrorAsync = async m => { await MessageDialog.ShowAsync(m, "播放", DialogButtons.Ok, DialogSeverity.Warning); };
+        _main = main; _main.CurrentFileChanged += UpdateDetails; Vm.ShowErrorAsync = async m => { await MessageDialog.ShowAsync(m, "播放", DialogButtons.Ok, DialogSeverity.Warning); };
         Vm.ReleaseDocumentPreviewAsync = PdfArea.ClearAsync;
         Vm.StateChanged += UpdateUi;
         if (Controls is not null) Controls.VideoClicked += OnNativeVideoClick;
+        if (Vm.Engine is IVideoSurfaceGestures gestures) gestures.VideoDoubleClicked += OnNativeVideoDoubleClick;
         HardwareCheck.IsChecked = Controls?.HardwareDecoding ?? true; VolumeSlider.Value = Vm.Volume; UpdateVolumeUi(Vm.Volume); _initialized = true;
         ProgressSlider.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, _) => _dragging = true), true);
         AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(OnProgressReleased), true);
@@ -69,11 +106,13 @@ public partial class PlayerPanel : UserControl
     }
     private async void OnLoaded(object sender, RoutedEventArgs e)
     { if (Lifetime is not null) await RunAsync(async () => { Lifetime.AttachSurface(VideoView.Handle); await Lifetime.InitializeAsync(); }); }
-    private async void OnNativeVideoClick()
-    { if (!_dialogCovered && Vm.Kind == MediaKind.Video) await RunAsync(Vm.TogglePlayPauseAsync); }
+    private void OnNativeVideoDoubleClick() { _videoClickTimer.Stop(); if (!_dialogCovered) FocusPreviewRequested?.Invoke(); }
+    private void OnNativeVideoClick()
+    { if (!_dialogCovered && Vm.Kind == MediaKind.Video && Controls is not null) { _clickToken = Controls.CurrentToken; _videoClickTimer.Stop(); _videoClickTimer.Start(); } }
     public void Detach()
     {
         VolumePopup.IsPopupOpen = false;
+        _videoClickTimer.Stop(); _inspectorTimer.Stop(); if (_main is not null) _main.CurrentFileChanged -= UpdateDetails;
         _timer.Stop(); Lifetime?.AttachSurface(IntPtr.Zero);
         if (_initialized) Vm.ReleaseImagePreview();
         ImageDisplay.Source = null;
@@ -85,6 +124,7 @@ public partial class PlayerPanel : UserControl
         Detach(); Vm.StateChanged -= UpdateUi;
         Vm.ReleaseDocumentPreviewAsync = null;
         if (Controls is not null) Controls.VideoClicked -= OnNativeVideoClick;
+        if (Vm.Engine is IVideoSurfaceGestures gestures) gestures.VideoDoubleClicked -= OnNativeVideoDoubleClick;
         _timer.Tick -= Poll; Loaded -= OnLoaded; Unloaded -= OnUnloaded;
     }
     private async Task RunAsync(Func<Task> action)

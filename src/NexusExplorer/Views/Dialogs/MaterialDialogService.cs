@@ -40,7 +40,7 @@ internal static class MaterialDialogService
                 // the caret anchor after refocusing. Keep DialogHost inside it.
                 owner = host is not null ? Window.GetWindow(host) : null;
                 app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                host = new DialogHost { Identifier = Guid.NewGuid().ToString("N"), CloseOnClickAway = false, DialogContentUniformCornerRadius = 28 };
+                host = new DialogHost { Identifier = Guid.NewGuid().ToString("N"), CloseOnClickAway = false, DialogContentUniformCornerRadius = 24 };
                 host.SetResourceReference(FrameworkElement.StyleProperty, "MaterialDesignEmbeddedDialogHost");
                 shell = new Window { Title = "NexusExplorer", Width = 720, Height = 520, Content = host,
                     Owner = owner, WindowStartupLocation = owner is null ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner,
@@ -61,7 +61,7 @@ internal static class MaterialDialogService
                     // Dp24's 49px blur and 12.5px offset must fit inside the
                     // transparent HWND; otherwise its edges clip the rounded shadow.
                     host.DialogMargin = new Thickness(64);
-                    host.SetResourceReference(DialogHost.DialogBackgroundProperty, "BrushPanelBg");
+                    host.SetResourceReference(DialogHost.DialogBackgroundProperty, "BrushPrismDialog");
                     shell.Width = view.Width + view.Margin.Left + view.Margin.Right + host.DialogMargin.Left + host.DialogMargin.Right;
                 }
                 var area = SystemParameters.WorkArea;

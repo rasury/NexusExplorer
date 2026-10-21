@@ -18,6 +18,8 @@
  </UserControl.Resources>
  <Grid>
   <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid x:Name="PreviewLayout"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+  <views:PrismCard x:Name="PreviewSurface" Padding="10" Margin="0,0,8,0" PreviewMouseLeftButtonDown="OnPreviewDoubleClick">
   <md:Card x:Name="PreviewCard" Background="Black" UniformCornerRadius="16" md:ElevationAssist.Elevation="Dp0" ClipContent="True">
    <Grid Background="Black">
     <views:MpvVideoHost x:Name="VideoView" Visibility="Hidden"/>
@@ -34,7 +36,25 @@
     </StackPanel>
    </Grid>
   </md:Card>
-  <md:Card x:Name="ControlsBar" Grid.Row="1" Style="{StaticResource PlayerCard}" Padding="8" Margin="0,8,0,0" Visibility="Collapsed">
+  </views:PrismCard>
+  <Grid x:Name="InspectorSlot" Grid.Column="1" Width="24" ClipToBounds="True" MouseEnter="OnInspectorEnter" MouseLeave="OnInspectorLeave">
+   <views:PrismCard Width="260" HorizontalAlignment="Left" Padding="0,16,16,16">
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Button x:Name="InspectorHandle" Style="{StaticResource ButtonText}" MinWidth="0" Height="Auto" Padding="0" Click="OnInspectorOpen" ToolTip="文件详情" AutomationProperties.Name="展开文件详情"><Border Width="3" Height="38" CornerRadius="2" Background="{DynamicResource BrushSecondaryText}"/></Button>
+     <Grid x:Name="InspectorBody" Grid.Column="1" Visibility="Hidden"><Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+      <DockPanel><ToggleButton x:Name="InspectorPin" DockPanel.Dock="Right" Width="36" Height="36" Style="{StaticResource MaterialDesignFlatToggleButton}" Checked="OnInspectorPin" Unchecked="OnInspectorPin" ToolTip="固定文件详情"><md:PackIcon Kind="PinOutline" Width="20" Height="20"/></ToggleButton><TextBlock Text="文件详情" Style="{StaticResource TextHeader}" VerticalAlignment="Center"/></DockPanel>
+      <ScrollViewer Style="{StaticResource PrismOverlayScrollViewer}" Grid.Row="1" Margin="0,8,0,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
+       <TextBlock x:Name="DetailName" Text="尚未打开文件" TextWrapping="Wrap" FontSize="19" Margin="0,12,0,20" Foreground="{DynamicResource BrushPrimaryText}"/>
+       <TextBlock Text="格式" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailFormat" Style="{StaticResource TextPrimary}" Margin="0,6,0,18"/>
+       <TextBlock Text="所属分类" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailCategory" Style="{StaticResource TextPrimary}" TextWrapping="Wrap" Margin="0,6,0,18"/>
+       <TextBlock Text="文件位置" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailPath" Style="{StaticResource TextPrimary}" TextWrapping="Wrap" Margin="0,6,0,18"/>
+       <TextBlock Text="登记时间" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailDate" Style="{StaticResource TextPrimary}" Margin="0,6,0,0"/>
+      </StackPanel></ScrollViewer>
+     </Grid>
+    </Grid>
+   </views:PrismCard>
+  </Grid></Grid>
+  <views:PrismCard x:Name="ControlsBar" Grid.Row="1" Padding="8" Margin="12,16,36,0" Visibility="Collapsed">
    <Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
     <Grid x:Name="ProgressRow" Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
@@ -82,6 +102,6 @@
      <Button Style="{StaticResource PlayerIconButton}" Click="OnNext" ToolTip="下一项"><md:PackIcon Kind="SkipNext" Width="24" Height="24"/></Button>
     </StackPanel>
    </Grid>
-  </md:Card>
+  </views:PrismCard>
  </Grid>
 </UserControl>

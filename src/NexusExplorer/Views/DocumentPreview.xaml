@@ -13,7 +13,7 @@
      <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}" Style="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Center"/></DataTemplate></ComboBox.ItemTemplate>
     </ComboBox>
    </StackPanel>
-   <TextBlock x:Name="DocumentTitle" Style="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
+   <TextBlock x:Name="DocumentTitle" Visibility="Collapsed" Style="{StaticResource TextPrimary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
   </DockPanel>
   <Grid Grid.Row="1">
    <avalon:TextEditor x:Name="SourceEditor" IsReadOnly="True" FontFamily="{StaticResource FontFamilyMain}" FontSize="14"
