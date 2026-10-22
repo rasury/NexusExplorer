@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 
@@ -14,24 +14,35 @@ internal static class WindowAppearance
         var rounded = 2; // DWMWCP_ROUND; DWM removes rounding while maximized.
         _ = DwmSetWindowAttribute(handle, 33, ref rounded, sizeof(int));
     }
-    internal static void InstallWorkAreaHook(Window window)
+    internal static void UpdateMaximizedInset(Window window, FrameworkElement surface)
     {
-        var source = HwndSource.FromHwnd(new WindowInteropHelper(window).Handle);
-        source?.AddHook(WorkAreaHook);
-    }
-    private static IntPtr WorkAreaHook(IntPtr hwnd, int message, IntPtr wparam, IntPtr lparam, ref bool handled)
-    {
-        if (message != 0x0024) return IntPtr.Zero; // WM_GETMINMAXINFO, physical pixels
-        var monitor = MonitorFromWindow(hwnd, 2);
+        if (window.WindowState != WindowState.Maximized) { surface.Margin = new Thickness(0); return; }
+        var hwnd = new WindowInteropHelper(window).Handle;
         var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-        if (!GetMonitorInfo(monitor, ref info)) return IntPtr.Zero;
-        var limits = Marshal.PtrToStructure<MinMaxInfo>(lparam);
-        limits.MaxPosition = new PointInt { X = info.Work.Left - info.Monitor.Left, Y = info.Work.Top - info.Monitor.Top };
-        limits.MaxSize = new PointInt { X = info.Work.Right - info.Work.Left, Y = info.Work.Bottom - info.Work.Top };
-        Marshal.StructureToPtr(limits, lparam, false);
-        handled = true;
-        return IntPtr.Zero;
+        if (!GetMonitorInfo(MonitorFromWindow(hwnd, 2), ref info) || !GetWindowRect(hwnd, out var rect)) return;
+        var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(window);
+        surface.Margin = new Thickness(Math.Max(0, info.Work.Left - rect.Left) / dpi.DpiScaleX,
+            Math.Max(0, info.Work.Top - rect.Top) / dpi.DpiScaleY,
+            Math.Max(0, rect.Right - info.Work.Right) / dpi.DpiScaleX,
+            Math.Max(0, rect.Bottom - info.Work.Bottom) / dpi.DpiScaleY);
     }
+    internal static void FillMonitor(Window window)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (GetMonitorInfo(MonitorFromWindow(hwnd, 2), ref info))
+            SetWindowPos(hwnd, IntPtr.Zero, info.Monitor.Left, info.Monitor.Top, info.Monitor.Right - info.Monitor.Left, info.Monitor.Bottom - info.Monitor.Top, 0x24);
+    }
+    internal static void SetFullscreenFrame(Window window, bool fullscreen)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        var corner = fullscreen ? 1 : 2;
+        var border = fullscreen ? unchecked((int)0xFFFFFFFE) : unchecked((int)0xFFFFFFFF);
+        _ = DwmSetWindowAttribute(hwnd, 33, ref corner, sizeof(int));
+        _ = DwmSetWindowAttribute(hwnd, 34, ref border, sizeof(int));
+    }
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out RectInt rect);
+    [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, int flags);
     [StructLayout(LayoutKind.Sequential)] private struct PointInt { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] private struct RectInt { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] private struct MinMaxInfo { public PointInt Reserved, MaxSize, MaxPosition, MinTrackSize, MaxTrackSize; }

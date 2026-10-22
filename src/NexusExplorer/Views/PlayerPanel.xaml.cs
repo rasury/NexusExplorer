@@ -18,6 +18,8 @@ namespace NexusExplorer.Views;
 public partial class PlayerPanel : UserControl
 {
     public event Action? FocusPreviewRequested;
+    public event Action? ExitFocusPreviewRequested;
+    private bool _focusPreview;
     private readonly DispatcherTimer _videoClickTimer = new();
     private PlaybackToken _clickToken;
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
@@ -82,7 +84,14 @@ public partial class PlayerPanel : UserControl
         { e.Handled = true; FocusPreviewRequested?.Invoke(); }
     }
     internal void SetFocusPreview(bool focus)
-    { InspectorSlot.Visibility = focus ? Visibility.Collapsed : Visibility.Visible; }
+    {
+        _focusPreview = focus;
+        InspectorSlot.Visibility = focus ? Visibility.Collapsed : Visibility.Visible;
+        PreviewSurface.IsPlain = focus; PreviewSurface.Padding = new Thickness(focus ? 0 : 10);
+        PreviewSurface.Margin = focus ? new Thickness(0) : new Thickness(0, 0, 8, 0);
+        PreviewCard.UniformCornerRadius = focus ? 0 : 16; VideoView.CornerRadius = focus ? 0 : 16;
+        UpdateUi();
+    }
     private MainViewModel _main = null!;
     private PlayerViewModel Vm => _main.Player;
     private IMediaPlaybackControls? Controls => Vm.Engine as IMediaPlaybackControls;
@@ -132,7 +141,7 @@ public partial class PlayerPanel : UserControl
         Vm.ReleaseDocumentPreviewAsync = PdfArea.ClearAsync;
         Vm.StateChanged += UpdateUi;
         if (Controls is not null) Controls.VideoClicked += OnNativeVideoClick;
-        if (Vm.Engine is IVideoSurfaceGestures gestures) gestures.VideoDoubleClicked += OnNativeVideoDoubleClick;
+        if (Vm.Engine is IVideoSurfaceGestures gestures) { gestures.VideoDoubleClicked += OnNativeVideoDoubleClick; gestures.VideoEscapePressed += OnNativeEscape; }
         HardwareCheck.IsChecked = Controls?.HardwareDecoding ?? true; VolumeSlider.Value = Vm.Volume; UpdateVolumeUi(Vm.Volume); _initialized = true;
         ProgressSlider.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, _) => _dragging = true), true);
         AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(OnProgressReleased), true);
@@ -141,6 +150,7 @@ public partial class PlayerPanel : UserControl
     }
     private async void OnLoaded(object sender, RoutedEventArgs e)
     { if (Lifetime is not null) await RunAsync(async () => { Lifetime.AttachSurface(VideoView.Handle); await Lifetime.InitializeAsync(); }); }
+    private void OnNativeEscape() => ExitFocusPreviewRequested?.Invoke();
     private void OnNativeVideoDoubleClick() { _videoClickTimer.Stop(); if (!_dialogCovered) FocusPreviewRequested?.Invoke(); }
     private void OnNativeVideoClick()
     { if (!_dialogCovered && Vm.Kind == MediaKind.Video && Controls is not null) { _clickToken = Controls.CurrentToken; _videoClickTimer.Stop(); _videoClickTimer.Start(); } }
@@ -159,7 +169,7 @@ public partial class PlayerPanel : UserControl
         Detach(); Vm.StateChanged -= UpdateUi;
         Vm.ReleaseDocumentPreviewAsync = null;
         if (Controls is not null) Controls.VideoClicked -= OnNativeVideoClick;
-        if (Vm.Engine is IVideoSurfaceGestures gestures) gestures.VideoDoubleClicked -= OnNativeVideoDoubleClick;
+        if (Vm.Engine is IVideoSurfaceGestures gestures) { gestures.VideoDoubleClicked -= OnNativeVideoDoubleClick; gestures.VideoEscapePressed -= OnNativeEscape; }
         _timer.Tick -= Poll; Loaded -= OnLoaded; Unloaded -= OnUnloaded;
     }
     private async Task RunAsync(Func<Task> action)
@@ -206,7 +216,7 @@ public partial class PlayerPanel : UserControl
         else _ = PdfArea.ClearAsync();
         AudioLayer.Visibility = Vm.Kind == MediaKind.Audio ? Visibility.Visible : Visibility.Collapsed;
         AudioTitle.Text = Vm.MediaTitle ?? "";
-        ControlsBar.Visibility = media || document || pdf || Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
+        ControlsBar.Visibility = !_focusPreview && (media || document || pdf || Vm.Kind == MediaKind.Image) ? Visibility.Visible : Visibility.Collapsed;
         DocumentButtonsRow.Visibility = document || pdf ? Visibility.Visible : Visibility.Collapsed;
         ProgressRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         MediaButtonsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;

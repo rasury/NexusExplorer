@@ -1,4 +1,4 @@
-namespace NexusExplorer.ApplicationLayer;
+﻿namespace NexusExplorer.ApplicationLayer;
 
 public enum PlayMode { Sequential, RepeatAll, RepeatOne, Shuffle }
 public record PlaybackSnapshot(bool IsPlaying, TimeSpan Position, TimeSpan Duration, bool IsPaused = false,
@@ -45,4 +45,5 @@ public interface IPlaybackDiagnostics
 public interface IVideoSurfaceGestures
 {
     event Action? VideoDoubleClicked;
+    event Action? VideoEscapePressed;
 }

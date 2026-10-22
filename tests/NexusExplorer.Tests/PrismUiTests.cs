@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -16,6 +16,54 @@ namespace NexusExplorer.Tests;
 [Collection("NativePlaybackLogging")]
 public class PrismUiTests
 {
+    [Fact]
+    public async Task NativeVideoClickPausesResumesAndFullscreenKeepsTheSameSurface()
+    {
+        using var host = new TestHost();
+        var category = await host.Categories.CreateAsync("Video", null);
+        var file = await host.Files.AddAsync(SyntheticMedia.WriteAvi(Path.Combine(host.RootDir, "click.avi")), category.Id);
+        await WpfTestHost.RunAsync(async () =>
+        {
+            using var engine = new NexusExplorer.Infrastructure.Playback.Mpv.MpvPlaybackEngine(Dispatcher.CurrentDispatcher) { HardwareDecoding = false };
+            var main = new MainViewModel(host.Categories, host.Files, host.Organization, engine);
+            var window = new MainWindow(main, host.Categories, host.Files, host.Organization, host.RecycleBin, engine) { ShowInTaskbar = false };
+            try
+            {
+                window.Show(); await main.SelectCategoryAsync(category); await main.SelectFileAsync(file);
+                await BoundedDialogTests.Until(() => engine.Snapshot.Position.TotalMilliseconds > 100);
+                var player = (PlayerPanel)window.FindName("PlayerArea");
+                var video = (MpvVideoHost)player.FindName("VideoView");
+                var handle = video.Handle;
+                var region = CreateRectRgn(0, 0, 0, 0);
+                try
+                {
+                    Assert.NotEqual(0, GetWindowRgn(handle, region));
+                    Assert.False(PtInRegion(region, 0, 0));
+                    Assert.True(PtInRegion(region, 30, 30));
+                }
+                finally { DeleteObject(region); }
+                var child = IntPtr.Zero;
+                EnumChildWindows(handle, (hwnd, _) => { var name = new System.Text.StringBuilder(128); GetClassName(hwnd, name, 128); if (name.ToString() == "mpv") child = hwnd; return true; }, IntPtr.Zero);
+                Assert.NotEqual(IntPtr.Zero, child);
+                void Click()
+                {
+                    SendMessage(child, 0x0201, (IntPtr)1, (IntPtr)((60 << 16) | 80));
+                    SendMessage(child, 0x0202, IntPtr.Zero, (IntPtr)((60 << 16) | 80));
+                }
+                Click(); await BoundedDialogTests.Until(() => !engine.Snapshot.IsPlaying);
+                await Task.Delay(600); Click(); await BoundedDialogTests.Until(() => engine.Snapshot.IsPlaying);
+                await Task.Delay(600); Click(); Click();
+                await BoundedDialogTests.Until(() => ((FrameworkElement)window.FindName("TitleBar")).Visibility == Visibility.Collapsed);
+                window.UpdateLayout(); Assert.Equal(handle, video.Handle); Assert.Equal(0, video.CornerRadius);
+                Assert.Equal(window.ActualWidth, video.ActualWidth, 1); Assert.Equal(window.ActualHeight, video.ActualHeight, 1);
+                SendMessage(child, 0x0100, (IntPtr)27, IntPtr.Zero);
+                SendMessage(child, 0x0101, (IntPtr)27, IntPtr.Zero);
+                await BoundedDialogTests.Until(() => ((FrameworkElement)window.FindName("TitleBar")).Visibility == Visibility.Visible);
+                Assert.Equal(16, video.CornerRadius); Assert.Equal(handle, video.Handle);
+            }
+            finally { await engine.ShutdownAsync(); window.PrepareForVerificationExit(); window.Close(); }
+        });
+    }
     [Fact]
     public async Task NativeDoubleClickReachesPreviewGesture()
     {
@@ -52,6 +100,10 @@ public class PrismUiTests
         });
     }
     private delegate bool ChildProc(IntPtr hwnd, IntPtr parameter);
+    [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetWindowRgn(IntPtr window, IntPtr region);
+    [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern bool PtInRegion(IntPtr region, int x, int y);
+    [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr region);
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, ChildProc callback, IntPtr parameter);
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)] private static extern int GetClassName(IntPtr hwnd, System.Text.StringBuilder text, int count);
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr hwnd, uint message, IntPtr wparam, IntPtr lparam);
@@ -79,7 +131,7 @@ public class PrismUiTests
                 window.Show(); await main.RefreshTreeAsync(); await main.SelectCategoryAsync(category);
                 await main.SelectFileAsync(first);
                 window.UpdateLayout(); await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-                Assert.Equal(WindowStyle.None, window.WindowStyle);
+                Assert.Equal(WindowStyle.SingleBorderWindow, window.WindowStyle);
                 Assert.Equal(64, WindowChrome.GetWindowChrome(window).CaptionHeight);
                 var left = (CategoryFilePanel)window.FindName("LeftPanel");
                 var list = (ListBox)left.FindName("FileListBox");
@@ -112,6 +164,10 @@ public class PrismUiTests
                 Assert.Equal(Visibility.Collapsed, ((FrameworkElement)window.FindName("TitleBar")).Visibility);
                 Assert.Equal(Visibility.Collapsed, ((FrameworkElement)window.FindName("SearchCard")).Visibility);
                 Assert.Same(first, main.CurrentFile);
+                Assert.Equal(Visibility.Collapsed, controls.Visibility);
+                Assert.Equal(0, ((MpvVideoHost)player.FindName("VideoView")).CornerRadius);
+                Assert.Equal(window.ActualWidth, preview.ActualWidth, 1);
+                Assert.Equal(window.ActualHeight, preview.ActualHeight, 1);
                 window.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, Key.Escape) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
                 Assert.Equal(Visibility.Visible, ((FrameworkElement)window.FindName("TitleBar")).Visibility);
             }

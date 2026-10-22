@@ -29,13 +29,18 @@ public partial class MainWindow : Window
         LeftPanel.Initialize(_main, recycleBin);
         PlayerArea.Initialize(_main);
         NavBar.Initialize(_main);
+        Activated += (_, _) => { if (_focusPreview) Topmost = true; };
+        Deactivated += (_, _) => { if (_focusPreview) Topmost = false; };
         PlayerArea.FocusPreviewRequested += ToggleFocusPreview;
+        PlayerArea.ExitFocusPreviewRequested += () => { if (_focusPreview) ToggleFocusPreview(); };
         LeftPanel.PresentationSizeChanged += ResizeLibrary;
         Workspace.SizeChanged += (_, _) => ResizeLibrary();
         Loaded += async (_, _) => { try { await ApplyWallpaperAsync(AppConfig.LoadOrDefault(AppPaths.SettingsPath).Appearance); } catch (Exception ex) { Serilog.Log.Warning(ex, "自定义背景不可用，使用默认背景"); } };
-        StateChanged += (_, _) => { MaximizeIcon.Kind = WindowState == WindowState.Maximized ? PackIconKind.WindowRestore : PackIconKind.WindowMaximize; WindowLayout.Margin = new Thickness(6); WindowRim.CornerRadius = new CornerRadius(WindowState == WindowState.Maximized ? 0 : 24); };
+        StateChanged += (_, _) => { Dispatcher.BeginInvoke(() => WindowAppearance.UpdateMaximizedInset(this, WindowSurface)); MaximizeIcon.Kind = WindowState == WindowState.Maximized ? PackIconKind.WindowRestore : PackIconKind.WindowMaximize; WindowLayout.Margin = new Thickness(_focusPreview ? 0 : 6); };
+        SizeChanged += (_, _) => WindowAppearance.UpdateMaximizedInset(this, WindowSurface);
         UiThemeService.Changed += OnThemeChanged;
-        SourceInitialized += (_, _) => { WindowAppearance.Apply(this); WindowAppearance.InstallWorkAreaHook(this); };
+        SourceInitialized += (_, _) => { WindowAppearance.Apply(this); WindowAppearance.UpdateMaximizedInset(this, WindowSurface); };
+        Loaded += (_, _) => { WindowAppearance.Apply(this); WindowAppearance.UpdateMaximizedInset(this, WindowSurface); };
         MaterialDialogService.NoticeRequested += OnNotice;
         MaterialDialogService.InputWindowStateChanged += OnInputWindowStateChanged;
         Closed += (_, _) => { UiThemeService.Changed -= OnThemeChanged; MaterialDialogService.NoticeRequested -= OnNotice; MaterialDialogService.InputWindowStateChanged -= OnInputWindowStateChanged; _noticeTimer.Stop(); PlayerArea.FocusPreviewRequested -= ToggleFocusPreview; };
@@ -132,22 +137,43 @@ public partial class MainWindow : Window
     private void OnMinimize(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     private void OnMaximize(object sender, RoutedEventArgs e) { if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this); else SystemCommands.MaximizeWindow(this); }
     private void OnCloseWindow(object sender, RoutedEventArgs e) => Close();
-    private void OnSearchChanged(object sender, TextChangedEventArgs e) => LeftPanel?.SetFileFilter(FileSearch.Text, SearchScope.SelectedIndex == 1);
-    private void OnSearchScopeChanged(object sender, SelectionChangedEventArgs e)
+    private void OnSearchChanged(object sender, TextChangedEventArgs e) => LeftPanel?.SetFileFilter(FileSearch.Text, _globalSearch);
+    private bool _globalSearch;
+    private void OnSearchScopeClick(object sender, RoutedEventArgs e)
     {
-        if (FileSearch is null) return;
-        HintAssist.SetHint(FileSearch, SearchScope.SelectedIndex == 1 ? "搜索全部分类文件…" : "搜索当前分类文件…");
-        LeftPanel?.SetFileFilter(FileSearch.Text, SearchScope.SelectedIndex == 1);
+        _globalSearch = !_globalSearch;
+        SearchScope.ApplyTemplate();
+        if (SearchScope.Template.FindName("ScopeTranslate", SearchScope) is System.Windows.Media.TranslateTransform slide)
+            slide.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, PrismMotion.Spring(slide.X, _globalSearch ? -104 : 0));
+        HintAssist.SetHint(FileSearch, _globalSearch ? "搜索全部分类文件…" : "搜索当前分类文件…");
+        LeftPanel.SetFileFilter(FileSearch.Text, _globalSearch);
     }
     private bool _focusPreview;
     private WindowState _beforeFocusState;
     private Visibility _beforeFocusLibrary;
+    private Rect _beforeFocusBounds;
     private void ToggleFocusPreview()
     {
         _focusPreview = !_focusPreview;
         var center = (Grid)PlayerArea.Parent;
-        if (_focusPreview) { _beforeFocusState = WindowState; _beforeFocusLibrary = LibraryCard.Visibility; WindowState = WindowState.Maximized; }
-        else WindowState = _beforeFocusState;
+        if (_focusPreview)
+        {
+            _beforeFocusState = WindowState; _beforeFocusLibrary = LibraryCard.Visibility;
+            _beforeFocusBounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
+            WindowState = WindowState.Normal; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
+            WindowSurface.Margin = new Thickness(0); Topmost = true;
+            WindowAppearance.FillMonitor(this);
+        }
+        else
+        {
+            Topmost = false; WindowStyle = WindowStyle.SingleBorderWindow; ResizeMode = ResizeMode.CanResize;
+            Left = _beforeFocusBounds.Left; Top = _beforeFocusBounds.Top; Width = _beforeFocusBounds.Width; Height = _beforeFocusBounds.Height;
+            WindowState = _beforeFocusState;
+            WindowAppearance.UpdateMaximizedInset(this, WindowSurface);
+        }
+        WindowLayout.Margin = new Thickness(_focusPreview ? 0 : 6);
+        Workspace.Margin = _focusPreview ? new Thickness(0) : new Thickness(20, 8, -6, 16);
+        WallpaperScene.Visibility = _focusPreview ? Visibility.Hidden : Visibility.Visible;
         TitleBar.Visibility = SearchCard.Visibility = _focusPreview ? Visibility.Collapsed : Visibility.Visible;
         System.Windows.Shell.WindowChrome.GetWindowChrome(this).CaptionHeight = _focusPreview ? 0 : 64;
         WindowLayout.RowDefinitions[0].Height = new GridLength(_focusPreview ? 0 : 64);
@@ -156,6 +182,7 @@ public partial class MainWindow : Window
         center.RowDefinitions[0].Height = new GridLength(_focusPreview ? 0 : 64);
         ((FrameworkElement)NavBar.Parent).Visibility = _focusPreview ? Visibility.Collapsed : Visibility.Visible;
         PlayerArea.SetFocusPreview(_focusPreview);
+        WindowAppearance.SetFullscreenFrame(this, _focusPreview);
     }
     private void OnDialogOpened(object sender, DialogOpenedEventArgs e) => PlayerArea.SetDialogCovered(true);
     private void OnDialogClosed(object sender, DialogClosedEventArgs e) => PlayerArea.SetDialogCovered(false);
@@ -166,17 +193,27 @@ public partial class MainWindow : Window
         try
         {
             var config = AppConfig.LoadOrDefault(AppPaths.SettingsPath);
-            var result = await AppearanceDialog.ShowAsync(config.Appearance);
-            if (result is null) return;
+            var before = config.Appearance;
+            var result = await AppearanceDialog.ShowAsync(before, async draft =>
+            {
+                UiThemeService.Apply(draft.ThemeMode);
+                await ApplyWallpaperAsync(draft);
+            }, ApplyWallpaperOpacity);
+            if (result is null) { UiThemeService.Apply(before.ThemeMode); await ApplyWallpaperAsync(before); return; }
             await ApplyWallpaperAsync(result);
             config.Appearance = result; config.Save(AppPaths.SettingsPath);
             UiThemeService.Apply(result.ThemeMode);
         }
         catch (Exception ex) { await MessageDialog.ShowAsync(ex.Message, "外观设置", severity: DialogSeverity.Error); }
     }
+    private int _wallpaperVersion;
+    private bool _wallpaperLoaded;
+    private string? _wallpaperPath;
     internal async Task ApplyWallpaperAsync(AppearanceConfig appearance)
     {
+        var version = ++_wallpaperVersion;
         var path = appearance.BackgroundImagePath;
+        if (_wallpaperLoaded && path == _wallpaperPath) { ApplyWallpaperOpacity(appearance.BackgroundOpacity); return; }
         var image = await Task.Run(() =>
         {
             var bitmap = new System.Windows.Media.Imaging.BitmapImage();
@@ -186,7 +223,15 @@ public partial class MainWindow : Window
                 ? new Uri("pack://application:,,,/NexusExplorer;component/Assets/PrismBackground.png") : new Uri(System.IO.Path.GetFullPath(path));
             bitmap.EndInit(); bitmap.Freeze(); return bitmap;
         });
-        WallpaperImage.Source = image; WallpaperImage.Opacity = double.IsFinite(appearance.BackgroundOpacity) ? Math.Clamp(appearance.BackgroundOpacity, 0, 1) : 1;
+        if (version != _wallpaperVersion) return;
+        _wallpaperLoaded = true; _wallpaperPath = path; WallpaperImage.Source = image; ApplyWallpaperOpacity(appearance.BackgroundOpacity);
+    }
+    internal void ApplyWallpaperOpacity(double opacity)
+    {
+        opacity = double.IsFinite(opacity) ? Math.Clamp(opacity, 0, 1) : 1;
+        WallpaperImage.Opacity = opacity;
+        WallpaperShade.Opacity = opacity;
+        MaterialDialogService.RefreshBackdrop();
     }
     internal void PrepareForVerificationExit()
     {

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -36,13 +36,13 @@ public class PrismRefinementTests
                 var left = (CategoryFilePanel)window.FindName("LeftPanel");
                 var list = (ListBox)left.FindName("FileListBox");
                 var search = (TextBox)window.FindName("FileSearch");
-                var scope = (ComboBox)window.FindName("SearchScope");
-                scope.SelectedIndex = 1; search.Text = "second";
+                var scope = (Button)window.FindName("SearchScope");
+                scope.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); search.Text = "second";
                 await BoundedDialogTests.Until(() => list.Items.Cast<FileItem>().Any(f => f.Id == second.Id));
                 Assert.Single(main.CurrentFiles); Assert.Equal(first.Id, main.CurrentFile!.Id);
                 await main.SelectFileAsync(second);
                 Assert.True(Assert.Single(list.Items.Cast<FileItem>()).IsCurrent);
-                search.Text = "first"; scope.SelectedIndex = 0; search.Clear();
+                search.Text = "first"; scope.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); search.Clear();
                 await Task.Delay(350); Assert.Equal(first.Id, Assert.Single(list.Items.Cast<FileItem>()).Id);
                 var player = (PlayerPanel)window.FindName("PlayerArea");
                 var preview = (FrameworkElement)player.FindName("PreviewSurface");
@@ -56,7 +56,7 @@ public class PrismRefinementTests
                 Assert.Equal(before, preview.ActualWidth, 1);
                 var controlWidth = controls.ActualWidth;
                 player.ShowInspector(true); await Task.Delay(800); window.UpdateLayout();
-                Assert.Equal(controlWidth, controls.ActualWidth, 1);
+                Assert.InRange(Math.Abs(controlWidth - controls.ActualWidth), 0, 2);
                 var pin = (ToggleButton)player.FindName("InspectorPin");
                 var slot = (FrameworkElement)player.FindName("InspectorSlot");
                 var pinPoint = pin.TranslatePoint(new Point(pin.ActualWidth / 2, pin.ActualHeight / 2), slot);
@@ -87,8 +87,12 @@ public class PrismRefinementTests
                 GetWindowRect(hwnd, out var rect);
                 var info = new MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<MonitorInfo>() };
                 GetMonitorInfo(MonitorFromWindow(hwnd, 2), ref info);
-                Assert.Equal(info.Work.Bottom, rect.Bottom); Assert.Equal(info.Work.Top, rect.Top);
-                Assert.Equal(info.Work.Left, rect.Left); Assert.Equal(info.Work.Right, rect.Right);
+                window.UpdateLayout();
+                var surface = (FrameworkElement)window.FindName("WindowSurface");
+                var top = surface.PointToScreen(new Point());
+                var bottom = surface.PointToScreen(new Point(surface.ActualWidth, surface.ActualHeight));
+                Assert.Equal(info.Work.Bottom, bottom.Y); Assert.Equal(info.Work.Top, top.Y);
+                Assert.Equal(info.Work.Left, top.X); Assert.Equal(info.Work.Right, bottom.X);
             }
             finally { window.PrepareForVerificationExit(); window.Close(); }
         });

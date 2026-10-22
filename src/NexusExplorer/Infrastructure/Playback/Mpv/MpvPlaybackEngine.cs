@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
@@ -74,6 +74,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, IMediaPlaybackControls,
     public event Action<string, string>? PlaybackError;
     public event Action? VideoClicked;
     public event Action? VideoDoubleClicked;
+    public event Action? VideoEscapePressed;
     public MpvPlaybackEngine(Dispatcher? dispatcher = null) => _dispatcher = dispatcher ?? System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
     public void AttachSurface(IntPtr hwnd) => _surface = hwnd;
     private void Post(Action action)
@@ -108,7 +109,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, IMediaPlaybackControls,
         {
             foreach (var (name, value) in new[] {
                 ("config", "no"), ("load-scripts", "no"), ("idle", "yes"), ("terminal", "no"),
-                ("osc", "no"), ("osd-level", "0"), ("input-default-bindings", "no"), ("input-vo-keyboard", "no"),
+                ("osc", "no"), ("osd-level", "0"), ("input-default-bindings", "no"), ("input-vo-keyboard", "yes"),
                 ("keep-open", "no"), ("resume-playback", "no"), ("audio-display", "no"),
                 ("ao", "wasapi"), ("volume", "100"), ("speed", "1"),
                 ("input-conf", Path.Combine(AppContext.BaseDirectory, "native", "mpv", "input.conf")) })
@@ -325,10 +326,10 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, IMediaPlaybackControls,
                     case MpvNative.EventId.ClientMessage:
                         var message = Marshal.PtrToStructure<MpvNative.ClientMessage>(ev.Data);
                         var gesture = message.Count > 0 ? MpvNative.Text(Marshal.ReadIntPtr(message.Args)) : "";
-                        if (gesture is "nexus-video-click" or "nexus-video-double-click")
+                        if (gesture is "nexus-video-click" or "nexus-video-double-click" or "nexus-video-escape")
                         {
                             var token = CurrentToken;
-                            Post(() => { if (token == CurrentToken && token.MediaGeneration == Interlocked.Read(ref _generation)) { if (gesture == "nexus-video-double-click") VideoDoubleClicked?.Invoke(); else VideoClicked?.Invoke(); } });
+                            Post(() => { if (token == CurrentToken && token.MediaGeneration == Interlocked.Read(ref _generation)) { if (gesture == "nexus-video-double-click") VideoDoubleClicked?.Invoke(); else if (gesture == "nexus-video-escape") VideoEscapePressed?.Invoke(); else VideoClicked?.Invoke(); } });
                         }
                         break;
                     case MpvNative.EventId.Seek: Log.Debug("mpv 跳转开始;会话 {Generation}", CurrentToken.MediaGeneration); break;

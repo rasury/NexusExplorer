@@ -1,9 +1,9 @@
 ﻿<Window x:Class="NexusExplorer.Views.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:NexusExplorer.Views" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes" xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
  Title="NexusExplorer" Icon="/NexusExplorer;component/Assets/AppIcon.ico" Width="1360" Height="900" MinWidth="960" MinHeight="680" WindowStartupLocation="CenterScreen"
- WindowStyle="None" ResizeMode="CanResize" Style="{StaticResource MaterialDesignWindow}" Background="{DynamicResource BrushPrimaryBg}" FontFamily="{StaticResource FontFamilyMain}" UseLayoutRounding="True">
- <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="64" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="24" UseAeroCaptionButtons="False"/></shell:WindowChrome.WindowChrome>
+ WindowStyle="SingleBorderWindow" ResizeMode="CanResize" Style="{StaticResource MaterialDesignWindow}" Background="{DynamicResource BrushPrimaryBg}" FontFamily="{StaticResource FontFamilyMain}" UseLayoutRounding="True">
+ <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="64" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/></shell:WindowChrome.WindowChrome>
  <Grid x:Name="WindowSurface">
-  <Grid x:Name="WallpaperScene" IsHitTestVisible="False"><Image x:Name="WallpaperImage" Source="/NexusExplorer;component/Assets/PrismBackground.png" Stretch="UniformToFill"/><Border Background="{DynamicResource BrushWallpaperShade}"/></Grid>
+  <Grid x:Name="WallpaperScene" IsHitTestVisible="False" Background="White"><Image x:Name="WallpaperImage" Source="/NexusExplorer;component/Assets/PrismBackground.png" Stretch="UniformToFill"/><Border x:Name="WallpaperShade" Background="{DynamicResource BrushWallpaperShade}"/></Grid>
   <md:DialogHost x:Name="RootDialog" Identifier="Nexus.Main" CloseOnClickAway="False" DialogContentUniformCornerRadius="24" DialogBackground="{DynamicResource BrushPrismDialog}" OverlayBackground="#20456775" DialogOpened="OnDialogOpened" DialogClosed="OnDialogClosed">
    <Grid x:Name="WindowLayout" Margin="6">
     <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/></Grid.RowDefinitions>
@@ -30,7 +30,7 @@
       </Grid>
      </views:PrismCard></Grid>
      <Grid Grid.Column="1" Panel.ZIndex="1"><Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-      <views:PrismCard x:Name="SearchCard" Padding="16,4" Height="46" MaxWidth="540" Margin="0,0,24,18" HorizontalAlignment="Stretch"><DockPanel><md:PackIcon Kind="Magnify" Width="20" Height="20" VerticalAlignment="Center" Foreground="{DynamicResource BrushSecondaryText}" Margin="0,0,12,0"/><ComboBox x:Name="SearchScope" md:TextFieldAssist.DecorationVisibility="Collapsed" DockPanel.Dock="Right" Width="100" Margin="8,0,0,0" SelectedIndex="0" SelectionChanged="OnSearchScopeChanged" ToolTip="搜索范围"><ComboBoxItem Content="当前分类"/><ComboBoxItem Content="全部分类"/></ComboBox><TextBox x:Name="FileSearch" Background="Transparent" BorderThickness="0" VerticalContentAlignment="Center" md:HintAssist.Hint="搜索当前分类文件…" TextChanged="OnSearchChanged" Foreground="{DynamicResource BrushPrimaryText}"><TextBox.Template><ControlTemplate TargetType="TextBox"><ScrollViewer x:Name="PART_ContentHost" Background="Transparent" VerticalAlignment="Center"/></ControlTemplate></TextBox.Template></TextBox></DockPanel></views:PrismCard>
+      <views:PrismCard x:Name="SearchCard" Padding="16,4" Height="46" MaxWidth="540" Margin="0,0,24,18" HorizontalAlignment="Stretch"><DockPanel><md:PackIcon Kind="Magnify" Width="20" Height="20" VerticalAlignment="Center" Foreground="{DynamicResource BrushSecondaryText}" Margin="0,0,12,0"/><Button x:Name="SearchScope" Foreground="{DynamicResource BrushPrimaryText}" DockPanel.Dock="Right" Width="104" Margin="8,0,0,0" Click="OnSearchScopeClick" ToolTip="切换搜索范围" Background="Transparent" BorderThickness="0" Padding="0"><Button.Template><ControlTemplate TargetType="Button"><Border CornerRadius="12" Background="{DynamicResource BrushPrismSurface}" BorderBrush="{DynamicResource BrushPrismRim}" BorderThickness="1"><Grid ClipToBounds="True" Height="30"><StackPanel x:Name="ScopeStrip" Width="208" Orientation="Horizontal" HorizontalAlignment="Left"><StackPanel.RenderTransform><TranslateTransform x:Name="ScopeTranslate"/></StackPanel.RenderTransform><TextBlock Text="当前分类" Width="104" TextAlignment="Center" VerticalAlignment="Center"/><TextBlock Text="全部分类" Width="104" TextAlignment="Center" VerticalAlignment="Center"/></StackPanel></Grid></Border></ControlTemplate></Button.Template></Button><TextBox x:Name="FileSearch" Background="Transparent" BorderThickness="0" VerticalContentAlignment="Center" md:HintAssist.Hint="搜索当前分类文件…" TextChanged="OnSearchChanged" Foreground="{DynamicResource BrushPrimaryText}"><TextBox.Template><ControlTemplate TargetType="TextBox"><ScrollViewer x:Name="PART_ContentHost" Background="Transparent" VerticalAlignment="Center"/></ControlTemplate></TextBox.Template></TextBox></DockPanel></views:PrismCard>
       <views:PlayerPanel x:Name="PlayerArea" Grid.Row="1"/>
       <views:PrismCard x:Name="NavigationCard" Grid.Row="2" Margin="0,16,24,0" Padding="4"><views:NavigationBar x:Name="NavBar"/></views:PrismCard>
      </Grid>
@@ -40,6 +40,6 @@
     </views:PrismCard>
    </Grid>
   </md:DialogHost>
-  <Border x:Name="WindowRim" CornerRadius="24" BorderThickness="1.5" BorderBrush="{DynamicResource BrushPrismRim}" IsHitTestVisible="False"/>
+
  </Grid>
 </Window>

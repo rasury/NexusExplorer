@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 
@@ -18,7 +18,7 @@ internal sealed class DialogSurface : Grid
         var heading = new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         heading.SetResourceReference(StyleProperty, "DialogTitle");
         content.Children.Add(heading); content.Children.Add(body);
-        Children.Add(new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        Children.Add(new ScrollViewer { Content = content, Padding = new Thickness(8), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
         actions.Margin = new Thickness(0, 24, 0, 0); SetRow(actions, 1); Children.Add(actions);
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; Complete(null); } };
     }

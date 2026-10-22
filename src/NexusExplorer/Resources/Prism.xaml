@@ -3,17 +3,52 @@
  <SolidColorBrush x:Key="BrushPrismRim" Color="#B3FFFFFF"/>
  <SolidColorBrush x:Key="BrushWallpaperShade" Color="Transparent"/>
  <SolidColorBrush x:Key="BrushPrismDialog" Color="#D9E4F0F3"/>
+ <SolidColorBrush x:Key="BrushPrismSelection" Color="#9EFFFFFF"/>
+ <Style x:Key="PrismFileItem" TargetType="ListBoxItem">
+  <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="9,10"/><Setter Property="Margin" Value="0,2"/>
+  <Setter Property="views:PressFeedback.IsEnabled" Value="True"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem">
+   <Border x:Name="Row" CornerRadius="12" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" Padding="{TemplateBinding Padding}"><ContentPresenter HorizontalAlignment="Stretch"/></Border>
+   <ControlTemplate.Triggers>
+    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Row" Property="Background" Value="{DynamicResource BrushPrismSelection}"/><Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource BrushPrismRim}"/></Trigger>
+    <Trigger Property="IsSelected" Value="True"><Setter TargetName="Row" Property="Background" Value="{DynamicResource BrushPrismSelection}"/><Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource BrushPrismRim}"/></Trigger>
+   </ControlTemplate.Triggers>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <Style x:Key="PrismTreeItem" TargetType="TreeViewItem">
+  <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/><Setter Property="FontSize" Value="13"/>
+  <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/><Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+  <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TreeViewItem">
+   <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Border x:Name="Row" Grid.ColumnSpan="2" CornerRadius="10" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" MinHeight="39" views:PressFeedback.IsEnabled="True">
+     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <ToggleButton x:Name="Expander" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" Focusable="False"><ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Grid Background="Transparent"><md:PackIcon x:Name="Chevron" Kind="ChevronRight" Width="16" Height="16" VerticalAlignment="Center"/></Grid><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Chevron" Property="Kind" Value="ChevronDown"/></Trigger></ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template></ToggleButton>
+      <ContentPresenter Grid.Column="1" ContentSource="Header" Margin="6,0,10,0" VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+     </Grid>
+    </Border>
+    <ItemsPresenter x:Name="Children" Grid.Row="1" Grid.Column="1"/>
+   </Grid>
+   <ControlTemplate.Triggers>
+    <Trigger SourceName="Row" Property="IsMouseOver" Value="True"><Setter TargetName="Row" Property="Background" Value="{DynamicResource BrushPrismSelection}"/><Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource BrushPrismRim}"/></Trigger>
+    <Trigger Property="IsSelected" Value="True"><Setter TargetName="Row" Property="Background" Value="{DynamicResource BrushPrismSelection}"/><Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource BrushPrismRim}"/></Trigger>
+    <Trigger Property="IsExpanded" Value="False"><Setter TargetName="Children" Property="Visibility" Value="Collapsed"/></Trigger>
+    <Trigger Property="HasItems" Value="False"><Setter TargetName="Expander" Property="Visibility" Value="Hidden"/></Trigger>
+   </ControlTemplate.Triggers>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
  <Style x:Key="PrismCardStyle" TargetType="views:PrismCard">
   <Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Stretch"/>
   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="views:PrismCard">
    <Grid>
-    <Border CornerRadius="24" BorderBrush="#FF345A70" BorderThickness="2" IsHitTestVisible="False"><Border.Effect><DropShadowEffect Color="#345A70" BlurRadius="24" ShadowDepth="8" Opacity="0.16"/></Border.Effect></Border>
+    <Border x:Name="Shadow" CornerRadius="24" BorderBrush="#FF345A70" BorderThickness="2" IsHitTestVisible="False"><Border.Effect><DropShadowEffect Color="#345A70" BlurRadius="24" ShadowDepth="8" Opacity="0.16"/></Border.Effect></Border>
     <Grid x:Name="PART_Clip">
      <Border x:Name="PART_Backdrop" Margin="-18" IsHitTestVisible="False"><Border.Effect><BlurEffect Radius="18" RenderingBias="Performance"/></Border.Effect></Border>
-     <Border CornerRadius="24" Background="{DynamicResource BrushPrismSurface}" BorderBrush="{DynamicResource BrushPrismRim}" BorderThickness="2" IsHitTestVisible="False"/>
+     <Border x:Name="Surface" CornerRadius="24" Background="{DynamicResource BrushPrismSurface}" BorderBrush="{DynamicResource BrushPrismRim}" BorderThickness="2" IsHitTestVisible="False"/>
      <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
     </Grid>
    </Grid>
+  <ControlTemplate.Triggers><Trigger Property="IsPlain" Value="True"><Setter TargetName="Surface" Property="Visibility" Value="Collapsed"/><Setter TargetName="Shadow" Property="Visibility" Value="Collapsed"/><Setter TargetName="PART_Backdrop" Property="Visibility" Value="Collapsed"/></Trigger></ControlTemplate.Triggers>
   </ControlTemplate></Setter.Value></Setter>
  </Style>
  <Style x:Key="PrismScrollBar" TargetType="ScrollBar">

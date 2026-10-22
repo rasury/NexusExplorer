@@ -47,7 +47,7 @@ public partial class CategoryFilePanel : UserControl
         {
             int Count(IEnumerable<Category> categories) => categories.Sum(c => 1 + (c.IsExpanded ? Count(c.Children) : 0));
             var rows = _main is null ? 0 : Count(CategoryVm.RootCategories);
-            return 40 + 8 + Math.Max(120, rows * 36 + 16) + Math.Max(120, FileListBox.Items.Count * 64 + 40);
+            return 40 + 8 + Math.Max(120, rows * 39 + 16) + Math.Max(120, FileListBox.Items.Count * 72 + 40);
         }
     }
     public CategoryFilePanel()

@@ -10,7 +10,7 @@
     <UserControl.Resources>
         <Style TargetType="ScrollViewer" BasedOn="{StaticResource PrismOverlayScrollViewer}"/>
         <!-- 分类树节点模板 -->
-        <HierarchicalDataTemplate DataType="{x:Type models:Category}" ItemsSource="{Binding Children}">
+        <HierarchicalDataTemplate DataType="{x:Type models:Category}" ItemContainerStyle="{StaticResource PrismTreeItem}" ItemsSource="{Binding Children}">
             <StackPanel Orientation="Horizontal">
                 <md:PackIcon Style="{StaticResource CategoryFolderIcon}" />
                 <TextBlock Text="{Binding Name}" ToolTip="{Binding Name}" VerticalAlignment="Center" />
@@ -37,7 +37,7 @@
             </DockPanel>
         </Border>
         <!-- 分类树 -->
-        <TreeView x:Name="CategoryTree"
+        <TreeView x:Name="CategoryTree" ItemContainerStyle="{StaticResource PrismTreeItem}"
                   Grid.Row="1"
                   Padding="8"
                   VirtualizingPanel.IsVirtualizing="True"
@@ -113,7 +113,7 @@
             </Border>
 
             <!-- 文件列表 -->
-            <ListBox x:Name="FileListBox"
+            <ListBox x:Name="FileListBox" ItemContainerStyle="{StaticResource PrismFileItem}"
                      Grid.Row="1"
                      Padding="8"
                      ScrollViewer.CanContentScroll="True"

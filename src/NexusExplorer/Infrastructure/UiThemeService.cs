@@ -65,6 +65,7 @@ public static class UiThemeService
         resources["MaterialDesign.Brush.ForegroundLight"] = resources["BrushSecondaryText"];
         resources["MaterialDesign.Brush.Card.Background"] = resources["BrushPanelBg"];
         Brush("BrushPrismRim", IsDark ? "#55C4EAF3" : "#B3FFFFFF");
+        Brush("BrushPrismSelection", IsDark ? "#30C2E6EE" : "#9EFFFFFF");
         Brush("BrushWallpaperShade", IsDark ? "#800C203A" : "#00000000");
         Brush("BrushPrismDialog", IsDark ? "#EE294550" : "#E6E4F0F3");
         resources["BrushPrismSurface"] = new LinearGradientBrush(new GradientStopCollection
