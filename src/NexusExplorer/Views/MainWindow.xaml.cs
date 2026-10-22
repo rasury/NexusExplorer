@@ -113,6 +113,16 @@ public partial class MainWindow : Window
         exit.Completed += (_, _) => { if (version == _noticeVersion) NoticeCard.Visibility = Visibility.Collapsed; };
         NoticeTransform.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, exit);
     }
+    // A signed extent preserves spring overshoot beyond the zero-width boundary.
+    // The slot consumes positive space; the center stretches into negative space.
+    private static readonly DependencyProperty DrawerExtentProperty = DependencyProperty.Register(
+        "DrawerExtent", typeof(double), typeof(MainWindow), new PropertyMetadata(320d, (d, e) =>
+        {
+            var window = (MainWindow)d;
+            var extent = (double)e.NewValue;
+            window.LibrarySlot.Width = Math.Max(0, extent);
+            window.CenterWorkspace.Margin = new Thickness(Math.Min(0, extent), 0, 0, 0);
+        }));
     private bool _libraryOpen = true;
     private double _libraryHeight;
     private void ResizeLibrary()
@@ -128,7 +138,7 @@ public partial class MainWindow : Window
     {
         _libraryOpen = !_libraryOpen;
         LibraryCard.IsHitTestVisible = _libraryOpen;
-        LibrarySlot.BeginAnimation(WidthProperty, PrismMotion.Spring(LibrarySlot.ActualWidth, _libraryOpen ? 320 : 0, true));
+        BeginAnimation(DrawerExtentProperty, PrismMotion.Spring((double)GetValue(DrawerExtentProperty), _libraryOpen ? 320 : 0));
         LibraryScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, PrismMotion.Spring(LibraryScale.ScaleX, _libraryOpen ? 1 : .78));
         LibraryScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, PrismMotion.Spring(LibraryScale.ScaleY, _libraryOpen ? 1 : .78));
         LibraryTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, PrismMotion.Spring(LibraryTranslate.X, _libraryOpen ? 0 : 160));

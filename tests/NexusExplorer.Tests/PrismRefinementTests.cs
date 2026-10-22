@@ -62,7 +62,14 @@ public class PrismRefinementTests
                 Assert.InRange(Math.Abs(searchCard.PointToScreen(new Point(searchCard.ActualWidth / 2, 0)).X - preview.PointToScreen(new Point(preview.ActualWidth / 2, 0)).X), 0, 1);
                 var before = preview.ActualWidth;
                 var toggle = (Button)window.FindName("DrawerToggleButton");
-                toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Task.Delay(800); window.UpdateLayout();
+                toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                var widest = preview.ActualWidth;
+                for (var frame = 0; frame < 45; frame++)
+                {
+                    await Task.Delay(20); window.UpdateLayout();
+                    widest = Math.Max(widest, preview.ActualWidth);
+                }
+                Assert.True(widest > preview.ActualWidth + 2, $"peak={widest}; settled={preview.ActualWidth}");
                 Assert.True(preview.ActualWidth > before + 300);
                 Assert.Equal(0, ((FrameworkElement)window.FindName("LibrarySlot")).ActualWidth);
                 toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Task.Delay(800); window.UpdateLayout();
