@@ -1,10 +1,11 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MaterialDesignThemes.Wpf;
 using NexusExplorer.Views.Dialogs;
+using NexusExplorer.Views;
 
 namespace NexusExplorer.Tests;
 
@@ -25,8 +26,8 @@ public sealed class InputWindowTests
             {
                 var result = InputDialog.ShowAsync("新建分类", "分类名称", "中文分类");
                 Window? shell = null;
-                await BoundedDialogTests.Until(() => (shell = System.Windows.Application.Current.Windows.OfType<Window>().FirstOrDefault(w => ReferenceEquals(w.Owner, owner)))?.Content is DialogHost { IsOpen: true, DialogContent: DialogSurface { IsLoaded: true } });
-                var surface = (DialogSurface)((DialogHost)shell!.Content).DialogContent!;
+                await BoundedDialogTests.Until(() => (shell = System.Windows.Application.Current.Windows.OfType<Window>().FirstOrDefault(w => ReferenceEquals(w.Owner, owner)))?.Content is DialogHost { IsOpen: true, DialogContent: PrismCard { Content: DialogSurface { IsLoaded: true } } });
+                var surface = (DialogSurface)((PrismCard)((DialogHost)shell!.Content).DialogContent!).Content;
                 var body = (StackPanel)((ScrollViewer)surface.Children[0]).Content;
                 var input = body.Children.OfType<TextBox>().Single();
                 await BoundedDialogTests.Until(() => input.SelectionLength == input.Text.Length);
@@ -66,10 +67,10 @@ public sealed class InputWindowTests
                 var topLeft = card.TranslatePoint(new Point(0, 0), dialogHost);
                 var centerX = (int)(topLeft.X + card.ActualWidth / 2);
                 var shadowY = (int)(topLeft.Y + card.ActualHeight + 8);
-                Assert.InRange(pixels[(shadowY * bitmap.PixelWidth + centerX) * 4 + 3], 1, 254);
                 var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
                 var folder = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "nexus-feature-checks"); System.IO.Directory.CreateDirectory(folder);
                 using (var image = System.IO.File.Create(System.IO.Path.Combine(folder, "input-card.png"))) encoder.Save(image);
+                Assert.InRange(pixels[(shadowY * bitmap.PixelWidth + centerX) * 4 + 3], 1, 254);
                 actions[0].Focus(); input.Focus(); input.CaretIndex = 2;
                 await Dispatcher.Yield(DispatcherPriority.Input);
                 Assert.True(input.IsKeyboardFocused); Assert.Equal(2, input.CaretIndex);

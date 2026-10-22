@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -27,22 +27,16 @@ public class DrawerVirtualizationTests
         var path = host.CreateTestFile("sample.mp3");
         await WpfTestHost.RunAsync(async () =>
         {
-            // Load the production layout without startup, database restore, or exit handlers.
-            var sourcePath = Path.GetFullPath("../../../../../src/NexusExplorer/Views/MainWindow.xaml", AppContext.BaseDirectory);
-            var xaml = Regex.Replace(File.ReadAllText(sourcePath), "\\s+x:Class=\"[^\"]+\"|\\s+\\w+=\"On\\w+\"", "");
-            xaml = xaml.Replace("clr-namespace:NexusExplorer.Views\"", "clr-namespace:NexusExplorer.Views;assembly=NexusExplorer\"");
-            var window = (Window)XamlReader.Parse(xaml);
-            window.ShowActivated = false; window.ShowInTaskbar = false;
-            window.WindowStartupLocation = WindowStartupLocation.Manual; window.Left = -5000; window.Top = -5000;
+            using var engine = new FakePlaybackEngine();
+            var main = new MainViewModel(host.Categories, host.Files, host.Organization, engine);
+            var window = new MainWindow(main, host.Categories, host.Files, host.Organization, host.RecycleBin, engine)
+            { ShowActivated = false, ShowInTaskbar = false };
             var drawer = (PrismCard)window.FindName("LibraryCard");
             var panel = (CategoryFilePanel)window.FindName("LeftPanel");
             var list = (ListBox)panel.FindName("FileListBox");
             var player = (PlayerPanel)window.FindName("PlayerArea");
-            using var engine = new FakePlaybackEngine();
-            var main = new MainViewModel(host.Categories, host.Files, host.Organization, engine);
             var records = new ObservableCollection<FileItem>(Enumerable.Range(0, count)
                 .Select(i => new FileItem { Id = i + 1, FileName = $"sample-{i:D4}.mp3", AbsolutePath = path }));
-            main.CurrentFiles = records; list.ItemsSource = records; player.Initialize(main);
             var maxRealized = 0;
             list.ItemContainerGenerator.StatusChanged += (_, _) =>
             {
@@ -53,7 +47,8 @@ public class DrawerVirtualizationTests
             var report = new List<string>();
             try
             {
-                window.Show(); await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
+                window.Show(); await main.RefreshTreeAsync(); await Task.Delay(200);
+                main.CurrentFiles = records; panel.SetFileFilter(""); await Task.Delay(800); window.UpdateLayout();
                 report.Add($"count={count} initialHeight={panel.Height:F1} viewport={drawer.ActualHeight:F1} maxRows={maxRealized}");
                 Assert.True(ScrollViewer.GetCanContentScroll(list));
                 Assert.True(VirtualizingPanel.GetIsVirtualizing(list));
@@ -69,14 +64,13 @@ public class DrawerVirtualizationTests
                 var offset = viewer.VerticalOffset;
                 var originalHeight = panel.ActualHeight;
                 var button = Descendants<Button>(window).Single(b => b.ToolTip is string text && text == "显示或隐藏分类面板");
-                button.Click += (_, _) => drawer.Visibility = drawer.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
                 for (var cycle = 0; cycle < 2; cycle++)
                 {
                     foreach (var open in new[] { false, true })
                     {
                         var timing = Stopwatch.StartNew();
                         button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
+                        await Task.Delay(800); window.UpdateLayout();
                         report.Add($"count={count} cycle={cycle} open={open} settledMs={timing.Elapsed.TotalMilliseconds:F1} maxRows={maxRealized}");
                         Assert.InRange(maxRealized, 1, Math.Min(count, 50));
                         if (open) Assert.InRange(drawer.ActualHeight - panel.ActualHeight, 70, 75);
@@ -90,7 +84,7 @@ public class DrawerVirtualizationTests
                     if (cycle == 0)
                     {
                         window.Height = 720; window.Width = 960;
-                        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle); window.UpdateLayout();
+                        await Task.Delay(800); window.UpdateLayout();
                         Assert.True(panel.ActualHeight < originalHeight);
                         Assert.InRange(drawer.ActualHeight - panel.ActualHeight, 70, 75);
                         offset = viewer.VerticalOffset;
@@ -99,7 +93,7 @@ public class DrawerVirtualizationTests
             }
             finally
             {
-                player.Detach(); window.Close();
+                window.PrepareForVerificationExit(); window.Close();
                 var directory = Path.Combine(Path.GetTempPath(), "nexus-feature-checks", "drawer-analysis");
                 Directory.CreateDirectory(directory); File.WriteAllLines(Path.Combine(directory, $"fixed-{count}.txt"), report);
             }

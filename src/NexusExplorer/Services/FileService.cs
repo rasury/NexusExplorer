@@ -22,6 +22,18 @@ public class FileService
 
     // ---------- 查询 ----------
 
+    public Task<List<FileItem>> SearchAsync(string query, CancellationToken token = default) => Task.Run(async () =>
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(token);
+        var escaped = query.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var files = await db.Files.AsNoTracking()
+            .Where(f => EF.Functions.Like(f.FileName, "%" + escaped + "%", "\\"))
+            .OrderBy(f => f.FileName).ThenBy(f => f.Id).ToListAsync(token);
+        token.ThrowIfCancellationRequested();
+        await LocationService.ResolveAsync(db, files: files);
+        return files;
+    }, token);
+
     public Task<List<FileItem>> GetByCategoryAsync(int categoryId) => Task.Run(() => GetByCategoryAsyncCore(categoryId));
     private async Task<List<FileItem>> GetByCategoryAsyncCore(int categoryId)
     {

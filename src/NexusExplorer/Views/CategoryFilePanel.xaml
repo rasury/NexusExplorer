@@ -1,7 +1,8 @@
-<UserControl x:Class="NexusExplorer.Views.CategoryFilePanel"
+﻿<UserControl x:Class="NexusExplorer.Views.CategoryFilePanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:views="clr-namespace:NexusExplorer.Views"
              xmlns:models="clr-namespace:NexusExplorer.Models"
              AllowDrop="True"
              Background="Transparent">
@@ -17,25 +18,7 @@
         </HierarchicalDataTemplate>
 
         <!-- 文件列表项模板 -->
-        <DataTemplate DataType="{x:Type models:FileItem}">
-            <StackPanel Orientation="Horizontal">
-                <md:PackIcon Kind="{Binding Extension, Converter={StaticResource FileMaterialIconConverter}}" Width="24" Height="24" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <TextBlock x:Name="FileNameText"
-                           Text="{Binding FileName}"
-                           VerticalAlignment="Center"
-                           TextTrimming="CharacterEllipsis" />
-            </StackPanel>
-            <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                    <Setter TargetName="FileNameText" Property="FontWeight" Value="Bold" />
-                    <Setter TargetName="FileNameText" Property="Foreground" Value="{DynamicResource BrushAccentOrange}" />
-                </DataTrigger>
-                <DataTrigger Binding="{Binding ExistsOnDisk}" Value="False">
-                    <Setter TargetName="FileNameText" Property="Foreground" Value="{DynamicResource BrushDisabledText}" />
-                    <Setter TargetName="FileNameText" Property="TextDecorations" Value="Strikethrough" />
-                </DataTrigger>
-            </DataTemplate.Triggers>
-        </DataTemplate>
+        <DataTemplate DataType="{x:Type models:FileItem}"><views:FileRow/></DataTemplate>
     </UserControl.Resources>
 
     <Grid x:Name="CategoryFileLayout">
@@ -125,7 +108,7 @@
                     BorderBrush="{DynamicResource BrushDivider}"
                     BorderThickness="0,1,0,1"
                     Padding="16,0">
-                <TextBlock Text="{Binding FileListVmBinding.HeaderText, Mode=OneWay}"
+                <TextBlock x:Name="FileCountHeader" Text="文件 · 0"
                            Style="{StaticResource TextCaption}" />
             </Border>
 

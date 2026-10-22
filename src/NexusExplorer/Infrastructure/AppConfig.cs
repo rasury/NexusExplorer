@@ -62,6 +62,8 @@ public class PlaybackConfig
 
 public class AppearanceConfig
 {
+    public string? BackgroundImagePath { get; set; }
+    public double BackgroundOpacity { get; set; } = 1;
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public UiThemeMode ThemeMode { get; set; } = UiThemeMode.System;
 }

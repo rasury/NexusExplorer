@@ -1,4 +1,4 @@
-using NexusExplorer.Views.Dialogs;
+﻿using NexusExplorer.Views.Dialogs;
 using System.IO;
 using System.Diagnostics;
 using System.Windows;
@@ -40,7 +40,22 @@ public partial class CategoryFilePanel : UserControl
     private AsyncRelayCommand<Category>? _organizeCommand;
     public ICommand OrganizeCommand => _organizeCommand ??= new AsyncRelayCommand<Category>(OrganizeAsync, category => category is not null && _organizing is null);
 
-    public CategoryFilePanel() { InitializeComponent(); DataContext = this; _filePreview = new(FileListBox); }
+    public event Action? PresentationSizeChanged;
+    internal double PreferredHeight
+    {
+        get
+        {
+            int Count(IEnumerable<Category> categories) => categories.Sum(c => 1 + (c.IsExpanded ? Count(c.Children) : 0));
+            var rows = _main is null ? 0 : Count(CategoryVm.RootCategories);
+            return 40 + 8 + Math.Max(120, rows * 36 + 16) + Math.Max(120, FileListBox.Items.Count * 64 + 40);
+        }
+    }
+    public CategoryFilePanel()
+    {
+        InitializeComponent(); DataContext = this; _filePreview = new(FileListBox);
+        CategoryTree.AddHandler(TreeViewItem.ExpandedEvent, new RoutedEventHandler((_, _) => Dispatcher.BeginInvoke(() => PresentationSizeChanged?.Invoke())));
+        CategoryTree.AddHandler(TreeViewItem.CollapsedEvent, new RoutedEventHandler((_, _) => Dispatcher.BeginInvoke(() => PresentationSizeChanged?.Invoke())));
+    }
     public void Initialize(MainViewModel main, IRecycleBinService recycleBin)
     {
         _main = main; DataContext = null; DataContext = this; _state = UiStateStore.Load();
@@ -49,7 +64,7 @@ public partial class CategoryFilePanel : UserControl
         CategoryVm.ShowConfirmDialog = ConfirmAsync; FileListVm.ShowConfirmDialog = ConfirmAsync;
         CategoryVm.ShowErrorAsync = ShowErrorAsync; FileListVm.ShowErrorAsync = ShowErrorAsync;
         FileListVm.ShowInfo = message => { OperationStatus.Text = message; MaterialDialogService.Notice(message); };
-        FileListVm.ShowImportStatus = message => OperationStatus.Text = message;
+        FileListVm.ShowImportStatus = message => { OperationStatus.Text = message; MaterialDialogService.Notice(message); };
         FileListVm.PickFiles = () =>
         {
             var dialog = new OpenFileDialog { Title = "选择文件", Multiselect = true };
@@ -121,18 +136,48 @@ public partial class CategoryFilePanel : UserControl
             _restored = true;
         }
         CategoryTree.ItemsSource = CategoryVm.RootCategories;
+        PresentationSizeChanged?.Invoke();
         _ = Dispatcher.BeginInvoke(() => FindChild<ScrollViewer>(CategoryTree)?.ScrollToVerticalOffset(offset));
         _organizeCommand?.NotifyCanExecuteChanged();
     }
     private string _fileFilter = "";
-    public void SetFileFilter(string query)
+    private bool _globalSearch;
+    private CancellationTokenSource? _search;
+    public void SetFileFilter(string query) => SetFileFilter(query, _globalSearch);
+    public async void SetFileFilter(string query, bool global)
     {
-        _fileFilter = query.Trim();
-        if (FileListBox.ItemsSource is not null)
+        _fileFilter = query.Trim(); _globalSearch = global;
+        _search?.Cancel(); _search?.Dispose(); _search = new();
+        var token = _search.Token;
+        if (_main is null) return;
+        if (global && _fileFilter.Length > 0)
         {
-            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListBox.ItemsSource);
-            view.Filter = string.IsNullOrEmpty(_fileFilter) ? null : item => item is FileItem f && f.FileName.Contains(_fileFilter, StringComparison.CurrentCultureIgnoreCase);
+            FileCountHeader.Text = "正在搜索…";
+            FileListBox.ItemsSource = Array.Empty<FileItem>();
+            try
+            {
+                await Task.Delay(200, token);
+                var results = await _main.Files.SearchAsync(_fileFilter, token);
+                token.ThrowIfCancellationRequested();
+                foreach (var f in results) f.IsCurrent = f.Id == _main.CurrentFile?.Id;
+                FileListBox.ItemsSource = results;
+                UpdatePresentationCount();
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { if (!token.IsCancellationRequested) { FileCountHeader.Text = "搜索失败"; Log.Error(ex, "全局搜索失败"); } }
         }
+        else
+        {
+            FileListBox.ItemsSource = FileListVm.Files;
+            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListVm.Files);
+            view.Filter = string.IsNullOrEmpty(_fileFilter) ? null : item => item is FileItem f && f.FileName.Contains(_fileFilter, StringComparison.CurrentCultureIgnoreCase);
+            UpdatePresentationCount();
+        }
+    }
+    private void UpdatePresentationCount()
+    {
+        FileCountHeader.Text = $"{(_globalSearch && _fileFilter.Length > 0 ? "搜索结果" : _main.CurrentCategory?.Name ?? "文件")} · {FileListBox.Items.Count}";
+        PresentationSizeChanged?.Invoke();
     }
     private void RefreshFileList()
     {
@@ -172,7 +217,7 @@ public partial class CategoryFilePanel : UserControl
     {
         _filePreview.Cancel();
         _dragWheel.Dispose();
-        _shuttingDown = true; _organizing?.Cancel();
+        _shuttingDown = true; _organizing?.Cancel(); _search?.Cancel();
         if (_organizeCommand?.ExecutionTask is { } task) await task;
         using var lease = await MutationGate.AcquireAsync();
     }
@@ -198,7 +243,12 @@ public partial class CategoryFilePanel : UserControl
         if (IsControlChrome(e.OriginalSource as DependencyObject)) return;
         if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject)?.DataContext is not FileItem file) return;
         Log.Information("文件双击播放;文件 {FileId};名称 {FileName}", file.Id, file.FileName);
-        e.Handled = true; await RunAsync(() => FileListVm.ActivateFileAsync(file));
+        e.Handled = true; await RunAsync(async () =>
+        {
+            if (_globalSearch && file.CategoryId != _main.CurrentCategory?.Id)
+                await _main.SelectCategoryAsync(await _main.Categories.GetByIdAsync(file.CategoryId));
+            await FileListVm.ActivateFileAsync(file);
+        });
     }
     private void OnCategoryTreeContextMenuOpening(object sender, ContextMenuEventArgs e)
     {

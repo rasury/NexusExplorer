@@ -211,6 +211,7 @@ public partial class FileListViewModel : ObservableObject
             catch (Exception ex) { errors.Add($"{f.FileName}: {ex.Message}"); Serilog.Log.Error(ex, "批量归类失败"); }
         }
         await _main.OnFilesRecategorizedAsync(succeeded);
+        if (succeeded.Count > 0) ShowInfo?.Invoke($"已将 {succeeded.Count} 个文件归类到「{target.Name}」。");
         if (errors.Count > 0) await ReportErrorAsync($"成功 {succeeded.Count}，失败 {errors.Count}\n" + string.Join("\n", errors));
     }
     public Task RecategorizeAsync(FileItem file, Category target) => RecategorizeManyAsync(new[] { file }, target);

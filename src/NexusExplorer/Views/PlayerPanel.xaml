@@ -1,4 +1,4 @@
-<UserControl x:Class="NexusExplorer.Views.PlayerPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:NexusExplorer.Views" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+﻿<UserControl x:Class="NexusExplorer.Views.PlayerPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:NexusExplorer.Views" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
  <UserControl.Resources>
   <Style x:Key="PlayerIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
    <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
@@ -37,10 +37,10 @@
    </Grid>
   </md:Card>
   </views:PrismCard>
-  <Grid x:Name="InspectorSlot" Grid.Column="1" Width="24" ClipToBounds="True" MouseEnter="OnInspectorEnter" MouseLeave="OnInspectorLeave">
+  <Grid x:Name="InspectorSlot" Grid.Column="1" Width="24" Background="Transparent" ClipToBounds="True" MouseEnter="OnInspectorEnter" MouseLeave="OnInspectorLeave">
    <views:PrismCard Width="260" HorizontalAlignment="Left" Padding="0,16,16,16">
     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-     <Button x:Name="InspectorHandle" Style="{StaticResource ButtonText}" MinWidth="0" Height="Auto" Padding="0" Click="OnInspectorOpen" ToolTip="文件详情" AutomationProperties.Name="展开文件详情"><Border Width="3" Height="38" CornerRadius="2" Background="{DynamicResource BrushSecondaryText}"/></Button>
+     <Button x:Name="InspectorHandle" Background="Transparent" BorderThickness="0" MinWidth="0" Height="Auto" Padding="0" Click="OnInspectorOpen" ToolTip="文件详情" AutomationProperties.Name="展开文件详情"><Button.Template><ControlTemplate TargetType="Button"><Border Background="Transparent"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Button.Template><Border Width="3" Height="38" CornerRadius="2" Background="{DynamicResource BrushSecondaryText}"/></Button>
      <Grid x:Name="InspectorBody" Grid.Column="1" Visibility="Hidden"><Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/></Grid.RowDefinitions>
       <DockPanel><ToggleButton x:Name="InspectorPin" DockPanel.Dock="Right" Width="36" Height="36" Style="{StaticResource MaterialDesignFlatToggleButton}" Checked="OnInspectorPin" Unchecked="OnInspectorPin" ToolTip="固定文件详情"><md:PackIcon Kind="PinOutline" Width="20" Height="20"/></ToggleButton><TextBlock Text="文件详情" Style="{StaticResource TextHeader}" VerticalAlignment="Center"/></DockPanel>
       <ScrollViewer Style="{StaticResource PrismOverlayScrollViewer}" Grid.Row="1" Margin="0,8,0,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>

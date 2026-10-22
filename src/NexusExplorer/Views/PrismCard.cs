@@ -8,6 +8,7 @@ namespace NexusExplorer.Views;
 /// <summary>Samples only the wallpaper, never video, text or the card itself.</summary>
 public sealed class PrismCard : ContentControl
 {
+    internal FrameworkElement? BackdropScene { get; set; }
     private FrameworkElement? _backdrop;
     private Grid? _clip;
     private VisualBrush? _sample;
@@ -32,8 +33,9 @@ public sealed class PrismCard : ContentControl
         if (_clip.Clip is not RectangleGeometry geometry || geometry.Rect != clip)
             _clip.Clip = new RectangleGeometry(clip, 24, 24);
         var window = Window.GetWindow(this);
-        if (window?.FindName("WallpaperScene") is not FrameworkElement scene) return;
-        var origin = TranslatePoint(new Point(-18, -18), scene);
+        var scene = BackdropScene ?? window?.FindName("WallpaperScene") as FrameworkElement;
+        if (scene is null || PresentationSource.FromVisual(scene) is null || PresentationSource.FromVisual(this) is null) return;
+        var origin = scene.PointFromScreen(PointToScreen(new Point(-18, -18)));
         var rect = new Rect(origin, new Size(ActualWidth + 36, ActualHeight + 36));
         if (_sample is null)
         {

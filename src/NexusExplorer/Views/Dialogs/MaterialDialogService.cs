@@ -34,6 +34,7 @@ internal static class MaterialDialogService
             if (_closing) return null;
             DialogHost? host = null;
             if (_root is not null && _root.TryGetTarget(out var root) && root.IsLoaded) host = root;
+            var scene = host is null ? null : Window.GetWindow(host)?.FindName("WallpaperScene") as FrameworkElement;
             if (host is null || view.RequiresInputWindow)
             {
                 // Text input uses a real owned HWND: Popup's IME context can lose
@@ -61,7 +62,7 @@ internal static class MaterialDialogService
                     // Dp24's 49px blur and 12.5px offset must fit inside the
                     // transparent HWND; otherwise its edges clip the rounded shadow.
                     host.DialogMargin = new Thickness(64);
-                    host.SetResourceReference(DialogHost.DialogBackgroundProperty, "BrushPrismDialog");
+                    host.DialogBackground = System.Windows.Media.Brushes.Transparent;
                     shell.Width = view.Width + view.Margin.Left + view.Margin.Right + host.DialogMargin.Left + host.DialogMargin.Right;
                 }
                 var area = SystemParameters.WorkArea;
@@ -80,8 +81,18 @@ internal static class MaterialDialogService
             view.Constrain(host.ActualWidth, host.ActualHeight, host.DialogMargin); host.SizeChanged += Bounds;
             try
             {
-                return await DialogHost.Show(view, host.Identifier!, new DialogOpenedEventHandler((_, e) =>
+                host.DialogBackground = System.Windows.Media.Brushes.Transparent;
+                var glass = new PrismCard { Content = view, BackdropScene = scene };
+                return await DialogHost.Show(glass, host.Identifier!, new DialogOpenedEventHandler((_, e) =>
                 {
+                    // Prism owns the rounded clipping; the host must not crop its shadow.
+                    host.ApplyTemplate();
+                    if (host.Template.FindName("PART_PopupContentElement", host) is Card card)
+                    {
+                        card.ClipContent = false;
+                        card.Effect = new System.Windows.Media.Effects.DropShadowEffect
+                        { Color = System.Windows.Media.Color.FromRgb(30, 55, 70), BlurRadius = 28, ShadowDepth = 8, Opacity = .28 };
+                    }
                     _session = e.Session;
                     view.Complete = result => { if (!e.Session.IsEnded) e.Session.Close(result); };
                     if (view.RequiresInputWindow && shell is not null)

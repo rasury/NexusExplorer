@@ -1,4 +1,4 @@
-using NexusExplorer.Views.Dialogs;
+﻿using NexusExplorer.Views.Dialogs;
 using NexusExplorer.ApplicationLayer;
 using System.Windows;
 using System.Windows.Controls;
@@ -21,16 +21,51 @@ public partial class PlayerPanel : UserControl
     private readonly DispatcherTimer _videoClickTimer = new();
     private PlaybackToken _clickToken;
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
-    private readonly DispatcherTimer _inspectorTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
-    private void OnInspectorEnter(object sender, MouseEventArgs e) { _inspectorTimer.Stop(); if (InspectorPin.IsChecked != true) _inspectorTimer.Start(); }
-    private void OnInspectorLeave(object sender, MouseEventArgs e) { _inspectorTimer.Stop(); if (InspectorPin.IsChecked != true) ShowInspector(false); }
+    private readonly DispatcherTimer _inspectorTimer = new() { Interval = TimeSpan.FromMilliseconds(40) };
+    private bool _inspectorOpen;
+    private DateTime _inspectorEntered, _inspectorLeft;
+    private bool IsPointerInsideInspector()
+    {
+        if (!InspectorSlot.IsVisible) return false;
+        GetCursorPos(out var point);
+        var p = InspectorSlot.PointFromScreen(new Point(point.X, point.Y));
+        // Includes the card padding and the stationary edge handle throughout resizing.
+        return new Rect(-8, -8, InspectorSlot.ActualWidth + 16, InspectorSlot.ActualHeight + 16).Contains(p);
+    }
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct CursorPoint { public int X, Y; }
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetCursorPos(out CursorPoint point);
+    private void OnInspectorEnter(object sender, MouseEventArgs e)
+    {
+        if (!_inspectorTimer.IsEnabled) { _inspectorEntered = DateTime.UtcNow; _inspectorLeft = default; _inspectorTimer.Start(); }
+    }
+    private void OnInspectorLeave(object sender, MouseEventArgs e) { /* The stable screen rectangle, not animated hit testing, decides exit. */ }
+    private void TrackInspectorPointer()
+    {
+        if (InspectorPin.IsChecked == true) { _inspectorTimer.Stop(); return; }
+        if (IsPointerInsideInspector())
+        {
+            _inspectorLeft = default;
+            if (!_inspectorOpen && (DateTime.UtcNow - _inspectorEntered).TotalMilliseconds >= 200) ShowInspector(true);
+        }
+        else
+        {
+            if (_inspectorLeft == default) _inspectorLeft = DateTime.UtcNow;
+            if ((DateTime.UtcNow - _inspectorLeft).TotalMilliseconds >= 180)
+            { ShowInspector(false); _inspectorTimer.Stop(); }
+        }
+    }
     private void OnInspectorOpen(object sender, RoutedEventArgs e) => ShowInspector(true);
-    private void OnInspectorPin(object sender, RoutedEventArgs e) { _inspectorTimer.Stop(); ShowInspector(InspectorPin.IsChecked == true); }
+    private void OnInspectorPin(object sender, RoutedEventArgs e)
+    {
+        if (InspectorPin.IsChecked == true) { _inspectorTimer.Stop(); ShowInspector(true); }
+        else { _inspectorLeft = default; _inspectorTimer.Start(); }
+    }
     internal void ShowInspector(bool open)
     {
+        _inspectorOpen = open;
         InspectorBody.Visibility = open ? Visibility.Visible : Visibility.Hidden;
         InspectorBody.IsHitTestVisible = open;
-        InspectorSlot.BeginAnimation(WidthProperty, new DoubleAnimation(open ? 260 : 24, TimeSpan.FromMilliseconds(450)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+        InspectorSlot.BeginAnimation(WidthProperty, PrismMotion.Spring(InspectorSlot.ActualWidth, open ? 260 : 24, true));
     }
     private void UpdateDetails(FileItem? file)
     {
@@ -71,7 +106,7 @@ public partial class PlayerPanel : UserControl
         InitializeComponent();
         _videoClickTimer.Interval = TimeSpan.FromMilliseconds(GetDoubleClickTime());
         _videoClickTimer.Tick += async (_, _) => { _videoClickTimer.Stop(); if (!_dialogCovered && Controls?.CurrentToken == _clickToken && Vm.Kind == MediaKind.Video) await RunAsync(Vm.TogglePlayPauseAsync); };
-        _inspectorTimer.Tick += (_, _) => { _inspectorTimer.Stop(); if (InspectorSlot.IsMouseOver) ShowInspector(true); };
+        _inspectorTimer.Tick += (_, _) => TrackInspectorPointer();
         VolumeSlider.AddHandler(Mouse.LostMouseCaptureEvent, new MouseEventHandler(OnVolumeSliderLostCapture), true);
         VolumePopup.Closed += OnVolumePopupClosed;
         VideoView.SurfaceCreated += hwnd => { if (_main is not null) Lifetime?.AttachSurface(hwnd); };
