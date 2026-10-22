@@ -231,7 +231,10 @@ public partial class CategoryFilePanel : UserControl
     }
     private void OnCurrentFileChanged(FileItem? file)
     {
-        if (file is not null && FileListVm.Files.FirstOrDefault(f => f.Id == file.Id) is { } visible) FileListBox.ScrollIntoView(visible);
+        // Global results are detached records, separate from the browsed collection.
+        var displayed = FileListBox.Items.Cast<FileItem>().ToList();
+        foreach (var item in displayed) item.IsCurrent = item.Id == file?.Id;
+        if (file is not null && displayed.FirstOrDefault(f => f.Id == file.Id) is { } visible) FileListBox.ScrollIntoView(visible);
     }
     private async void OnCategoryDoubleClick(object sender, MouseButtonEventArgs e)
     {

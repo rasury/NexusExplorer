@@ -40,6 +40,8 @@ public class PrismRefinementTests
                 scope.SelectedIndex = 1; search.Text = "second";
                 await BoundedDialogTests.Until(() => list.Items.Cast<FileItem>().Any(f => f.Id == second.Id));
                 Assert.Single(main.CurrentFiles); Assert.Equal(first.Id, main.CurrentFile!.Id);
+                await main.SelectFileAsync(second);
+                Assert.True(Assert.Single(list.Items.Cast<FileItem>()).IsCurrent);
                 search.Text = "first"; scope.SelectedIndex = 0; search.Clear();
                 await Task.Delay(350); Assert.Equal(first.Id, Assert.Single(list.Items.Cast<FileItem>()).Id);
                 var player = (PlayerPanel)window.FindName("PlayerArea");
