@@ -47,7 +47,7 @@ public partial class CategoryFilePanel : UserControl
         {
             int Count(IEnumerable<Category> categories) => categories.Sum(c => 1 + (c.IsExpanded ? Count(c.Children) : 0));
             var rows = _main is null ? 0 : Count(CategoryVm.RootCategories);
-            return 40 + 8 + Math.Max(120, rows * 39 + 16) + Math.Max(120, FileListBox.Items.Count * 72 + 40);
+            return 8 + Math.Max(120, rows * 39 + 16) + Math.Max(120, FileListBox.Items.Count * 72 + 40);
         }
     }
     public CategoryFilePanel()
@@ -63,8 +63,8 @@ public partial class CategoryFilePanel : UserControl
         CategoryVm.ShowInputDialog = (title, value) => Dialogs.InputDialog.ShowAsync(title, "分类名称", value);
         CategoryVm.ShowConfirmDialog = ConfirmAsync; FileListVm.ShowConfirmDialog = ConfirmAsync;
         CategoryVm.ShowErrorAsync = ShowErrorAsync; FileListVm.ShowErrorAsync = ShowErrorAsync;
-        FileListVm.ShowInfo = message => { OperationStatus.Text = message; MaterialDialogService.Notice(message); };
-        FileListVm.ShowImportStatus = message => { OperationStatus.Text = message; MaterialDialogService.Notice(message); };
+        FileListVm.ShowInfo = message => MaterialDialogService.Notice(message);
+        FileListVm.ShowImportStatus = message => MaterialDialogService.Notice(message);
         FileListVm.PickFiles = () =>
         {
             var dialog = new OpenFileDialog { Title = "选择文件", Multiselect = true };
@@ -312,24 +312,24 @@ public partial class CategoryFilePanel : UserControl
     {
         if (category is null || _organizing is not null) return;
         _organizing = new(); var statusRefreshed = false;
+        CancelOrganizeButton.Header = "取消整理";
         CancelOrganizeButton.Visibility = Visibility.Visible; _organizeCommand?.NotifyCanExecuteChanged();
         try
         {
-            Dialogs.ConflictDecision? policy = null; var cancelledByDialog = false;
-            var progress = new Progress<OrganizeProgress>(p => OperationStatus.Text = $"整理 {p.Completed}/{p.Total}: {p.FileName}");
+            Dialogs.ConflictDecision? policy = null;
+            var progress = new Progress<OrganizeProgress>(p => CancelOrganizeButton.Header = $"取消整理（{p.Completed}/{p.Total}）");
             var result = await _main.Organization.OrganizeAsync(category.Id, async (name, target) =>
             {
                 var decision = policy ?? await Dialogs.ConflictDialog.ShowDecisionAsync(name, target);
-                if (decision.Resolution == ConflictResolution.Ask) cancelledByDialog = true;
                 if (decision.ApplyToAll && decision.Resolution != ConflictResolution.Ask) policy = decision;
                 return decision.Resolution;
             }, _organizing.Token, progress);
             await _main.RefreshOrganizationStatesAsync(); statusRefreshed = true;
             await _main.RefreshFilesAsync();
-            OperationStatus.Text = _organizing.IsCancellationRequested || cancelledByDialog ? $"整理已取消，已处理 {result.Count} 项" : $"整理完成，已处理 {result.Count} 项";
+
             if (!_shuttingDown) await Dialogs.OrganizeResultDialog.ShowAsync(category.Name, result);
         }
-        catch (Exception ex) { Log.Error(ex, "整理失败"); await ShowErrorAsync(ex.Message); OperationStatus.Text = "整理失败，请查看日志"; }
+        catch (Exception ex) { Log.Error(ex, "整理失败"); await ShowErrorAsync(ex.Message); }
         finally
         {
             _organizing.Dispose(); _organizing = null; CancelOrganizeButton.Visibility = Visibility.Collapsed; _organizeCommand?.NotifyCanExecuteChanged();
@@ -344,7 +344,7 @@ public partial class CategoryFilePanel : UserControl
         e.Handled = true;
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths) return;
         if (_main.CurrentCategory is { } target) QueueExternalImport(paths, target);
-        else OperationStatus.Text = "请先双击打开分类，再拖入文件。";
+        else MaterialDialogService.Notice("请先双击打开分类，再拖入文件。");
     }
     private void QueueExternalImport(string[] paths, Category target)
     {
@@ -356,9 +356,9 @@ public partial class CategoryFilePanel : UserControl
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(async () =>
         {
             Log.Information("外部拖入开始;导入 {ImportId};排队 {ElapsedMs:F1} ms", importId, queued.Elapsed.TotalMilliseconds);
-            OperationStatus.Text = $"正在导入到「{target.Name}」…";
+            MaterialDialogService.Notice($"正在导入到「{target.Name}」…");
             try { await FileListVm.ImportIntoAsync(copiedPaths, target, importId); }
-            catch (Exception ex) { Log.Error(ex, "外部拖入失败"); OperationStatus.Text = $"导入失败：{ex.Message}"; }
+            catch (Exception ex) { Log.Error(ex, "外部拖入失败"); MaterialDialogService.Notice($"导入失败：{ex.Message}"); }
             finally { Log.Information("外部拖入结束;导入 {ImportId};总耗时 {ElapsedMs:F1} ms", importId, queued.Elapsed.TotalMilliseconds); }
         }));
     }

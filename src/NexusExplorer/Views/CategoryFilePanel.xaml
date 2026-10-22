@@ -29,13 +29,6 @@
             <RowDefinition Height="*" MinHeight="120" />
         </Grid.RowDefinitions>
 
-        <!-- One reserved status row; classification controls live in the header/context menu. -->
-        <Border Grid.Row="0" Height="40" Background="Transparent" BorderBrush="{DynamicResource BrushDivider}" BorderThickness="0,0,0,1" Padding="16,0">
-            <DockPanel VerticalAlignment="Center">
-                <Button Style="{StaticResource ButtonText}" x:Name="CancelOrganizeButton" DockPanel.Dock="Right" Content="取消整理" Click="OnCancelOrganize" Visibility="Collapsed" Margin="8,0,0,0" />
-                <TextBlock Style="{StaticResource TextCaption}" x:Name="OperationStatus" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
-            </DockPanel>
-        </Border>
         <!-- 分类树 -->
         <TreeView x:Name="CategoryTree" ItemContainerStyle="{StaticResource PrismTreeItem}"
                   Grid.Row="1"
@@ -58,6 +51,7 @@
                     <MenuItem Header="导入文件" Click="OnAddCategoryFiles" />
                     <MenuItem Header="导入文件夹" Click="OnAddCategoryFolder" />
                     <MenuItem x:Name="OrganizeCategoryMenu" Header="整理" Click="OnOrganizeCategory" ToolTip="整理此分类及全部子分类" />
+                    <MenuItem x:Name="CancelOrganizeButton" Header="取消整理" Click="OnCancelOrganize" Visibility="Collapsed" />
                     <Separator />
                     <MenuItem Header="重命名" Click="OnRenameCategory" />
                     <MenuItem Header="重新定位目录…" Click="OnRelocateCategory" />

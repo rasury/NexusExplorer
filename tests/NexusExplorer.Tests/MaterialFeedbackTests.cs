@@ -1,4 +1,4 @@
-using NexusExplorer.Infrastructure.Playback.Mpv;
+﻿using NexusExplorer.Infrastructure.Playback.Mpv;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -46,7 +46,7 @@ public class MaterialFeedbackTests
     }
 
     [Fact]
-    public async Task CategoryListStartsAfterSingleStatusRowWithoutToolbarOrRootStrip()
+    public async Task CategoryListStartsAtTopWithoutReservedStatusRow()
     {
         using var host = new TestHost();
         await WpfTestHost.RunAsync(() =>
@@ -55,12 +55,11 @@ public class MaterialFeedbackTests
             var panel = new CategoryFilePanel(); panel.Initialize(main, host.RecycleBin);
             panel.Measure(new Size(400, 800)); panel.Arrange(new Rect(0, 0, 400, 800)); panel.UpdateLayout();
             Assert.Null(panel.FindName("RootDropZone"));
-            var status = (TextBlock)panel.FindName("OperationStatus");
+            Assert.Null(panel.FindName("OperationStatus"));
+            Assert.IsType<MenuItem>(panel.FindName("CancelOrganizeButton"));
             var tree = (TreeView)panel.FindName("CategoryTree");
             var treeTop = tree.TranslatePoint(new Point(), panel).Y;
-            Assert.Equal(TextWrapping.NoWrap, status.TextWrapping);
-            Assert.Equal(TextTrimming.CharacterEllipsis, status.TextTrimming);
-            Assert.InRange(treeTop, 40, 41);
+            Assert.InRange(treeTop, 0, 1);
             Assert.True(tree.ActualHeight > 350);
         });
     }
