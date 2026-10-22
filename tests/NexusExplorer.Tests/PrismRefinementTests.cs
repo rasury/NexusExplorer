@@ -37,7 +37,18 @@ public class PrismRefinementTests
                 var list = (ListBox)left.FindName("FileListBox");
                 var search = (TextBox)window.FindName("FileSearch");
                 var scope = (Button)window.FindName("SearchScope");
-                scope.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); search.Text = "second";
+                var resets = 0;
+                ((System.Collections.Specialized.INotifyCollectionChanged)list.Items).CollectionChanged += (_, _) => resets++;
+                scope.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                await Task.Delay(800); window.UpdateLayout();
+                Assert.Equal(0, resets);
+                var strip = (Canvas)scope.Template.FindName("ScopeStrip", scope);
+                var allLabel = (TextBlock)strip.Children[1];
+                var labelCenter = allLabel.TranslatePoint(new Point(52, 8), scope);
+                Assert.InRange(labelCenter.X, 1, scope.ActualWidth - 1);
+                Assert.True(allLabel.ActualWidth > 0);
+                Assert.Same(allLabel, scope.InputHitTest(labelCenter));
+                search.Text = "second";
                 await BoundedDialogTests.Until(() => list.Items.Cast<FileItem>().Any(f => f.Id == second.Id));
                 Assert.Single(main.CurrentFiles); Assert.Equal(first.Id, main.CurrentFile!.Id);
                 await main.SelectFileAsync(second);
@@ -47,6 +58,8 @@ public class PrismRefinementTests
                 var player = (PlayerPanel)window.FindName("PlayerArea");
                 var preview = (FrameworkElement)player.FindName("PreviewSurface");
                 var controls = (FrameworkElement)player.FindName("ControlsBar");
+                var searchCard = (FrameworkElement)window.FindName("SearchCard");
+                Assert.InRange(Math.Abs(searchCard.PointToScreen(new Point(searchCard.ActualWidth / 2, 0)).X - preview.PointToScreen(new Point(preview.ActualWidth / 2, 0)).X), 0, 1);
                 var before = preview.ActualWidth;
                 var toggle = (Button)window.FindName("DrawerToggleButton");
                 toggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Task.Delay(800); window.UpdateLayout();

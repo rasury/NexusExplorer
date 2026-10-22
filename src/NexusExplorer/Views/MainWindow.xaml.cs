@@ -146,7 +146,7 @@ public partial class MainWindow : Window
         if (SearchScope.Template.FindName("ScopeTranslate", SearchScope) is System.Windows.Media.TranslateTransform slide)
             slide.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, PrismMotion.Spring(slide.X, _globalSearch ? -104 : 0));
         HintAssist.SetHint(FileSearch, _globalSearch ? "搜索全部分类文件…" : "搜索当前分类文件…");
-        LeftPanel.SetFileFilter(FileSearch.Text, _globalSearch);
+        if (!string.IsNullOrWhiteSpace(FileSearch.Text)) LeftPanel.SetFileFilter(FileSearch.Text, _globalSearch);
     }
     private bool _focusPreview;
     private WindowState _beforeFocusState;
@@ -231,7 +231,6 @@ public partial class MainWindow : Window
         opacity = double.IsFinite(opacity) ? Math.Clamp(opacity, 0, 1) : 1;
         WallpaperImage.Opacity = opacity;
         WallpaperShade.Opacity = opacity;
-        MaterialDialogService.RefreshBackdrop();
     }
     internal void PrepareForVerificationExit()
     {

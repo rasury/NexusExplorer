@@ -32,15 +32,15 @@ public class AppearancePreviewTests
                 var glass = (PrismCard)dialog.DialogContent!;
                 var surface = (DialogSurface)glass.Content; glass.UpdateLayout();
                 var backdrop = (Border)glass.Template.FindName("PART_Backdrop", glass);
-                Assert.IsType<ImageBrush>(backdrop.Background);
-                Assert.NotNull(((ImageBrush)backdrop.Background).ImageSource);
+                Assert.IsType<VisualBrush>(backdrop.Background);
+                Assert.Same(window.FindName("WallpaperScene"), ((VisualBrush)backdrop.Background).Visual);
                 await Task.Delay(400); glass.UpdateLayout();
                 var slider = Descendants<Slider>(surface).Single();
                 var top = slider.TranslatePoint(new Point(), surface);
                 Assert.True(top.X >= 12, $"left={top.X}"); Assert.True(top.X + slider.ActualWidth + 12 <= surface.ActualWidth, $"left={top.X}; slider={slider.ActualWidth}; surface={surface.ActualWidth}");
                 slider.Value = 0;
                 Assert.Equal(0, wallpaper.Opacity); Assert.Equal(0, ((Border)window.FindName("WallpaperShade")).Opacity);
-                Assert.Equal(Colors.White, ((SolidColorBrush)((Grid)window.FindName("WallpaperScene")).Background).Color);
+                Assert.Equal(Colors.Black, ((SolidColorBrush)((Grid)window.FindName("WallpaperScene")).Background).Color);
                 slider.Value = 45; Assert.Equal(.45, wallpaper.Opacity);
                 await Task.Delay(150); glass.UpdateLayout();
                 var bitmap = new RenderTargetBitmap((int)glass.ActualWidth, (int)glass.ActualHeight, 96, 96, PixelFormats.Pbgra32); bitmap.Render(glass);

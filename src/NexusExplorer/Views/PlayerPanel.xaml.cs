@@ -77,11 +77,13 @@ public partial class PlayerPanel : UserControl
         DetailPath.Text = file?.AbsolutePath ?? "—";
         DetailDate.Text = file?.CreatedAt.ToString("yyyy-MM-dd HH:mm") ?? "—";
     }
+    public FrameworkElement PreviewSurfaceElement => PreviewSurface;
     private void OnPreviewDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2 && CategoryFilePanel.FindAncestor<System.Windows.Controls.Primitives.ButtonBase>(e.OriginalSource as DependencyObject) is null
             && CategoryFilePanel.FindAncestor<System.Windows.Controls.Primitives.ScrollBar>(e.OriginalSource as DependencyObject) is null)
-        { e.Handled = true; FocusPreviewRequested?.Invoke(); }
+        { _videoClickTimer.Stop(); e.Handled = true; FocusPreviewRequested?.Invoke(); }
+        else if (e.ClickCount == 1 && Vm.Kind == MediaKind.Video) OnNativeVideoClick();
     }
     internal void SetFocusPreview(bool focus)
     {

@@ -11,12 +11,6 @@ internal static class MaterialDialogService
     private static WeakReference<DialogHost>? _root;
     private static DialogSession? _session;
     private static bool _closing;
-    private static PrismCard? _activeGlass;
-    private static FrameworkElement? _activeScene;
-    private static readonly DispatcherTimer BackdropTimer = new() { Interval = TimeSpan.FromMilliseconds(80) };
-    static MaterialDialogService()
-    { BackdropTimer.Tick += (_, _) => { BackdropTimer.Stop(); _activeGlass?.PrepareDialogBackdrop(_activeScene); }; }
-    internal static void RefreshBackdrop() { if (_activeGlass is not null && !BackdropTimer.IsEnabled) BackdropTimer.Start(); }
     public static event Action<string>? NoticeRequested;
     public static event Action<Window, bool>? InputWindowStateChanged;
     public static void Notice(string message) => NoticeRequested?.Invoke(message);
@@ -43,7 +37,6 @@ internal static class MaterialDialogService
             var scene = host is null ? null : Window.GetWindow(host)?.FindName("WallpaperScene") as FrameworkElement;
             var glass = new PrismCard { Content = view };
             glass.PrepareDialogBackdrop(scene);
-            _activeGlass = glass; _activeScene = scene;
             if (host is null || view.RequiresInputWindow)
             {
                 // Text input uses a real owned HWND: Popup's IME context can lose
@@ -116,7 +109,6 @@ internal static class MaterialDialogService
         }
         finally
         {
-            BackdropTimer.Stop(); _activeGlass = null; _activeScene = null;
             if (shell is not null)
             {
                 if (ReferenceEquals(app.MainWindow, shell)) app.MainWindow = previousMain;

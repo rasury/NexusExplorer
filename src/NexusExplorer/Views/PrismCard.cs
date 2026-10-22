@@ -11,15 +11,13 @@ public sealed class PrismCard : ContentControl
     public static readonly DependencyProperty IsPlainProperty = DependencyProperty.Register(nameof(IsPlain), typeof(bool), typeof(PrismCard), new PropertyMetadata(false));
     public bool IsPlain { get => (bool)GetValue(IsPlainProperty); set => SetValue(IsPlainProperty, value); }
     internal FrameworkElement? BackdropScene { get; set; }
-    private ImageBrush? _dialogBackdrop;
+    private VisualBrush? _dialogBackdrop;
     internal void PrepareDialogBackdrop(FrameworkElement? scene)
     {
-        if (scene is null || scene.ActualWidth <= 0 || scene.ActualHeight <= 0) return;
-        var scale = Math.Min(1, 900 / scene.ActualWidth);
-        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
-            Math.Max(1, (int)(scene.ActualWidth * scale)), Math.Max(1, (int)(scene.ActualHeight * scale)), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
-        bitmap.Render(scene); bitmap.Freeze();
-        _dialogBackdrop = new ImageBrush(bitmap) { Stretch = Stretch.UniformToFill };
+        if (scene is null) return;
+        // Keep a stable view of the wallpaper, with live compositor updates.
+        // No repeated RenderTargetBitmap allocation while dragging opacity.
+        _dialogBackdrop = new VisualBrush(scene) { Stretch = Stretch.UniformToFill };
         if (_backdrop is Border border) border.Background = _dialogBackdrop;
     }
     private FrameworkElement? _backdrop;

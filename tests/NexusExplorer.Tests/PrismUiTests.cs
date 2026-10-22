@@ -50,8 +50,25 @@ public class PrismUiTests
                     SendMessage(child, 0x0201, (IntPtr)1, (IntPtr)((60 << 16) | 80));
                     SendMessage(child, 0x0202, IntPtr.Zero, (IntPtr)((60 << 16) | 80));
                 }
-                Click(); await BoundedDialogTests.Until(() => !engine.Snapshot.IsPlaying);
-                await Task.Delay(600); Click(); await BoundedDialogTests.Until(() => engine.Snapshot.IsPlaying);
+                window.Activate();
+                var pointer = video.PointToScreen(new Point(video.ActualWidth / 2, video.ActualHeight / 2));
+                GetCursorPos(out var savedCursor);
+                try
+                {
+                    SetCursorPos((int)pointer.X, (int)pointer.Y);
+                    await Task.Delay(200);
+                    mouse_event(2, 0, 0, 0, UIntPtr.Zero); mouse_event(4, 0, 0, 0, UIntPtr.Zero);
+                    await BoundedDialogTests.Until(() => !engine.Snapshot.IsPlaying);
+                }
+                finally { SetCursorPos(savedCursor.X, savedCursor.Y); }
+                await Task.Delay(600);
+                try
+                {
+                    SetCursorPos((int)pointer.X, (int)pointer.Y); await Task.Delay(200);
+                    mouse_event(2, 0, 0, 0, UIntPtr.Zero); mouse_event(4, 0, 0, 0, UIntPtr.Zero);
+                    await BoundedDialogTests.Until(() => engine.Snapshot.IsPlaying);
+                }
+                finally { SetCursorPos(savedCursor.X, savedCursor.Y); }
                 await Task.Delay(600); Click(); Click();
                 await BoundedDialogTests.Until(() => ((FrameworkElement)window.FindName("TitleBar")).Visibility == Visibility.Collapsed);
                 window.UpdateLayout(); Assert.Equal(handle, video.Handle); Assert.Equal(0, video.CornerRadius);
@@ -101,6 +118,10 @@ public class PrismUiTests
     }
     private delegate bool ChildProc(IntPtr hwnd, IntPtr parameter);
     [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] private struct CursorPoint { public int X, Y; }
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetCursorPos(out CursorPoint point);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern int GetWindowRgn(IntPtr window, IntPtr region);
     [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern bool PtInRegion(IntPtr region, int x, int y);
     [System.Runtime.InteropServices.DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr region);
