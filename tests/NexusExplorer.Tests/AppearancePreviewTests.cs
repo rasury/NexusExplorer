@@ -36,6 +36,17 @@ public class AppearancePreviewTests
                 UiThemeService.Apply(theme);
                 var glass = (PrismCard)dialog.DialogContent!;
                 var surface = (DialogSurface)glass.Content; glass.UpdateLayout();
+                var themes = Descendants<ListBox>(surface).Single();
+                Assert.Equal(3, themes.Items.Count);
+                Assert.Empty(Descendants<ComboBox>(surface));
+                var themeRow = (ListBoxItem)themes.ItemContainerGenerator.ContainerFromIndex(0);
+                Assert.True(((Border)themeRow.Template.FindName("Row", themeRow)).CornerRadius.TopLeft > 0);
+                Assert.True(themeRow.Margin.Top > 0);
+                var otherTheme = theme == UiThemeMode.Light ? UiThemeMode.Dark : UiThemeMode.Light;
+                themes.SelectedItem = themes.Items.Cast<DialogChoice<UiThemeMode>>().Single(x => x.Value == otherTheme);
+                await BoundedDialogTests.Until(() => UiThemeService.Mode == otherTheme);
+                themes.SelectedItem = themes.Items.Cast<DialogChoice<UiThemeMode>>().Single(x => x.Value == theme);
+                await BoundedDialogTests.Until(() => UiThemeService.Mode == theme);
                 var backdrop = (Border)glass.Template.FindName("PART_Backdrop", glass);
                 Assert.IsType<VisualBrush>(backdrop.Background);
                 Assert.Same(window.FindName("WallpaperScene"), ((VisualBrush)backdrop.Background).Visual);

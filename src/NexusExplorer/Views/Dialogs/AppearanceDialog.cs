@@ -9,7 +9,12 @@ internal static class AppearanceDialog
     {
         var body = new StackPanel { Margin = new Thickness(8) };
         var themes = new[] { new DialogChoice<UiThemeMode>("跟随 Windows", UiThemeMode.System), new("浅色", UiThemeMode.Light), new("深色", UiThemeMode.Dark) };
-        var theme = new ComboBox { ItemsSource = themes, DisplayMemberPath = "Name", SelectedItem = themes.First(x => x.Value == UiThemeService.Mode), Margin = new Thickness(0, 8, 0, 20) };
+        var theme = new ListBox { ItemsSource = themes, DisplayMemberPath = "Name",
+            SelectedItem = themes.First(x => x.Value == UiThemeService.Mode),
+            BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent,
+            Padding = new Thickness(4), Margin = new Thickness(0, 8, 0, 20) };
+        theme.SetResourceReference(ItemsControl.ItemContainerStyleProperty, "PrismFileItem");
+        System.Windows.Automation.AutomationProperties.SetName(theme, "界面主题");
         body.Children.Add(new TextBlock { Text = "界面主题" }); body.Children.Add(theme);
         var path = current.BackgroundImagePath;
         double selectedOpacity = Math.Clamp(current.BackgroundOpacity, 0, 1);
