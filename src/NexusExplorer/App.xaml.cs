@@ -1,4 +1,4 @@
-using NexusExplorer.Views.Dialogs;
+﻿using NexusExplorer.Views.Dialogs;
 using NexusExplorer.ApplicationLayer;
 using NexusExplorer.Infrastructure.Playback.Mpv;
 using System.IO;
@@ -18,6 +18,8 @@ namespace NexusExplorer;
 
 public partial class App : Application
 {
+    static App() => FocusVisualPolicy.Initialize();
+
     private ServiceProvider? _services;
 
     protected override async void OnStartup(StartupEventArgs e)

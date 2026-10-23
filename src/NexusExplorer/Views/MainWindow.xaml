@@ -9,13 +9,13 @@
     <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <DockPanel x:Name="TitleBar" Margin="16,0,4,0">
      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-      <Button Style="{StaticResource IconButton}" Click="OnAppearanceClick" ToolTip="外观设置"><md:PackIcon Kind="PaletteOutline" Width="22" Height="22"/></Button>
-      <Button Style="{StaticResource IconButton}" Click="OnMinimize" ToolTip="最小化" AutomationProperties.Name="最小化"><md:PackIcon Kind="Minus" Width="20" Height="20"/></Button>
-      <Button x:Name="MaximizeButton" Style="{StaticResource IconButton}" Click="OnMaximize" ToolTip="最大化" AutomationProperties.Name="最大化或还原"><md:PackIcon x:Name="MaximizeIcon" Kind="WindowMaximize" Width="18" Height="18"/></Button>
-      <Button Style="{StaticResource IconButton}" Click="OnCloseWindow" ToolTip="关闭" AutomationProperties.Name="关闭"><md:PackIcon Kind="Close" Width="22" Height="22"/></Button>
+      <Button Style="{StaticResource ClassicIconButton}" Click="OnAppearanceClick" ToolTip="外观设置"><md:PackIcon Kind="PaletteOutline" Width="22" Height="22"/></Button>
+      <Button Style="{StaticResource ClassicIconButton}" Click="OnMinimize" ToolTip="最小化" AutomationProperties.Name="最小化"><md:PackIcon Kind="Minus" Width="20" Height="20"/></Button>
+      <Button x:Name="MaximizeButton" Style="{StaticResource ClassicIconButton}" Click="OnMaximize" ToolTip="最大化" AutomationProperties.Name="最大化或还原"><md:PackIcon x:Name="MaximizeIcon" Kind="WindowMaximize" Width="18" Height="18"/></Button>
+      <Button Style="{StaticResource ClassicIconButton}" Click="OnCloseWindow" ToolTip="关闭" AutomationProperties.Name="关闭"><md:PackIcon Kind="Close" Width="22" Height="22"/></Button>
      </StackPanel>
      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-      <Button x:Name="DrawerToggleButton" Style="{StaticResource IconButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板"><md:PackIcon Kind="Menu" Width="22" Height="22"/></Button>
+      <Button x:Name="DrawerToggleButton" Style="{StaticResource ClassicIconButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板"><md:PackIcon Kind="Menu" Width="22" Height="22"/></Button>
       <TextBlock x:Name="AppTitle" Text="NexusExplorer" FontSize="23" FontWeight="SemiBold" Margin="12,0" Foreground="{DynamicResource BrushPrimaryText}" VerticalAlignment="Center"/>
      </StackPanel>
     </DockPanel>
@@ -25,7 +25,7 @@
      <views:PrismCard x:Name="LibraryCard" Width="300" HorizontalAlignment="Left" Padding="12,16" RenderTransformOrigin="1,0.5">
       <views:PrismCard.RenderTransform><TransformGroup><ScaleTransform x:Name="LibraryScale"/><TranslateTransform x:Name="LibraryTranslate"/></TransformGroup></views:PrismCard.RenderTransform>
       <Grid><Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-       <DockPanel Margin="8,0"><Button x:Name="CreateRootCategoryButton" DockPanel.Dock="Right" Style="{StaticResource IconButton}" ToolTip="新建分类" AutomationProperties.Name="新建分类"><md:PackIcon Kind="Plus" Width="22" Height="22"/></Button><TextBlock Text="分类列表" Style="{StaticResource TextHeader}" VerticalAlignment="Center"/></DockPanel>
+       <DockPanel Margin="8,0"><Button x:Name="CreateRootCategoryButton" DockPanel.Dock="Right" Style="{StaticResource ClassicIconButton}" ToolTip="新建分类" AutomationProperties.Name="新建分类"><md:PackIcon Kind="Plus" Width="22" Height="22"/></Button><TextBlock Text="分类列表" Style="{StaticResource TextHeader}" VerticalAlignment="Center"/></DockPanel>
        <views:CategoryFilePanel x:Name="LeftPanel" Grid.Row="1"/>
       </Grid>
      </views:PrismCard></Grid>

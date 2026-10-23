@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Threading;
 
 namespace NexusExplorer.Tests;
@@ -14,6 +14,7 @@ internal static class WpfTestHost
         {
             try
             {
+                NexusExplorer.Infrastructure.FocusVisualPolicy.Initialize();
                 var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
                 app.Resources.MergedDictionaries.Add(new MaterialDesignThemes.Wpf.BundledTheme
                 { BaseTheme = MaterialDesignThemes.Wpf.BaseTheme.Light, PrimaryColor = MaterialDesignColors.PrimaryColor.DeepPurple, SecondaryColor = MaterialDesignColors.SecondaryColor.Teal });

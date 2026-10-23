@@ -54,6 +54,10 @@
     <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource ButtonText}">
         <Setter Property="Width" Value="40"/><Setter Property="MinWidth" Value="0"/><Setter Property="Padding" Value="8"/>
     </Style>
+    <Style x:Key="ClassicIconButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+        <Setter Property="Width" Value="40"/><Setter Property="Height" Value="40"/>
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="10"/>
+    </Style>
     <Style x:Key="PrismToggleButton" TargetType="ToggleButton" BasedOn="{StaticResource PrismButtonBase}">
         <Setter Property="MinWidth" Value="0"/><Setter Property="Padding" Value="8"/>
         <Style.Triggers><Trigger Property="IsChecked" Value="True">

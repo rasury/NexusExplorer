@@ -1,16 +1,17 @@
 ﻿<UserControl x:Class="NexusExplorer.Views.PlayerPanel" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:NexusExplorer.Views" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
  <UserControl.Resources>
+  <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource ClassicIconButton}"/>
   <Style x:Key="PlayerIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
    <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
    <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
   </Style>
-  <Style x:Key="HardwareDecodeToggle" TargetType="ToggleButton" BasedOn="{StaticResource PrismToggleButton}">
-   <Setter Property="Background" Value="{DynamicResource BrushPrismSurface}"/>
+  <Style x:Key="HardwareDecodeToggle" TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignFlatToggleButton}">
+   <Setter Property="Background" Value="Transparent"/>
    <Setter Property="Foreground" Value="{DynamicResource BrushSecondaryText}"/>
    <Setter Property="ToolTip" Value="硬件解码：已关闭（软件解码）；点击开启，下次打开媒体生效"/>
    <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
    <Style.Triggers><Trigger Property="IsChecked" Value="True">
-    <Setter Property="Background" Value="{DynamicResource BrushPrismSelection}"/>
+    <Setter Property="Background" Value="{DynamicResource BrushAccentBlueLight}"/>
     <Setter Property="Foreground" Value="{DynamicResource BrushOnPrimaryContainer}"/>
     <Setter Property="ToolTip" Value="硬件解码：已开启；点击关闭，下次打开媒体生效"/>
    </Trigger></Style.Triggers>
@@ -42,7 +43,7 @@
     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <Button x:Name="InspectorHandle" Background="Transparent" BorderThickness="0" MinWidth="0" Height="Auto" Padding="0" Click="OnInspectorOpen" ToolTip="文件详情" AutomationProperties.Name="展开文件详情"><Button.Template><ControlTemplate TargetType="Button"><Border Background="Transparent"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Button.Template><Border Width="3" Height="38" CornerRadius="2" Background="{DynamicResource BrushSecondaryText}"/></Button>
      <Grid x:Name="InspectorBody" Grid.Column="1" Visibility="Hidden"><Grid.RowDefinitions><RowDefinition Height="40"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <DockPanel><ToggleButton x:Name="InspectorPin" DockPanel.Dock="Right" Width="36" Height="36" Style="{StaticResource PrismToggleButton}" Checked="OnInspectorPin" Unchecked="OnInspectorPin" ToolTip="固定文件详情"><md:PackIcon Kind="PinOutline" Width="20" Height="20"/></ToggleButton><TextBlock Text="文件详情" Style="{StaticResource TextHeader}" VerticalAlignment="Center"/></DockPanel>
+      <DockPanel><ToggleButton x:Name="InspectorPin" DockPanel.Dock="Right" Width="36" Height="36" Style="{StaticResource MaterialDesignFlatToggleButton}" Checked="OnInspectorPin" Unchecked="OnInspectorPin" ToolTip="固定文件详情"><md:PackIcon Kind="PinOutline" Width="20" Height="20"/></ToggleButton><TextBlock Text="文件详情" Style="{StaticResource TextHeader}" VerticalAlignment="Center"/></DockPanel>
       <ScrollViewer Style="{StaticResource PrismOverlayScrollViewer}" Grid.Row="1" Margin="0,8,0,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
        <TextBlock x:Name="DetailName" Text="尚未打开文件" TextWrapping="Wrap" FontSize="19" Margin="0,12,0,20" Foreground="{DynamicResource BrushPrimaryText}"/>
        <TextBlock Text="格式" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailFormat" Style="{StaticResource TextPrimary}" Margin="0,6,0,18"/>
@@ -65,7 +66,7 @@
     </Grid>
     <StackPanel x:Name="MediaButtonsRow" Orientation="Horizontal" VerticalAlignment="Center">
      <Button Style="{StaticResource PlayerIconButton}" Click="OnPrevious" ToolTip="上一项"><md:PackIcon Kind="SkipPrevious" Width="24" Height="24"/></Button>
-     <Button x:Name="PlayPauseButton" Style="{StaticResource PlayerIconButton}" Click="OnPlayPause" ToolTip="播放"><md:PackIcon x:Name="PlayPauseIcon" Kind="Play" Width="24" Height="24"/></Button>
+     <Button x:Name="PlayPauseButton" Style="{StaticResource PlayerIconButton}" Background="{DynamicResource BrushAccentBlueLight}" Foreground="{DynamicResource BrushOnPrimaryContainer}" Click="OnPlayPause" ToolTip="播放"><md:PackIcon x:Name="PlayPauseIcon" Kind="Play" Width="24" Height="24"/></Button>
      <Button Style="{StaticResource PlayerIconButton}" Click="OnStop" ToolTip="停止"><md:PackIcon Kind="Stop" Width="24" Height="24"/></Button>
      <Button Style="{StaticResource PlayerIconButton}" Click="OnNext" ToolTip="下一项"><md:PackIcon Kind="SkipNext" Width="24" Height="24"/></Button>
      <Button x:Name="ModeButton" Style="{StaticResource PlayerIconButton}" Click="OnCycleMode" ToolTip="顺序"><md:PackIcon x:Name="ModeIcon" Kind="PlaylistPlay" Width="24" Height="24"/></Button>
