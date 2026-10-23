@@ -15,7 +15,7 @@
       <Button Style="{StaticResource ClassicIconButton}" Click="OnCloseWindow" ToolTip="关闭" AutomationProperties.Name="关闭"><md:PackIcon Kind="Close" Width="22" Height="22"/></Button>
      </StackPanel>
      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-      <Button x:Name="DrawerToggleButton" Style="{StaticResource ClassicIconButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板"><md:PackIcon Kind="Menu" Width="22" Height="22"/></Button>
+      <Button x:Name="DrawerToggleButton" Style="{StaticResource IconButton}" shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="OnToggleDrawer" ToolTip="显示或隐藏分类面板"><md:PackIcon Kind="Menu" Width="22" Height="22"/></Button>
       <TextBlock x:Name="AppTitle" Text="NexusExplorer" FontSize="23" FontWeight="SemiBold" Margin="12,0" Foreground="{DynamicResource BrushPrimaryText}" VerticalAlignment="Center"/>
      </StackPanel>
     </DockPanel>
