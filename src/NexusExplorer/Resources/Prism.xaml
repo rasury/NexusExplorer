@@ -21,7 +21,7 @@
   <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TreeViewItem">
    <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-    <Border x:Name="Row" Grid.ColumnSpan="2" CornerRadius="10" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" MinHeight="39" views:PressFeedback.IsEnabled="True">
+    <Border x:Name="Row" Grid.ColumnSpan="2" Margin="0,2" CornerRadius="10" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" MinHeight="39" views:PressFeedback.IsEnabled="True">
      <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
       <ToggleButton x:Name="Expander" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" Focusable="False"><ToggleButton.Template><ControlTemplate TargetType="ToggleButton"><Grid Background="Transparent"><md:PackIcon x:Name="Chevron" Kind="ChevronRight" Width="16" Height="16" VerticalAlignment="Center"/></Grid><ControlTemplate.Triggers><Trigger Property="IsChecked" Value="True"><Setter TargetName="Chevron" Property="Kind" Value="ChevronDown"/></Trigger></ControlTemplate.Triggers></ControlTemplate></ToggleButton.Template></ToggleButton>
       <ContentPresenter Grid.Column="1" ContentSource="Header" Margin="6,0,10,0" VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
