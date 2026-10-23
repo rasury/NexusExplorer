@@ -6,7 +6,7 @@ using NexusExplorer.ViewModels;
 using NexusExplorer.Infrastructure;
 using NexusExplorer.ApplicationLayer;
 using MaterialDesignThemes.Wpf;
-using System.Windows.Media.Animation;
+using System.Windows.Media;
 using System.Windows.Controls;
 using System.Windows.Threading;
 
@@ -43,7 +43,7 @@ public partial class MainWindow : Window
         Loaded += (_, _) => { WindowAppearance.Apply(this); WindowAppearance.UpdateMaximizedInset(this, WindowSurface); };
         MaterialDialogService.NoticeRequested += OnNotice;
         MaterialDialogService.InputWindowStateChanged += OnInputWindowStateChanged;
-        Closed += (_, _) => { UiThemeService.Changed -= OnThemeChanged; MaterialDialogService.NoticeRequested -= OnNotice; MaterialDialogService.InputWindowStateChanged -= OnInputWindowStateChanged; _noticeTimer.Stop(); PlayerArea.FocusPreviewRequested -= ToggleFocusPreview; };
+        Closed += (_, _) => { StopMotion(); UiThemeService.Changed -= OnThemeChanged; MaterialDialogService.NoticeRequested -= OnNotice; MaterialDialogService.InputWindowStateChanged -= OnInputWindowStateChanged; _noticeTimer.Stop(); PlayerArea.FocusPreviewRequested -= ToggleFocusPreview; };
         RootDialog.Identifier = "Nexus." + Guid.NewGuid().ToString("N");
         RootDialog.Loaded += (_, _) => MaterialDialogService.Register(RootDialog);
         RootDialog.Unloaded += (_, _) => MaterialDialogService.Unregister(RootDialog);
@@ -85,33 +85,25 @@ public partial class MainWindow : Window
     private bool _closingStarted;
     private bool _closingFinished;
     private void OnThemeChanged() => WindowAppearance.Apply(this);
-    private readonly DispatcherTimer _noticeTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private readonly DispatcherTimer _noticeTimer = new() { Interval = MotionProfiles.NoticeHold };
     private int _noticeVersion;
     private void OnNotice(string message)
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(() => OnNotice(message)); return; }
         var version = ++_noticeVersion;
+        var wasHidden = NoticeCard.Visibility != Visibility.Visible;
         _noticeTimer.Stop(); NoticeText.Text = message; NoticeCard.Visibility = Visibility.Visible;
         NoticeCard.UpdateLayout();
-        var distance = Math.Max(100, NoticeCard.ActualHeight + 30);
-        var animation = new DoubleAnimationUsingKeyFrames();
-        for (int i = 0; i <= 74; i++)
-        {
-            var t = i / 74d * .82; const double damping = .58, frequency = 18;
-            var damped = frequency * Math.Sqrt(1 - damping * damping);
-            var y = -distance * Math.Exp(-damping * frequency * t) * (Math.Cos(damped * t) + damping * frequency / damped * Math.Sin(damped * t));
-            animation.KeyFrames.Add(new LinearDoubleKeyFrame(i == 74 ? 0 : y, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(t))));
-        }
-        animation.Completed += (_, _) => { if (version == _noticeVersion) _noticeTimer.Start(); };
+        if (wasHidden) NoticeTransform.Y = -Math.Max(100, NoticeCard.ActualHeight + 30);
+        PrismMotion.Animate(NoticeTransform, TranslateTransform.YProperty, 0, MotionProfiles.NoticeEnter,
+            () => { if (version == _noticeVersion) _noticeTimer.Start(); });
         _noticeTimer.Tick -= HideNotice; _noticeTimer.Tick += HideNotice;
-        NoticeTransform.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, animation);
     }
     private void HideNotice(object? sender, EventArgs e)
     {
         _noticeTimer.Stop(); var version = _noticeVersion;
-        var exit = new DoubleAnimation(0, -Math.Max(100, NoticeCard.ActualHeight + 30), TimeSpan.FromMilliseconds(300)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
-        exit.Completed += (_, _) => { if (version == _noticeVersion) NoticeCard.Visibility = Visibility.Collapsed; };
-        NoticeTransform.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, exit);
+        PrismMotion.Animate(NoticeTransform, TranslateTransform.YProperty, -Math.Max(100, NoticeCard.ActualHeight + 30), MotionProfiles.NoticeExit,
+            () => { if (version == _noticeVersion) NoticeCard.Visibility = Visibility.Collapsed; });
     }
     // A signed extent preserves spring overshoot beyond the zero-width boundary.
     // The slot consumes positive space; the center stretches into negative space.
@@ -119,9 +111,17 @@ public partial class MainWindow : Window
         "DrawerExtent", typeof(double), typeof(MainWindow), new PropertyMetadata(320d, (d, e) =>
         {
             var window = (MainWindow)d;
-            var extent = (double)e.NewValue;
+            var dpi = VisualTreeHelper.GetDpi(window).DpiScaleX;
+            var extent = Math.Round((double)e.NewValue * dpi) / dpi;
             window.LibrarySlot.Width = Math.Max(0, extent);
             window.CenterWorkspace.Margin = new Thickness(Math.Min(0, extent), 0, 0, 0);
+        }));
+    private static readonly DependencyProperty LibraryHeightProperty = DependencyProperty.Register(
+        "LibraryHeight", typeof(double), typeof(MainWindow), new PropertyMetadata(360d, (d, e) =>
+        {
+            var window = (MainWindow)d;
+            var dpi = VisualTreeHelper.GetDpi(window).DpiScaleY;
+            window.LibraryCard.Height = Math.Round((double)e.NewValue * dpi) / dpi;
         }));
     private bool _libraryOpen = true;
     private double _libraryHeight;
@@ -132,17 +132,18 @@ public partial class MainWindow : Window
         var height = Math.Clamp(LeftPanel.PreferredHeight + 72, 360, available);
         if (Math.Abs(height - _libraryHeight) < 1) return;
         _libraryHeight = height;
-        LibraryCard.BeginAnimation(HeightProperty, PrismMotion.Spring(LibraryCard.ActualHeight > 0 ? LibraryCard.ActualHeight : height, height, true));
+        if (double.IsNaN(LibraryCard.Height)) { SetCurrentValue(LibraryHeightProperty, height); LibraryCard.Height = height; }
+        else PrismMotion.Animate(this, LibraryHeightProperty, height, MotionProfiles.Panel, minimum: 0);
     }
     private void OnToggleDrawer(object sender, RoutedEventArgs e)
     {
         _libraryOpen = !_libraryOpen;
         LibraryCard.IsHitTestVisible = _libraryOpen;
-        BeginAnimation(DrawerExtentProperty, PrismMotion.Spring((double)GetValue(DrawerExtentProperty), _libraryOpen ? 320 : 0));
-        LibraryScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, PrismMotion.Spring(LibraryScale.ScaleX, _libraryOpen ? 1 : .78));
-        LibraryScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, PrismMotion.Spring(LibraryScale.ScaleY, _libraryOpen ? 1 : .78));
-        LibraryTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, PrismMotion.Spring(LibraryTranslate.X, _libraryOpen ? 0 : 160));
-        LibraryCard.BeginAnimation(OpacityProperty, new DoubleAnimation(_libraryOpen ? 1 : 0, TimeSpan.FromMilliseconds(350)));
+        PrismMotion.Animate(this, DrawerExtentProperty, _libraryOpen ? 320 : 0, MotionProfiles.Panel);
+        PrismMotion.Animate(LibraryScale, ScaleTransform.ScaleXProperty, _libraryOpen ? 1 : .78, MotionProfiles.Panel);
+        PrismMotion.Animate(LibraryScale, ScaleTransform.ScaleYProperty, _libraryOpen ? 1 : .78, MotionProfiles.Panel);
+        PrismMotion.Animate(LibraryTranslate, TranslateTransform.XProperty, _libraryOpen ? 0 : 160, MotionProfiles.Panel);
+        PrismMotion.Animate(LibraryCard, OpacityProperty, _libraryOpen ? 1 : 0, MotionProfiles.Fade, minimum: 0, maximum: 1);
     }
     private void OnMinimize(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
     private void OnMaximize(object sender, RoutedEventArgs e) { if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this); else SystemCommands.MaximizeWindow(this); }
@@ -154,7 +155,7 @@ public partial class MainWindow : Window
         _globalSearch = !_globalSearch;
         SearchScope.ApplyTemplate();
         if (SearchScope.Template.FindName("ScopeTranslate", SearchScope) is System.Windows.Media.TranslateTransform slide)
-            slide.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, PrismMotion.Spring(slide.X, _globalSearch ? -104 : 0));
+            PrismMotion.Animate(slide, TranslateTransform.XProperty, _globalSearch ? -104 : 0, MotionProfiles.Scope);
         HintAssist.SetHint(FileSearch, _globalSearch ? "搜索全部分类文件…" : "搜索当前分类文件…");
         if (!string.IsNullOrWhiteSpace(FileSearch.Text)) LeftPanel.SetFileFilter(FileSearch.Text, _globalSearch);
     }
@@ -164,6 +165,7 @@ public partial class MainWindow : Window
     private Rect _beforeFocusBounds;
     private void ToggleFocusPreview()
     {
+        PrismMotion.Stop(this, DrawerExtentProperty, finish: true);
         _focusPreview = !_focusPreview;
         var center = (Grid)PlayerArea.Parent;
         if (_focusPreview)
@@ -242,9 +244,21 @@ public partial class MainWindow : Window
         WallpaperImage.Opacity = opacity;
         WallpaperShade.Opacity = opacity;
     }
+    private void StopMotion()
+    {
+        ++_noticeVersion; _noticeTimer.Stop();
+        PrismMotion.StopAll(this, finish: true);
+        PrismMotion.StopAll(NoticeTransform);
+        PrismMotion.StopAll(LibraryScale, finish: true);
+        PrismMotion.StopAll(LibraryTranslate, finish: true);
+        PrismMotion.StopAll(LibraryCard, finish: true);
+        if (SearchScope.Template.FindName("ScopeTranslate", SearchScope) is TranslateTransform slide)
+            PrismMotion.StopAll(slide, finish: true);
+    }
     internal void PrepareForVerificationExit()
     {
         // Explicit Application.Shutdown cannot await an asynchronous Closing handler.
+        StopMotion();
         _closingFinished = true; PlayerArea.Detach();
     }
 }

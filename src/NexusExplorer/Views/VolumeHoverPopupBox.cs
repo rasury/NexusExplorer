@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -10,14 +10,14 @@ namespace NexusExplorer.Views;
 // This corridor observes the pointer without capturing or blocking other controls.
 public sealed class VolumeHoverPopupBox : PopupBox
 {
-    internal const int CloseDelayMilliseconds = 250;
+    internal const int CloseDelayMilliseconds = MotionProfiles.VolumeLeaveMilliseconds;
     private readonly DispatcherTimer _leaveTimer;
     private long? _outsideSince;
 
     public VolumeHoverPopupBox()
     {
         _leaveTimer = new DispatcherTimer(DispatcherPriority.Input, Dispatcher)
-        { Interval = TimeSpan.FromMilliseconds(50) };
+        { Interval = MotionProfiles.HoverPoll };
         _leaveTimer.Tick += (_, _) => ProcessHover(Mouse.GetPosition(this),
             Mouse.Captured is Thumb thumb && PopupContent is FrameworkElement content && content.IsAncestorOf(thumb),
             Environment.TickCount64);

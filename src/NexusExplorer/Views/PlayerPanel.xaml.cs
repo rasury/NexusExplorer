@@ -10,7 +10,7 @@ using NexusExplorer.Services;
 using NexusExplorer.ViewModels;
 using Serilog;
 using MaterialDesignThemes.Wpf;
-using System.Windows.Media.Animation;
+using System.Windows.Media;
 using NexusExplorer.Models;
 
 namespace NexusExplorer.Views;
@@ -23,7 +23,7 @@ public partial class PlayerPanel : UserControl
     private readonly DispatcherTimer _videoClickTimer = new();
     private PlaybackToken _clickToken;
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
-    private readonly DispatcherTimer _inspectorTimer = new() { Interval = TimeSpan.FromMilliseconds(40) };
+    private readonly DispatcherTimer _inspectorTimer = new() { Interval = MotionProfiles.HoverPoll };
     private bool _inspectorOpen;
     private DateTime _inspectorEntered, _inspectorLeft;
     private bool IsPointerInsideInspector()
@@ -47,12 +47,12 @@ public partial class PlayerPanel : UserControl
         if (IsPointerInsideInspector())
         {
             _inspectorLeft = default;
-            if (!_inspectorOpen && (DateTime.UtcNow - _inspectorEntered).TotalMilliseconds >= 200) ShowInspector(true);
+            if (!_inspectorOpen && (DateTime.UtcNow - _inspectorEntered) >= MotionProfiles.InspectorEnter) ShowInspector(true);
         }
         else
         {
             if (_inspectorLeft == default) _inspectorLeft = DateTime.UtcNow;
-            if ((DateTime.UtcNow - _inspectorLeft).TotalMilliseconds >= 180)
+            if ((DateTime.UtcNow - _inspectorLeft) >= MotionProfiles.InspectorLeave)
             { ShowInspector(false); _inspectorTimer.Stop(); }
         }
     }
@@ -62,12 +62,21 @@ public partial class PlayerPanel : UserControl
         if (InspectorPin.IsChecked == true) { _inspectorTimer.Stop(); ShowInspector(true); }
         else { _inspectorLeft = default; _inspectorTimer.Start(); }
     }
+    private static readonly DependencyProperty InspectorExtentProperty = DependencyProperty.Register(
+        "InspectorExtent", typeof(double), typeof(PlayerPanel), new PropertyMetadata(24d, (d, e) =>
+        {
+            var panel = (PlayerPanel)d;
+            var dpi = VisualTreeHelper.GetDpi(panel).DpiScaleX;
+            panel.InspectorSlot.Width = Math.Round((double)e.NewValue * dpi) / dpi;
+        }));
     internal void ShowInspector(bool open)
     {
+        if (_inspectorOpen == open) return;
         _inspectorOpen = open;
-        InspectorBody.Visibility = open ? Visibility.Visible : Visibility.Hidden;
+        if (open) InspectorBody.Visibility = Visibility.Visible;
         InspectorBody.IsHitTestVisible = open;
-        InspectorSlot.BeginAnimation(WidthProperty, PrismMotion.Spring(InspectorSlot.ActualWidth, open ? 260 : 24, true));
+        PrismMotion.Animate(this, InspectorExtentProperty, open ? 260 : 24, MotionProfiles.Panel,
+            () => { if (!_inspectorOpen) InspectorBody.Visibility = Visibility.Hidden; }, minimum: 0);
     }
     private void UpdateDetails(FileItem? file)
     {
@@ -87,6 +96,8 @@ public partial class PlayerPanel : UserControl
     }
     internal void SetFocusPreview(bool focus)
     {
+        PrismMotion.Stop(this, InspectorExtentProperty, finish: true);
+        if (!_inspectorOpen) InspectorBody.Visibility = Visibility.Hidden;
         _focusPreview = focus;
         InspectorSlot.Visibility = focus ? Visibility.Collapsed : Visibility.Visible;
         PreviewSurface.IsPlain = focus; PreviewSurface.Padding = new Thickness(focus ? 0 : 10);
@@ -159,6 +170,7 @@ public partial class PlayerPanel : UserControl
     public void Detach()
     {
         VolumePopup.IsPopupOpen = false;
+        PrismMotion.Stop(this, InspectorExtentProperty, finish: true);
         _videoClickTimer.Stop(); _inspectorTimer.Stop(); if (_main is not null) _main.CurrentFileChanged -= UpdateDetails;
         _timer.Stop(); Lifetime?.AttachSurface(IntPtr.Zero);
         if (_initialized) Vm.ReleaseImagePreview();

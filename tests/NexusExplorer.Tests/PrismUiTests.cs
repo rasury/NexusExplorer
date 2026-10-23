@@ -42,6 +42,15 @@ public class PrismUiTests
                     Assert.True(PtInRegion(region, 30, 30));
                 }
                 finally { DeleteObject(region); }
+                // Native host regions must survive both size changes and position-only moves.
+                var drawerToggle = (Button)window.FindName("DrawerToggleButton");
+                drawerToggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Task.Delay(800);
+                drawerToggle.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); await Task.Delay(800);
+                window.Left += 8; await Task.Delay(100);
+                region = CreateRectRgn(0, 0, 0, 0);
+                try { Assert.NotEqual(0, GetWindowRgn(handle, region)); Assert.False(PtInRegion(region, 0, 0)); Assert.True(PtInRegion(region, 30, 30)); }
+                finally { DeleteObject(region); }
+
                 var child = IntPtr.Zero;
                 EnumChildWindows(handle, (hwnd, _) => { var name = new System.Text.StringBuilder(128); GetClassName(hwnd, name, 128); if (name.ToString() == "mpv") child = hwnd; return true; }, IntPtr.Zero);
                 Assert.NotEqual(IntPtr.Zero, child);
