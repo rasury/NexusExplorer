@@ -9,8 +9,11 @@ internal static class ChoiceDialog
 {
     public static async Task<(bool Confirmed, T Value)> ShowAsync<T>(string title, string label, IReadOnlyList<DialogChoice<T>> choices, T current)
     {
-        var box = new ComboBox { ItemsSource = choices, DisplayMemberPath = "Name", MinHeight = 56, Margin = new Thickness(0, 8, 0, 8) };
-        HintAssist.SetHint(box, label);
+        var box = new ListBox { ItemsSource = choices, DisplayMemberPath = "Name", MaxHeight = 280,
+            BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent,
+            Padding = new Thickness(4), Margin = new Thickness(0, 8, 0, 8) };
+        box.SetResourceReference(ItemsControl.ItemContainerStyleProperty, "PrismFileItem");
+        System.Windows.Automation.AutomationProperties.SetName(box, label);
         box.SelectedItem = choices.FirstOrDefault(c => EqualityComparer<T>.Default.Equals(c.Value, current)) ?? choices.FirstOrDefault();
         var footer = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; DialogSurface view = null!;
         footer.Children.Add(DialogSurface.Action("取消", "ButtonText", null, () => view));

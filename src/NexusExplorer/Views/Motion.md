@@ -20,10 +20,12 @@
 | 通知退出 | NoticeExit：300ms 平滑曲线 | 保持500ms后平滑退出；新通知可中途接管 |
 | 侧栏淡出入 | Fade：700ms 平滑曲线 | Opacity，限制在0～1，与侧栏运动周期协调 |
 | 按压反馈 | Press：140ms 平滑曲线，深度1.5 | 鼠标按下/释放/离开；追加专用 TranslateTransform，不覆盖原变换 |
+| 弹窗进入 | DialogEnter：220ms，阻尼0.78，角频率30；DialogFade：160ms | 12px位移与淡入，避免从零尺寸缩放；包含独立输入窗口 |
+| 弹窗退出 | DialogExit：120ms 平滑曲线 | 先淡出和位移，完成后才允许 DialogSession 关闭、移除内容和销毁输入窗口 |
 
 详情进入200ms、离开180ms；音量离开250ms；悬停检查40ms。它们是触发延迟，不是帧率。业务异步加载、搜索防抖、双击判定不属于动画执行层。
 
-MaterialDesign 的 Ripple、Popup/Dialog 模板内部过渡继续由框架负责；系统窗口最小化/最大化由 Windows 负责。不复制第三方模板另建一套运动系统，也不承诺这些外部动画具有相同曲线。
+MaterialDesign 的 Ripple、音量 Popup 模板内部过渡继续由框架负责；系统窗口最小化/最大化由 Windows 负责。DialogHost 保留模态、焦点和会话管理，清除其 PopupStates 的默认过渡，卡片进退场统一交给 PrismMotion，避免两套动画叠加。关闭请求在退出期间取消并合并，动画完成后携带原参数真正关闭；应用退出则直接取消。运动期间使用 WPF BitmapCache，结束后释放；内容变化仍可使缓存失效，未使用冻结背景截图。
 
 ## 布局与玻璃性能
 

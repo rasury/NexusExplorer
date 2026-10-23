@@ -63,15 +63,26 @@ public sealed class PrismCard : ContentControl
         _clip = GetTemplateChild("PART_Clip") as Grid;
         _sample = null;
         if (_clip is not null) _clip.Clip = _geometry;
+        UpdateClip();
         QueueSample(null, EventArgs.Empty);
     }
-    private void UpdateSample()
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
-        if (_clip is null || _backdrop is not Border backdrop || ActualWidth <= 0 || ActualHeight <= 0) return;
+        base.OnRenderSizeChanged(sizeInfo);
+        // Hit testing must see the new clip immediately, before a popup accepts input.
+        UpdateClip();
+    }
+    private void UpdateClip()
+    {
         var clip = new Rect(0, 0, ActualWidth, ActualHeight);
         var radius = IsPlain ? 0 : 24;
         if (_geometry.Rect != clip) _geometry.Rect = clip;
         if (_geometry.RadiusX != radius) { _geometry.RadiusX = radius; _geometry.RadiusY = radius; }
+    }
+    private void UpdateSample()
+    {
+        if (_clip is null || _backdrop is not Border backdrop || ActualWidth <= 0 || ActualHeight <= 0) return;
+        UpdateClip();
         if (IsPlain || _dialogBackdrop is not null) return;
         _scene ??= BackdropScene ?? Window.GetWindow(this)?.FindName("WallpaperScene") as FrameworkElement;
         if (_scene is null || PresentationSource.FromVisual(_scene) is null || PresentationSource.FromVisual(this) is null) return;

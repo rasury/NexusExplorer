@@ -72,7 +72,7 @@ public class AppearancePreviewTests
                 var card = (Card)dialog.Template.FindName("PART_PopupContentElement", dialog);
                 var width = card.ActualWidth; var height = card.ActualHeight;
                 surface.Complete(null);
-                Assert.False(dialog.IsOpen);
+                Assert.True(dialog.IsOpen); // Remains modal until the shared exit motion finishes.
                 Assert.Same(glass, dialog.DialogContent);
                 // Logical close must not collapse the popup during its exit animation.
                 var observedExit = false;

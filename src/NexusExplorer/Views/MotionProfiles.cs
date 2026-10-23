@@ -12,6 +12,10 @@ internal static class MotionProfiles
     internal static readonly MotionProfile NoticeExit = new(.3, MotionCurve.Smooth);
     internal static readonly MotionProfile Fade = new(.7, MotionCurve.Smooth);
     internal static readonly MotionProfile Press = new(.14, MotionCurve.Smooth);
+    internal static readonly MotionProfile DialogEnter = new(.22, MotionCurve.Spring, .78, 30);
+    internal static readonly MotionProfile DialogFade = new(.16, MotionCurve.Smooth);
+    internal static readonly MotionProfile DialogExit = new(.12, MotionCurve.Smooth);
+    internal const double DialogOffset = 12;
     internal static readonly TimeSpan NoticeHold = TimeSpan.FromMilliseconds(500);
     internal static readonly TimeSpan HoverPoll = TimeSpan.FromMilliseconds(40);
     internal static readonly TimeSpan InspectorEnter = TimeSpan.FromMilliseconds(200);

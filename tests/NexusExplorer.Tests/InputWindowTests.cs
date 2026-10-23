@@ -76,6 +76,12 @@ public sealed class InputWindowTests
                 Assert.True(input.IsKeyboardFocused); Assert.Equal(2, input.CaretIndex);
                 Assert.Equal(hwnd, ((HwndSource)PresentationSource.FromVisual(input)).Handle);
                 actions.Single(b => Equals(b.Content, accept ? "确定" : "取消")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Assert.True(shell.IsVisible);
+                Assert.False(result.IsCompleted);
+                var glass = (PrismCard)dialogHost.DialogContent!;
+                await Task.Delay(45);
+                Assert.True(shell.IsVisible);
+                Assert.InRange(glass.Opacity, .001, .999);
                 Assert.Equal(accept ? "中文分类" : null, await result);
                 Assert.True(owner.IsEnabled); Assert.False(shell.IsVisible);
             }

@@ -38,6 +38,21 @@ internal static class MaterialDialogService
             if (_root is not null && _root.TryGetTarget(out var root) && root.IsLoaded) host = root;
             var scene = host is null ? null : Window.GetWindow(host)?.FindName("WallpaperScene") as FrameworkElement;
             var glass = new PrismCard { Content = view };
+            var slide = new TranslateTransform(0, MotionProfiles.DialogOffset);
+            glass.RenderTransform = slide;
+            glass.Opacity = .15;
+            bool exiting = false, allowClose = false;
+            void Enter(object sender, RoutedEventArgs args)
+            {
+                if (exiting) return;
+                // Cache the live visual only while its position/opacity moves; content
+                // changes still invalidate WPF's cache. No screenshots or frozen wallpaper.
+                glass.CacheMode = new BitmapCache { SnapsToDevicePixels = true };
+                PrismMotion.Animate(slide, TranslateTransform.YProperty, 0, MotionProfiles.DialogEnter,
+                    () => { if (!exiting) glass.CacheMode = null; });
+                PrismMotion.Animate(glass, UIElement.OpacityProperty, 1, MotionProfiles.DialogFade, minimum: 0, maximum: 1);
+            }
+            glass.Loaded += Enter;
             glass.PrepareDialogBackdrop(scene);
             if (host is null || view.RequiresInputWindow)
             {
@@ -78,7 +93,12 @@ internal static class MaterialDialogService
                     view.Measure(new Size(Math.Min(view.Width, view.MaxWidth) + view.Margin.Left + view.Margin.Right, double.PositiveInfinity));
                     shell.Height = Math.Min(shell.MaxHeight, view.DesiredSize.Height + host.DialogMargin.Top + host.DialogMargin.Bottom);
                 }
-                shell.Closing += (_, _) => { if (_session is { IsEnded: false }) _session.Close(null); };
+                shell.Closing += (_, args) =>
+                {
+                    if (_session is not { IsEnded: false } session) return;
+                    if (!_closing && !allowClose) args.Cancel = true;
+                    session.Close(null);
+                };
                 if (owner is not null)
                 {
                     ownerWasEnabled = owner.IsEnabled; owner.IsEnabled = false;
@@ -92,6 +112,11 @@ internal static class MaterialDialogService
             try
             {
                 host.DialogBackground = System.Windows.Media.Brushes.Transparent;
+                // DialogHost still owns modality/focus; PrismMotion alone owns card motion.
+                host.ApplyTemplate();
+                if (VisualTreeHelper.GetChildrenCount(host) > 0 && VisualTreeHelper.GetChild(host, 0) is FrameworkElement templateRoot)
+                    foreach (var group in VisualStateManager.GetVisualStateGroups(templateRoot).OfType<VisualStateGroup>())
+                        if (group.Name == "PopupStates") group.Transitions.Clear();
                 var result = await DialogHost.Show(glass, host.Identifier!, new DialogOpenedEventHandler((_, e) =>
                 {
                     // Prism owns the rounded clipping; the host must not crop its shadow.
@@ -100,18 +125,37 @@ internal static class MaterialDialogService
                     {
                         card.ClipContent = false;
                         card.Effect = new System.Windows.Media.Effects.DropShadowEffect
-                        { Color = System.Windows.Media.Color.FromRgb(30, 55, 70), BlurRadius = 28, ShadowDepth = 8, Opacity = .28 };
+                        { Color = Color.FromRgb(30, 55, 70), BlurRadius = 28, ShadowDepth = 8, Opacity = .28 };
                     }
                     _session = e.Session;
                     view.Complete = result => { if (!e.Session.IsEnded) e.Session.Close(result); };
 
+                }), new DialogClosingEventHandler((_, e) =>
+                {
+                    if (allowClose || _closing || !glass.IsLoaded) return;
+                    e.Cancel();
+                    if (exiting) return;
+                    exiting = true; view.IsHitTestVisible = false;
+                    glass.CacheMode = new BitmapCache { SnapsToDevicePixels = true };
+                    var parameter = e.Parameter;
+                    PrismMotion.Animate(slide, TranslateTransform.YProperty, MotionProfiles.DialogOffset, MotionProfiles.DialogExit);
+                    PrismMotion.Animate(glass, UIElement.OpacityProperty, 0, MotionProfiles.DialogExit, () =>
+                    {
+                        allowClose = true;
+                        if (!e.Session.IsEnded) e.Session.Close(parameter);
+                    }, minimum: 0, maximum: 1);
                 }));
                 // Show completes at logical close, before the template's exit transition.
                 // Keep content/desired size intact until the popup has actually disappeared.
                 await WaitForVisualCloseAsync(host);
                 return result;
             }
-            finally { host.SizeChanged -= Bounds; host.DialogContent = null; _session = null; }
+            finally
+            {
+                glass.Loaded -= Enter; PrismMotion.StopAll(glass); PrismMotion.StopAll(slide);
+                glass.CacheMode = null;
+                host.SizeChanged -= Bounds; host.DialogContent = null; _session = null;
+            }
         }
         finally
         {

@@ -2,6 +2,7 @@
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Threading;
+using System.Windows.Media;
 using MaterialDesignThemes.Wpf;
 
 namespace NexusExplorer.Views;
@@ -26,9 +27,22 @@ public sealed class VolumeHoverPopupBox : PopupBox
 
     protected override void OnMouseEnter(MouseEventArgs e)
     {
+        if (PopupContent is PrismCard glass)
+            glass.PrepareDialogBackdrop(Window.GetWindow(this)?.FindName("WallpaperScene") as FrameworkElement);
         _leaveTimer.Stop();
         _outsideSince = null;
         base.OnMouseEnter(e);
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        if (GetTemplateChild(PopupPartName) is Popup { Child: Card card })
+        {
+            card.Background = Brushes.Transparent;
+            card.Padding = new Thickness(0);
+            card.ClipContent = false;
+        }
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)
