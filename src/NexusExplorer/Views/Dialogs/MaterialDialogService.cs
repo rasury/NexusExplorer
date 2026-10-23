@@ -1,5 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Threading;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 using MaterialDesignThemes.Wpf;
 using Serilog;
 
@@ -90,7 +92,7 @@ internal static class MaterialDialogService
             try
             {
                 host.DialogBackground = System.Windows.Media.Brushes.Transparent;
-                return await DialogHost.Show(glass, host.Identifier!, new DialogOpenedEventHandler((_, e) =>
+                var result = await DialogHost.Show(glass, host.Identifier!, new DialogOpenedEventHandler((_, e) =>
                 {
                     // Prism owns the rounded clipping; the host must not crop its shadow.
                     host.ApplyTemplate();
@@ -104,6 +106,10 @@ internal static class MaterialDialogService
                     view.Complete = result => { if (!e.Session.IsEnded) e.Session.Close(result); };
 
                 }));
+                // Show completes at logical close, before the template's exit transition.
+                // Keep content/desired size intact until the popup has actually disappeared.
+                await WaitForVisualCloseAsync(host);
+                return result;
             }
             finally { host.SizeChanged -= Bounds; host.DialogContent = null; _session = null; }
         }
@@ -121,6 +127,34 @@ internal static class MaterialDialogService
                 }
             }
             Queue.Release();
+        }
+    }
+
+    private static async Task WaitForVisualCloseAsync(DialogHost host)
+    {
+        if (!host.IsLoaded || host.Dispatcher.HasShutdownStarted) return;
+        var popup = host.Template.FindName("PART_Popup", host) as Popup;
+        var root = VisualTreeHelper.GetChildrenCount(host) > 0 ? VisualTreeHelper.GetChild(host, 0) as FrameworkElement : null;
+        var states = root is null ? null : VisualStateManager.GetVisualStateGroups(root).OfType<VisualStateGroup>()
+            .FirstOrDefault(group => group.Name == "PopupStates");
+        // Embedded hosts have no Popup HWND; their Closed visual state is the boundary.
+        bool Finished() => !host.IsLoaded || (popup is not null ? !popup.IsOpen : states is null || states.CurrentState?.Name == "Closed");
+        if (Finished()) return;
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Closed(object? sender, EventArgs e) => done.TrySetResult();
+        void Unloaded(object sender, RoutedEventArgs e) => done.TrySetResult();
+        void StateChanged(object? sender, VisualStateChangedEventArgs e) { if (Finished()) done.TrySetResult(); }
+        if (popup is not null) popup.Closed += Closed;
+        else if (states is not null) states.CurrentStateChanged += StateChanged;
+        host.Unloaded += Unloaded;
+        host.Dispatcher.ShutdownStarted += Closed;
+        try { if (!Finished()) await done.Task; }
+        finally
+        {
+            if (popup is not null) popup.Closed -= Closed;
+            else if (states is not null) states.CurrentStateChanged -= StateChanged;
+            host.Unloaded -= Unloaded;
+            host.Dispatcher.ShutdownStarted -= Closed;
         }
     }
 

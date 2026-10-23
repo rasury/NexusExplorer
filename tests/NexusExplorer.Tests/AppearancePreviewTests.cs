@@ -2,6 +2,7 @@
 using NexusExplorer.Infrastructure;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using MaterialDesignThemes.Wpf;
@@ -67,7 +68,26 @@ public class AppearancePreviewTests
                 var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
                 var folder = Path.Combine(Path.GetTempPath(), "nexus-feature-checks"); Directory.CreateDirectory(folder);
                 using (var stream = File.Create(Path.Combine(folder, $"appearance-preview-{theme}.png"))) encoder.Save(stream);
+                var popup = (Popup)dialog.Template.FindName("PART_Popup", dialog);
+                var card = (Card)dialog.Template.FindName("PART_PopupContentElement", dialog);
+                var width = card.ActualWidth; var height = card.ActualHeight;
                 surface.Complete(null);
+                Assert.False(dialog.IsOpen);
+                Assert.Same(glass, dialog.DialogContent);
+                // Logical close must not collapse the popup during its exit animation.
+                var observedExit = false;
+                var deadline = DateTime.UtcNow.AddSeconds(5);
+                while (popup.IsOpen)
+                {
+                    Assert.True(DateTime.UtcNow < deadline);
+                    observedExit = true; card.UpdateLayout();
+                    Assert.Same(glass, dialog.DialogContent);
+                    Assert.Equal(width, card.ActualWidth, 1);
+                    Assert.Equal(height, card.ActualHeight, 1);
+                    await Task.Delay(15);
+                }
+                Assert.True(observedExit);
+                await BoundedDialogTests.Until(() => dialog.DialogContent is null);
                 await BoundedDialogTests.Until(() => !dialog.IsOpen && Math.Abs(wallpaper.Opacity - original) < .001);
             }
             finally { MaterialDialogService.CancelAll(); window.PrepareForVerificationExit(); window.Close(); }
