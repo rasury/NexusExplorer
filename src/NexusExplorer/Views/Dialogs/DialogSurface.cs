@@ -19,7 +19,15 @@ internal sealed class DialogSurface : Grid
         heading.SetResourceReference(StyleProperty, "DialogTitle");
         content.Children.Add(heading); content.Children.Add(body);
         Children.Add(new ScrollViewer { Content = content, Padding = new Thickness(8), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
-        actions.Margin = new Thickness(0, 24, 0, 0); SetRow(actions, 1); Children.Add(actions);
+        // Every action row uses the same sizing and an 8px inter-button gap.
+        if (actions is Panel actionPanel)
+            foreach (var button in actionPanel.Children.OfType<Button>())
+            {
+                button.Margin = new Thickness(4);
+                button.MinWidth = 80; button.Height = 40;
+                button.VerticalAlignment = VerticalAlignment.Center;
+            }
+        actions.Margin = new Thickness(4, 20, 4, 0); SetRow(actions, 1); Children.Add(actions);
         PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; Complete(null); } };
     }
     public void Constrain(double width, double height, Thickness hostMargin = default)

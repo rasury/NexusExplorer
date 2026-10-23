@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using NexusExplorer.Infrastructure;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -12,8 +13,10 @@ namespace NexusExplorer.Tests;
 [Collection("NativePlaybackLogging")]
 public class AppearancePreviewTests
 {
-    [Fact]
-    public async Task AppearanceOpensWithPreparedBackdropPreviewsTransparencyAndCancels()
+    [Theory]
+    [InlineData(UiThemeMode.Light)]
+    [InlineData(UiThemeMode.Dark)]
+    public async Task AppearanceOpensWithPreparedBackdropPreviewsTransparencyAndCancels(UiThemeMode theme)
     {
         using var host = new TestHost();
         await WpfTestHost.RunAsync(async () =>
@@ -29,12 +32,29 @@ public class AppearancePreviewTests
                 button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 var dialog = (DialogHost)window.FindName("RootDialog");
                 await BoundedDialogTests.Until(() => dialog.DialogContent is PrismCard { IsLoaded: true });
+                UiThemeService.Apply(theme);
                 var glass = (PrismCard)dialog.DialogContent!;
                 var surface = (DialogSurface)glass.Content; glass.UpdateLayout();
                 var backdrop = (Border)glass.Template.FindName("PART_Backdrop", glass);
                 Assert.IsType<VisualBrush>(backdrop.Background);
                 Assert.Same(window.FindName("WallpaperScene"), ((VisualBrush)backdrop.Background).Visual);
                 await Task.Delay(400); glass.UpdateLayout();
+                var actions = (Panel)surface.Children[1];
+                var buttons = actions.Children.OfType<Button>().ToArray();
+                Assert.Equal(2, buttons.Length);
+                var first = buttons[0].TranslatePoint(new Point(), surface);
+                var last = buttons[1].TranslatePoint(new Point(), surface);
+                Assert.Equal(first.Y, last.Y, 1);
+                Assert.Equal(8, last.X - first.X - buttons[0].ActualWidth, 1);
+                foreach (var action in buttons)
+                {
+                    Assert.Equal(40, action.ActualHeight);
+                    var text = Descendants<TextBlock>(action).Single();
+                    var center = text.TranslatePoint(new Point(text.ActualWidth / 2, text.ActualHeight / 2), action);
+                    Assert.InRange(Math.Abs(center.Y - action.ActualHeight / 2), 0, 1);
+                    Assert.InRange(Math.Abs(center.X - action.ActualWidth / 2), 0, 1);
+                    Assert.IsType<LinearGradientBrush>(action.Background);
+                }
                 var slider = Descendants<Slider>(surface).Single();
                 var top = slider.TranslatePoint(new Point(), surface);
                 Assert.True(top.X >= 12, $"left={top.X}"); Assert.True(top.X + slider.ActualWidth + 12 <= surface.ActualWidth, $"left={top.X}; slider={slider.ActualWidth}; surface={surface.ActualWidth}");
@@ -46,7 +66,7 @@ public class AppearancePreviewTests
                 var bitmap = new RenderTargetBitmap((int)glass.ActualWidth, (int)glass.ActualHeight, 96, 96, PixelFormats.Pbgra32); bitmap.Render(glass);
                 var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
                 var folder = Path.Combine(Path.GetTempPath(), "nexus-feature-checks"); Directory.CreateDirectory(folder);
-                using (var stream = File.Create(Path.Combine(folder, "appearance-preview.png"))) encoder.Save(stream);
+                using (var stream = File.Create(Path.Combine(folder, $"appearance-preview-{theme}.png"))) encoder.Save(stream);
                 surface.Complete(null);
                 await BoundedDialogTests.Until(() => !dialog.IsOpen && Math.Abs(wallpaper.Opacity - original) < .001);
             }
