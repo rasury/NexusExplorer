@@ -10,6 +10,17 @@ namespace NexusExplorer.Tests;
 public class ThemeTransitionTests
 {
     [Fact]
+    public void ThemeCurveIsSlowFastSlowWithoutOvershoot()
+    {
+        var segment = new MotionSegment(0, 1, 0, MotionProfiles.Theme);
+        var duration = MotionProfiles.Theme.Seconds;
+        Assert.Equal(0, segment.Sample(0).Velocity);
+        Assert.Equal(0, segment.Sample(duration).Velocity);
+        Assert.True(segment.Sample(duration * .5).Velocity > segment.Sample(duration * .1).Velocity);
+        Assert.True(segment.Sample(duration * .5).Velocity > segment.Sample(duration * .9).Velocity);
+        for (var i = 0; i <= 100; i++) Assert.InRange(segment.Sample(duration * i / 100).Value, 0, 1);
+    }
+    [Fact]
     public async Task RevealTravelsDownwardRejectsReentryAndCleansUp()
     {
         await WpfTestHost.RunAsync(async () =>

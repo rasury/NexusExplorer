@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Diagnostics;
 
 namespace NexusExplorer.Views;
 
@@ -23,6 +24,7 @@ internal static class ThemeTransition
     private static async Task RunCoreAsync(Grid root, Grid? dialog, Action apply)
     {
         var layers = new List<Layer>();
+        var watch = Stopwatch.StartNew();
         try
         {
             if (root.IsVisible && root.ActualWidth > 0 && root.ActualHeight > 0)
@@ -31,7 +33,9 @@ internal static class ThemeTransition
                 if (dialog is { IsVisible: true, ActualWidth: > 0, ActualHeight: > 0 })
                     layers.Add(new Layer(dialog, root));
             }
+            var captureMs = watch.Elapsed.TotalMilliseconds;
             apply();
+            Serilog.Log.Information("主题过渡准备;截图 {CaptureMs:F1} ms;主题应用 {ApplyMs:F1} ms", captureMs, watch.Elapsed.TotalMilliseconds - captureMs);
             await Task.WhenAll(layers.Select(layer => layer.PlayAsync()));
         }
         finally
@@ -53,8 +57,9 @@ internal static class ThemeTransition
         {
             _target = target;
             var dpi = VisualTreeHelper.GetDpi(target);
-            // Bound transient allocation on very large/high-DPI displays.
-            var scale = Math.Min(dpi.DpiScaleX, 4096 / Math.Max(target.ActualWidth, target.ActualHeight));
+            // This short-lived old-theme veil need not render glass effects at screen DPI.
+            // The revealed live UI always retains full resolution.
+            var scale = Math.Min(dpi.DpiScaleX, MotionProfiles.ThemeSnapshotEdge / Math.Max(target.ActualWidth, target.ActualHeight));
             var bitmap = new RenderTargetBitmap(Math.Max(1, (int)Math.Ceiling(target.ActualWidth * scale)),
                 Math.Max(1, (int)Math.Ceiling(target.ActualHeight * scale)), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
             bitmap.Render(target); bitmap.Freeze();

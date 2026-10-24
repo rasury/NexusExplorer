@@ -15,8 +15,10 @@ internal static class MotionProfiles
     internal static readonly MotionProfile DialogEnter = new(.22, MotionCurve.Spring, .78, 30);
     internal static readonly MotionProfile DialogFade = new(.16, MotionCurve.Smooth);
     internal static readonly MotionProfile DialogExit = new(.12, MotionCurve.Smooth);
-    internal static readonly MotionProfile Theme = new(.65, MotionCurve.Smooth);
-    internal const double ThemeFeather = .22;
+    // Smooth starts with zero velocity, accelerates, then decelerates to rest.
+    internal static readonly MotionProfile Theme = new(.55, MotionCurve.Smooth);
+    internal const double ThemeFeather = .12;
+    internal const double ThemeSnapshotEdge = 720;
     internal const double DialogOffset = 12;
     internal static readonly TimeSpan NoticeHold = TimeSpan.FromMilliseconds(500);
     internal static readonly TimeSpan HoverPoll = TimeSpan.FromMilliseconds(40);
