@@ -3,7 +3,13 @@
  WindowStyle="SingleBorderWindow" ResizeMode="CanResize" Style="{StaticResource MaterialDesignWindow}" Background="{DynamicResource BrushPrimaryBg}" FontFamily="{StaticResource FontFamilyMain}" UseLayoutRounding="True">
  <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="64" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/></shell:WindowChrome.WindowChrome>
  <Grid x:Name="WindowSurface">
-  <Grid x:Name="WallpaperScene" IsHitTestVisible="False" Background="Black"><Image x:Name="WallpaperImage" Source="/NexusExplorer;component/Assets/PrismBackground.png" Stretch="UniformToFill"/><Border x:Name="WallpaperShade" Background="{DynamicResource BrushWallpaperShade}"/></Grid>
+  <Grid x:Name="WallpaperScene" IsHitTestVisible="False" Background="Black">
+   <Grid x:Name="WallpaperContent">
+    <views:PrismBackground x:Name="DefaultBackground"/>
+    <Image x:Name="WallpaperImage" Stretch="UniformToFill" Visibility="Collapsed"/>
+    <Border x:Name="WallpaperShade" Background="{DynamicResource BrushWallpaperShade}" Visibility="Collapsed"/>
+   </Grid>
+  </Grid>
   <md:DialogHost x:Name="RootDialog" Identifier="Nexus.Main" CloseOnClickAway="False" DialogContentUniformCornerRadius="24" DialogBackground="{DynamicResource BrushPrismDialog}" OverlayBackground="#20456775" DialogOpened="OnDialogOpened" DialogClosed="OnDialogClosed">
    <Grid x:Name="WindowLayout" Margin="6">
     <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/></Grid.RowDefinitions>

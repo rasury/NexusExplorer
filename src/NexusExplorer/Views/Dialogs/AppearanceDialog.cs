@@ -29,7 +29,7 @@ internal static class AppearanceDialog
             finally { previewing = false; }
         }
         label = new TextBlock { Text = path ?? "默认背景", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 12) };
-        body.Children.Add(new TextBlock { Text = "背景图片" }); body.Children.Add(label);
+        body.Children.Add(new TextBlock { Text = "背景" }); body.Children.Add(label);
         var row = new WrapPanel();
         var choose = new Button { Content = "选择图片", Margin = new Thickness(0, 0, 8, 0) }; choose.SetResourceReference(FrameworkElement.StyleProperty, "ButtonText");
         choose.Click += async (_, _) => { var picker = new OpenFileDialog { Filter = "图片|*.png;*.jpg;*.jpeg;*.bmp", CheckFileExists = true }; if (picker.ShowDialog() == true) { path = picker.FileName; label.Text = path; await Preview(); } };

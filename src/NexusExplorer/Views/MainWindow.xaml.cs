@@ -84,7 +84,11 @@ public partial class MainWindow : Window
     }
     private bool _closingStarted;
     private bool _closingFinished;
-    private void OnThemeChanged() => WindowAppearance.Apply(this);
+    private void OnThemeChanged()
+    {
+        WindowAppearance.Apply(this);
+        DefaultBackground.IsDark = UiThemeService.IsDark;
+    }
     private readonly DispatcherTimer _noticeTimer = new() { Interval = MotionProfiles.NoticeHold };
     private int _noticeVersion;
     private void OnNotice(string message)
@@ -225,24 +229,34 @@ public partial class MainWindow : Window
     {
         var version = ++_wallpaperVersion;
         var path = appearance.BackgroundImagePath;
+        DefaultBackground.IsDark = UiThemeService.IsDark;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            _wallpaperLoaded = true; _wallpaperPath = null;
+            WallpaperImage.Source = null;
+            WallpaperImage.Visibility = WallpaperShade.Visibility = Visibility.Collapsed;
+            DefaultBackground.Visibility = Visibility.Visible;
+            ApplyWallpaperOpacity(appearance.BackgroundOpacity);
+            return;
+        }
         if (_wallpaperLoaded && path == _wallpaperPath) { ApplyWallpaperOpacity(appearance.BackgroundOpacity); return; }
         var image = await Task.Run(() =>
         {
             var bitmap = new System.Windows.Media.Imaging.BitmapImage();
             bitmap.BeginInit(); bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
             bitmap.DecodePixelWidth = 2560;
-            bitmap.UriSource = string.IsNullOrWhiteSpace(path)
-                ? new Uri("pack://application:,,,/NexusExplorer;component/Assets/PrismBackground.png") : new Uri(System.IO.Path.GetFullPath(path));
+            bitmap.UriSource = new Uri(System.IO.Path.GetFullPath(path));
             bitmap.EndInit(); bitmap.Freeze(); return bitmap;
         });
         if (version != _wallpaperVersion) return;
         _wallpaperLoaded = true; _wallpaperPath = path; WallpaperImage.Source = image; ApplyWallpaperOpacity(appearance.BackgroundOpacity);
+        DefaultBackground.Visibility = Visibility.Collapsed;
+        WallpaperImage.Visibility = WallpaperShade.Visibility = Visibility.Visible;
     }
     internal void ApplyWallpaperOpacity(double opacity)
     {
         opacity = double.IsFinite(opacity) ? Math.Clamp(opacity, 0, 1) : 1;
-        WallpaperImage.Opacity = opacity;
-        WallpaperShade.Opacity = opacity;
+        WallpaperContent.Opacity = opacity;
     }
     private void StopMotion()
     {

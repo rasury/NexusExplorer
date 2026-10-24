@@ -28,12 +28,31 @@ public class AppearancePreviewTests
             try
             {
                 window.Show(); await Task.Delay(700); window.UpdateLayout();
-                var wallpaper = (Image)window.FindName("WallpaperImage"); var original = wallpaper.Opacity;
+                var wallpaper = (Grid)window.FindName("WallpaperContent"); var original = wallpaper.Opacity;
+                var defaultBackground = (PrismBackground)window.FindName("DefaultBackground");
+                var customImage = (Image)window.FindName("WallpaperImage");
+                var imagePath = Path.Combine(Path.GetTempPath(), $"nexus-background-{Guid.NewGuid():N}.png");
+                try
+                {
+                    var png = new PngBitmapEncoder();
+                    png.Frames.Add(BitmapFrame.Create(BitmapSource.Create(1, 1, 96, 96, PixelFormats.Bgra32, null, new byte[] { 80, 120, 160, 255 }, 4)));
+                    using (var file = File.Create(imagePath)) png.Save(file);
+                    await window.ApplyWallpaperAsync(new AppearanceConfig { BackgroundImagePath = imagePath, BackgroundOpacity = original });
+                    Assert.NotNull(customImage.Source);
+                    Assert.Equal(Visibility.Visible, customImage.Visibility);
+                    Assert.Equal(Visibility.Collapsed, defaultBackground.Visibility);
+                }
+                finally { File.Delete(imagePath); }
+                await window.ApplyWallpaperAsync(new AppearanceConfig { BackgroundOpacity = original });
+                Assert.Null(customImage.Source);
+                Assert.Equal(Visibility.Visible, defaultBackground.Visibility);
+                Assert.Equal(Visibility.Collapsed, customImage.Visibility);
                 var button = Descendants<Button>(window).Single(b => Equals(b.ToolTip, "外观设置"));
                 button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 var dialog = (DialogHost)window.FindName("RootDialog");
                 await BoundedDialogTests.Until(() => dialog.DialogContent is PrismCard { IsLoaded: true });
                 UiThemeService.Apply(theme);
+                Assert.Equal(theme == UiThemeMode.Dark, defaultBackground.IsDark);
                 var glass = (PrismCard)dialog.DialogContent!;
                 var surface = (DialogSurface)glass.Content; glass.UpdateLayout();
                 var themes = Descendants<ListBox>(surface).Single();
@@ -71,7 +90,7 @@ public class AppearancePreviewTests
                 var top = slider.TranslatePoint(new Point(), surface);
                 Assert.True(top.X >= 12, $"left={top.X}"); Assert.True(top.X + slider.ActualWidth + 12 <= surface.ActualWidth, $"left={top.X}; slider={slider.ActualWidth}; surface={surface.ActualWidth}");
                 slider.Value = 0;
-                Assert.Equal(0, wallpaper.Opacity); Assert.Equal(0, ((Border)window.FindName("WallpaperShade")).Opacity);
+                Assert.Equal(0, wallpaper.Opacity);
                 Assert.Equal(Colors.Black, ((SolidColorBrush)((Grid)window.FindName("WallpaperScene")).Background).Color);
                 slider.Value = 45; Assert.Equal(.45, wallpaper.Opacity);
                 await Task.Delay(150); glass.UpdateLayout();

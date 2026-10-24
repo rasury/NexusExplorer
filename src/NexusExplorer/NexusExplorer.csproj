@@ -58,7 +58,6 @@
 
   <ItemGroup>
     <Resource Include="Assets\AppIcon.ico" />
-    <Resource Include="Assets\PrismBackground.png" />
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
