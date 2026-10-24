@@ -24,23 +24,27 @@ internal sealed record MotionSegment(double From, double To, double Velocity, Mo
         }
         else if (Profile.Curve == MotionCurve.Emphasized)
         {
-            // Non-interruptible reveals: sixth-power edges meet the fast middle
-            // with continuous position and velocity at 20% and 80% of time.
+            // Spend 40% of time crossing the first 20% of the visible area,
+            // rush through the middle 60%, then settle across the last 20%.
+            // Quadratic edges and a cubic middle have continuous velocity.
             var u = t / Profile.Seconds;
             double progress, speed;
-            if (u < .2)
+            if (u < .4)
             {
-                var edge = u / .2;
-                progress = .05 * Math.Pow(edge, 6);
-                speed = 1.5 * Math.Pow(edge, 5);
+                progress = 1.25 * u * u;
+                speed = 2.5 * u;
             }
-            else if (u > .8)
+            else if (u > .6)
             {
-                var edge = (1 - u) / .2;
-                progress = 1 - .05 * Math.Pow(edge, 6);
-                speed = 1.5 * Math.Pow(edge, 5);
+                progress = 1 - 1.25 * (1 - u) * (1 - u);
+                speed = 2.5 * (1 - u);
             }
-            else { progress = .05 + 1.5 * (u - .2); speed = 1.5; }
+            else
+            {
+                var middle = (u - .4) / .2;
+                progress = .2 + .2 * middle + 1.2 * middle * middle - .8 * middle * middle * middle;
+                speed = 1 + 12 * middle * (1 - middle);
+            }
             value = From + (To - From) * progress;
             velocity = (To - From) * speed / Profile.Seconds;
         }
