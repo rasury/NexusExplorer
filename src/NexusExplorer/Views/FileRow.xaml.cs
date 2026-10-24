@@ -34,7 +34,7 @@ public partial class FileRow : UserControl
             }, token);
             token.ThrowIfCancellationRequested();
             Metadata.Text += " · " + size;
-            var thumbnail = await ThumbnailService.Shared.GetAsync(file.AbsolutePath, token);
+            var thumbnail = await ThumbnailService.Shared.GetAsync(file.AbsolutePath, token, identity: file.ThumbnailIdentity);
             if (!token.IsCancellationRequested) Cover.Source = thumbnail.Image;
         }
         catch (OperationCanceledException) { }

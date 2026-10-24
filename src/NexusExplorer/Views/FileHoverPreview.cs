@@ -19,6 +19,7 @@ internal sealed class FileHoverPreview : IDisposable
     private readonly DispatcherTimer _delay;
     private readonly Func<string, CancellationToken, Task<ThumbnailResult>> _load;
     private readonly Func<ListBoxItem, bool> _isHovered;
+    private readonly bool _prefetch;
     private ListBoxItem? _row;
     private FileItem? _file;
     private string? _path;
@@ -36,7 +37,8 @@ internal sealed class FileHoverPreview : IDisposable
         Func<string, CancellationToken, Task<ThumbnailResult>>? loader = null, Func<ListBoxItem, bool>? isHovered = null)
     {
         _list = list;
-        _load = loader ?? ((path, token) => ThumbnailService.Shared.GetAsync(path, token));
+        _prefetch = loader is null;
+        _load = loader ?? ((path, token) => ThumbnailService.Shared.GetAsync(path, token, ThumbnailPriority.Hover, _file?.ThumbnailIdentity));
         _isHovered = isHovered ?? (row => row.IsMouseOver);
         _delay = new DispatcherTimer(DispatcherPriority.Background, list.Dispatcher) { Interval = HoverDelay };
         _delay.Tick += OnDelay;
@@ -94,13 +96,32 @@ internal sealed class FileHoverPreview : IDisposable
         try
         {
             var result = await _load(path, token);
-            if (version == _version && !token.IsCancellationRequested && StillHovered()) _view.ShowResult(result);
+            if (version == _version && !token.IsCancellationRequested && StillHovered())
+            {
+                _view.ShowResult(result);
+                if (_prefetch) await PrefetchNeighborsAsync(token);
+            }
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             Log.Debug(ex, "文件悬停预览失败 {Path}", path);
             if (version == _version && StillHovered()) _view.ShowResult(new(null, ThumbnailStatus.Unavailable));
+        }
+    }
+    private async Task PrefetchNeighborsAsync(CancellationToken token)
+    {
+        var index = _row is null ? -1 : _list.ItemContainerGenerator.IndexFromContainer(_row);
+        if (index < 0) return;
+        // At most two neighboring files, only while this hover remains active.
+        var neighbors = new[] { index + 1, index - 1 }
+            .Where(i => i >= 0 && i < _list.Items.Count).Select(i => _list.Items[i]).OfType<FileItem>().ToArray();
+        foreach (var next in neighbors)
+        {
+            token.ThrowIfCancellationRequested();
+            try { await ThumbnailService.Shared.GetAsync(next.AbsolutePath, token, ThumbnailPriority.Prefetch, next.ThumbnailIdentity); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { Log.Debug(ex, "相邻文件缩略图预取失败"); }
         }
     }
     internal void Cancel()

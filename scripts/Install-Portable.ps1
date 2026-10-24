@@ -41,7 +41,7 @@ foreach ($taskRequired in @('NexusExplorer.exe', 'native/mpv/win-x64/libmpv-2.dl
     }
 }
 
-$taskProtectedRoots = @('Storage', 'data', 'logs') | ForEach-Object { Join-Path $taskOutput $_ }
+$taskProtectedRoots = @('Storage', 'data', 'logs', 'cache') | ForEach-Object { Join-Path $taskOutput $_ }
 $taskDatabase = Join-Path $taskOutput 'data/nexus.db'
 $taskSettings = Join-Path $taskOutput 'appsettings.json'
 if (Test-Path -LiteralPath $taskSettings) {

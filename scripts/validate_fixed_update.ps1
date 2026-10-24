@@ -7,7 +7,7 @@ $taskFixed = if ([IO.Path]::IsPathRooted($OutputDirectory)) { [IO.Path]::GetFull
 $taskSettingsAlreadyExisted = Test-Path -LiteralPath (Join-Path $taskFixed 'appsettings.json')
 function Get-UserSnapshot {
     $taskItems = @()
-    foreach ($taskName in @('data', 'Storage', 'logs')) {
+    foreach ($taskName in @('data', 'Storage', 'logs', 'cache')) {
         $taskFolder = Join-Path $taskFixed $taskName
         if (-not (Test-Path -LiteralPath $taskFolder)) { continue }
         $taskItems += Get-Item -LiteralPath $taskFolder
@@ -17,9 +17,11 @@ function Get-UserSnapshot {
         $taskItems += Get-Item -LiteralPath (Join-Path $taskFixed 'appsettings.json')
     }
     foreach ($taskItem in $taskItems | Sort-Object FullName) {
+        # Enumeration may retain directory timestamps from before its child writes completed.
+        $taskItem.Refresh()
         $taskRelative = $taskItem.FullName.Substring($taskFixed.TrimEnd('\', '/').Length + 1)
         $taskHash = $null
-        if (-not $taskItem.PSIsContainer -and -not $taskRelative.StartsWith('Storage\')) {
+        if (-not $taskItem.PSIsContainer -and -not $taskRelative.StartsWith('Storage\') -and -not $taskRelative.StartsWith('cache\')) {
             $taskHash = (Get-FileHash -LiteralPath $taskItem.FullName).Hash
         }
         [pscustomobject]@{ path = $taskRelative; directory = $taskItem.PSIsContainer;

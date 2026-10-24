@@ -24,6 +24,7 @@ public static class AppPaths
     public static string DatabasePath => Path.Combine(DataDirectory, "nexus.db");
 
     public static string LogsDirectory => Path.Combine(AppRoot, "logs");
+    public static string ThumbnailCacheDirectory => Path.Combine(AppRoot, "cache", "thumbnails-v1");
 
     /// <summary>默认分类物理根目录:软件目录下的 Storage。</summary>
     public static string DefaultStorageRoot => Path.Combine(AppRoot, "Storage");

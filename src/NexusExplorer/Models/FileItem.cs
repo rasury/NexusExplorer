@@ -9,6 +9,9 @@ public class FileItem : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]
     public bool IsCurrent { get => _isCurrent; set => SetProperty(ref _isCurrent, value); }
     public int Id { get; set; }
+    // Stable across app-managed rename/move; creation time prevents recycled IDs sharing frames.
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    internal string? ThumbnailIdentity => Id > 0 && CreatedAt != default ? $"file:{Id}:{CreatedAt.Ticks}" : null;
 
     public int CategoryId { get; set; }
 
