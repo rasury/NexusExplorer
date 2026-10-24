@@ -47,6 +47,7 @@
       <ScrollViewer Style="{StaticResource PrismOverlayScrollViewer}" Grid.Row="1" Margin="0,8,0,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><StackPanel>
        <TextBlock x:Name="DetailName" Text="尚未打开文件" TextWrapping="Wrap" FontSize="19" Margin="0,12,0,20" Foreground="{DynamicResource BrushPrimaryText}"/>
        <TextBlock Text="格式" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailFormat" Style="{StaticResource TextPrimary}" Margin="0,6,0,18"/>
+       <TextBlock Text="文件大小" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailSize" Text="—" Style="{StaticResource TextPrimary}" Margin="0,6,0,18"/>
        <TextBlock Text="所属分类" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailCategory" Style="{StaticResource TextPrimary}" TextWrapping="Wrap" Margin="0,6,0,18"/>
        <TextBlock Text="文件位置" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailPath" Style="{StaticResource TextPrimary}" TextWrapping="Wrap" Margin="0,6,0,18"/>
        <TextBlock Text="登记时间" Style="{StaticResource TextCaption}"/><TextBlock x:Name="DetailDate" Style="{StaticResource TextPrimary}" Margin="0,6,0,0"/>

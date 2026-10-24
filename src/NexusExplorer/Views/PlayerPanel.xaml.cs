@@ -78,13 +78,38 @@ public partial class PlayerPanel : UserControl
         PrismMotion.Animate(this, InspectorExtentProperty, open ? 260 : 24, MotionProfiles.Panel,
             () => { if (!_inspectorOpen) InspectorBody.Visibility = Visibility.Hidden; }, minimum: 0);
     }
-    private void UpdateDetails(FileItem? file)
+    private long _detailSizeVersion;
+    internal async Task UpdateFileSizeAsync(string? path)
+    {
+        var version = ++_detailSizeVersion;
+        DetailSize.Text = path is null ? "—" : "读取中…";
+        DetailSize.ToolTip = null;
+        if (path is null) return;
+        var result = await Task.Run(() =>
+        {
+            try
+            {
+                var bytes = new System.IO.FileInfo(path).Length;
+                double size = bytes; var units = new[] { "B", "KB", "MB", "GB", "TB", "PB" }; var unit = 0;
+                while (size >= 1024 && unit < units.Length - 1) { size /= 1024; unit++; }
+                return (Text: $"{size:0.##} {units[unit]}", Hint: (string?)$"{bytes:N0} 字节");
+            }
+            catch (System.IO.FileNotFoundException) { return (Text: "文件已失效", Hint: (string?)null); }
+            catch (System.IO.DirectoryNotFoundException) { return (Text: "文件已失效", Hint: (string?)null); }
+            catch (Exception ex) { Log.Debug(ex, "文件详情大小读取失败"); return (Text: "无法读取", Hint: (string?)null); }
+        });
+        if (version != _detailSizeVersion) return;
+        DetailSize.Text = result.Text; DetailSize.ToolTip = result.Hint;
+    }
+    private async void UpdateDetails(FileItem? file)
     {
         DetailName.Text = file?.FileName ?? "尚未打开文件";
+        var sizeTask = UpdateFileSizeAsync(file?.AbsolutePath);
         DetailFormat.Text = file?.Extension.TrimStart('.').ToUpperInvariant() ?? "—";
         DetailCategory.Text = file is null ? "—" : _main.Category.FlatCategories.FirstOrDefault(c => c.Id == file.CategoryId)?.Name ?? "—";
         DetailPath.Text = file?.AbsolutePath ?? "—";
         DetailDate.Text = file?.CreatedAt.ToString("yyyy-MM-dd HH:mm") ?? "—";
+        await sizeTask;
     }
     public FrameworkElement PreviewSurfaceElement => PreviewSurface;
     private void OnPreviewDoubleClick(object sender, MouseButtonEventArgs e)
@@ -169,6 +194,7 @@ public partial class PlayerPanel : UserControl
     { if (!_dialogCovered && Vm.Kind == MediaKind.Video && Controls is not null) { _clickToken = Controls.CurrentToken; _videoClickTimer.Stop(); _videoClickTimer.Start(); } }
     public void Detach()
     {
+        ++_detailSizeVersion;
         VolumePopup.IsPopupOpen = false;
         PrismMotion.Stop(this, InspectorExtentProperty, finish: true);
         _videoClickTimer.Stop(); _inspectorTimer.Stop(); if (_main is not null) _main.CurrentFileChanged -= UpdateDetails;
