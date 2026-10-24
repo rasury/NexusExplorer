@@ -14,6 +14,8 @@ public class FileItem : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
     internal string? ThumbnailIdentity => Id > 0 && CreatedAt != default ? $"file:{Id}:{CreatedAt.Ticks}" : null;
 
     public int CategoryId { get; set; }
+    private bool _isFavorite;
+    public bool IsFavorite { get => _isFavorite; set => SetProperty(ref _isFavorite, value); }
 
     public string FileName { get; set; } = string.Empty;
 

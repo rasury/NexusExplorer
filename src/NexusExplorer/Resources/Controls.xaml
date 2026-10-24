@@ -10,7 +10,7 @@
         <Setter Property="Margin" Value="0,0,8,0"/><Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="ToolTip" Value="{Binding OrganizationStatusHint}"/>
         <Setter Property="Foreground" Value="{DynamicResource BrushStatusPending}"/>
-        <Style.Triggers><DataTrigger Binding="{Binding IsOrganized}" Value="True"><Setter Property="Foreground" Value="{DynamicResource BrushStatusOrganized}"/></DataTrigger></Style.Triggers>
+        <Style.Triggers><DataTrigger Binding="{Binding IsOrganized}" Value="True"><Setter Property="Foreground" Value="{DynamicResource BrushStatusOrganized}"/></DataTrigger><DataTrigger Binding="{Binding IsFavorites}" Value="True"><Setter Property="Kind" Value="Star"/><Setter Property="Foreground" Value="#E3AF27"/><Setter Property="ToolTip" Value="收藏的文件"/></DataTrigger></Style.Triggers>
     </Style>
     <Style TargetType="TreeView" BasedOn="{StaticResource MaterialDesignTreeView}">
         <Setter Property="Background" Value="Transparent"/>

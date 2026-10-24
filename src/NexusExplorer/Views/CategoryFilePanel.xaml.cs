@@ -38,7 +38,7 @@ public partial class CategoryFilePanel : UserControl
     private CancellationTokenSource? _organizing;
     private readonly DragWheelScroller _dragWheel = new();
     private AsyncRelayCommand<Category>? _organizeCommand;
-    public ICommand OrganizeCommand => _organizeCommand ??= new AsyncRelayCommand<Category>(OrganizeAsync, category => category is not null && _organizing is null);
+    public ICommand OrganizeCommand => _organizeCommand ??= new AsyncRelayCommand<Category>(OrganizeAsync, category => category is { IsFavorites: false } && _organizing is null);
 
     public event Action? PresentationSizeChanged;
     internal double PreferredHeight
@@ -257,13 +257,14 @@ public partial class CategoryFilePanel : UserControl
     {
         _contextMenuCategory = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.Header as Category;
         OrganizeCategoryMenu.IsEnabled = OrganizeCommand.CanExecute(_contextMenuCategory);
-        if (_contextMenuCategory is null) e.Handled = true;
+        if (_contextMenuCategory is null || _contextMenuCategory.IsFavorites) e.Handled = true;
     }
     internal Category? GetContextMenuCategory() => _contextMenuCategory;
     internal void RecordContextMenuTarget(TreeViewItem item) => _contextMenuCategory = item.Header as Category;
     internal void RecordContextMenuSource(DependencyObject source) => _contextMenuCategory = FindAncestor<TreeViewItem>(source)?.Header as Category;
     private void OnFileContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
+        RemoveFileMenu.Header = _main.CurrentCategory?.IsFavorites == true ? "取消收藏" : "从分类移除";
         if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject)?.DataContext is not FileItem f) { e.Handled = true; return; }
         if (!FileListBox.SelectedItems.Contains(f)) { FileListBox.SelectedItems.Clear(); FileListBox.SelectedItems.Add(f); }
         RelocateFileMenu.IsEnabled = RenameFileMenu.IsEnabled = FileListBox.SelectedItems.Count == 1;
@@ -348,6 +349,7 @@ public partial class CategoryFilePanel : UserControl
     }
     private void QueueExternalImport(string[] paths, Category target)
     {
+        if (target.IsFavorites) { MaterialDialogService.Notice("请先导入普通分类，再点击星星收藏。"); return; }
         // Copy OLE data before returning Drop; never keep Explorer's drag loop in a dialog.
         var copiedPaths = paths.ToArray();
         var queued = Stopwatch.StartNew();
@@ -378,6 +380,7 @@ public partial class CategoryFilePanel : UserControl
     private void OnTreeDragOver(object sender, DragEventArgs e)
     {
         BeginTreeDragScroll(e.Data);
+        if (DropTarget(e)?.IsFavorites == true) { e.Effects = e.Data.GetDataPresent(FilesFormat) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; return; }
         e.Effects = DropTarget(e) is null ? (CanDropCategoryAtRoot(e.Data, e.OriginalSource as DependencyObject) ? DragDropEffects.Move : DragDropEffects.None) :
             e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy :
             e.Data.GetDataPresent(FilesFormat) || e.Data.GetDataPresent(CategoryFormat) ? DragDropEffects.Move : DragDropEffects.None;
@@ -387,6 +390,7 @@ public partial class CategoryFilePanel : UserControl
     {
         _dragWheel.Dispose();
         e.Handled = true; var target = DropTarget(e);
+        if (target?.IsFavorites == true && !e.Data.GetDataPresent(FilesFormat)) return;
         if (target is null && !CanDropCategoryAtRoot(e.Data, e.OriginalSource as DependencyObject)) return;
         if (target is not null && e.Data.GetData(DataFormats.FileDrop) is string[] externalPaths) { QueueExternalImport(externalPaths, target); return; }
         await RunAsync(async () =>
@@ -409,6 +413,7 @@ public partial class CategoryFilePanel : UserControl
         if (e.ChangedButton != MouseButton.Left || e.ClickCount > 1 || IsControlChrome(source)) return;
         _pressedFile = HitFile(source);
         _pressedCategory = HitCategory(source);
+        if (_pressedCategory?.IsFavorites == true) _pressedCategory = null;
         if (_pressedFile is null && _pressedCategory is null) return;
         _start = e.GetPosition(this); _potentialDrag = true;
         if (_pressedFile is not null && Keyboard.Modifiers == ModifierKeys.None && FileListBox.SelectedItems.Contains(_pressedFile))

@@ -30,6 +30,7 @@ public sealed class AppDbContext : DbContext
         model.Entity<FileItem>().HasOne(f => f.Category).WithMany(c => c.Files).HasForeignKey(f => f.CategoryId).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FileItem>().HasOne(f => f.Location).WithMany().HasForeignKey(f => f.DirectoryLocationId).OnDelete(DeleteBehavior.Restrict);
         model.Entity<FileItem>().HasIndex(f => f.AbsolutePath);
+        model.Entity<FileItem>().HasIndex(f => new { f.IsFavorite, f.FileName, f.Id });
         model.Entity<FileItem>().Property(f => f.AbsolutePath).UseCollation("NOCASE");
         model.Entity<DirectoryLocation>().HasOne(d => d.Parent).WithMany().HasForeignKey(d => d.ParentId).OnDelete(DeleteBehavior.Restrict);
     }

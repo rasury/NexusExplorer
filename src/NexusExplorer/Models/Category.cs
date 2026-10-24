@@ -3,6 +3,10 @@ namespace NexusExplorer.Models;
 /// <summary>分类。每个分类对应一个真实物理目录。</summary>
 public class Category : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 {
+    public const int FavoritesId = -1;
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public bool IsFavorites => Id == FavoritesId;
+    public static Category Favorites() => new() { Id = FavoritesId, Name = "收藏" };
     private bool _isExpanded;
     private bool _isSelected;
     [System.ComponentModel.DataAnnotations.Schema.NotMapped]

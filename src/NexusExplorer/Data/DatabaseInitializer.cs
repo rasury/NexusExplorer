@@ -8,7 +8,7 @@ namespace NexusExplorer.Data;
 /// <summary>Versioned, transactional adoption of the original EnsureCreated database.</summary>
 public static class DatabaseInitializer
 {
-    public const int SchemaVersion = 3;
+    public const int SchemaVersion = 4;
     public static async Task InitializeAsync(AppDbContext db, string path)
     {
         var connection = (SqliteConnection)db.Database.GetDbConnection();
@@ -58,6 +58,7 @@ public static class DatabaseInitializer
         if (count == 0)
         {
             await db.Database.EnsureCreatedAsync();
+            await InstallFavoritesAsync(db);
             await InstallOrganizationTriggersAsync(db);
             await db.Database.ExecuteSqlRawAsync($"PRAGMA user_version = {SchemaVersion}");
             return;
@@ -83,6 +84,7 @@ public static class DatabaseInitializer
             ("Categories", categoryColumns, "IsOrganized", "INTEGER NOT NULL DEFAULT 0"),
             ("Files", fileColumns, "DirectoryLocationId", "INTEGER NULL"),
             ("Files", fileColumns, "RelativePath", "TEXT NULL"),
+            ("Files", fileColumns, "IsFavorite", "INTEGER NOT NULL DEFAULT 0"),
             ("Files", fileColumns, "ExternalAbsolutePath", "TEXT NULL")
         })
             if (!columns.Contains(name))
@@ -101,9 +103,21 @@ public static class DatabaseInitializer
             for (var i = 0; i < pinned.Count; i++) pinned[i].PinnedOrder = i + 1;
             await db.SaveChangesAsync();
         }
+        await InstallFavoritesAsync(db);
         await InstallOrganizationTriggersAsync(db);
         await db.Database.ExecuteSqlRawAsync($"PRAGMA user_version = {SchemaVersion}");
         await transaction.CommitAsync();
+    }
+
+    private static async Task InstallFavoritesAsync(AppDbContext db)
+    {
+        // The reserved owner keeps favorite-only files compatible with the existing FK.
+        // It has no physical directory and is excluded from ordinary category operations.
+        if (await db.Categories.AnyAsync(c => c.Id == Models.Category.FavoritesId))
+            throw new InvalidDataException("数据库已使用保留分类 ID -1，停止升级以免覆盖现有分类。");
+        db.Categories.Add(new Models.Category { Id = Models.Category.FavoritesId, Name = "收藏", CreatedAt = DateTime.Now, UpdatedAt = DateTime.Now });
+        await db.SaveChangesAsync();
+        await db.Database.ExecuteSqlRawAsync("CREATE INDEX IF NOT EXISTS IX_Files_IsFavorite_FileName_Id ON Files(IsFavorite, FileName, Id)");
     }
 
     private static async Task InstallOrganizationTriggersAsync(AppDbContext db)
@@ -111,9 +125,10 @@ public static class DatabaseInitializer
         // Invalidate by category primary key in the same transaction as the mutation.
         // No bound-file query or filesystem check is needed to display this state.
         await db.Database.ExecuteSqlRawAsync("""
+            DROP TRIGGER IF EXISTS OrganizationFileUpdate;
             CREATE TRIGGER IF NOT EXISTS OrganizationFileInsert AFTER INSERT ON Files
             BEGIN UPDATE Categories SET IsOrganized = 0 WHERE Id = NEW.CategoryId AND IsOrganized <> 0; END;
-            CREATE TRIGGER IF NOT EXISTS OrganizationFileUpdate AFTER UPDATE ON Files
+            CREATE TRIGGER IF NOT EXISTS OrganizationFileUpdate AFTER UPDATE OF CategoryId, FileName, AbsolutePath, DirectoryLocationId, RelativePath, ExternalAbsolutePath ON Files
             BEGIN UPDATE Categories SET IsOrganized = 0 WHERE Id IN (OLD.CategoryId, NEW.CategoryId) AND IsOrganized <> 0; END;
             CREATE TRIGGER IF NOT EXISTS OrganizationFileDelete AFTER DELETE ON Files
             BEGIN UPDATE Categories SET IsOrganized = 0 WHERE Id = OLD.CategoryId AND IsOrganized <> 0; END;

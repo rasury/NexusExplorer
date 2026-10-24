@@ -127,7 +127,7 @@
                         <MenuItem x:Name="RelocateFileMenu" Header="重新定位…" Click="OnRelocateFile" />
                         <MenuItem x:Name="RenameFileMenu" Header="重命名…" Click="OnRenameFile" />
                         <Separator />
-                        <MenuItem Header="从分类移除" Click="OnRemoveFile" />
+                        <MenuItem x:Name="RemoveFileMenu" Header="从分类移除" Click="OnRemoveFile" />
                         <MenuItem Header="删除" Click="OnDeleteFile" Foreground="{DynamicResource BrushDanger}" />
                     </ContextMenu>
                 </ListBox.ContextMenu>

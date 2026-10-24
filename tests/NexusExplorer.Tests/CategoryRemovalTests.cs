@@ -109,7 +109,8 @@ public class CategoryRemovalTests
             Assert.Empty(errors);
             Assert.Null(main.CurrentCategory); Assert.Empty(main.CurrentFiles);
             Assert.Empty(main.Navigation.PinnedCategories); Assert.Null(main.Navigation.SelectedCategory);
-            Assert.Equal(other.Id, Assert.Single(main.Category.RootCategories).Id);
+            Assert.True(main.Category.RootCategories[0].IsFavorites);
+            Assert.Equal(other.Id, Assert.Single(main.Category.RootCategories.Where(c => !c.IsFavorites)).Id);
             if (playingRemovedFile)
             {
                 Assert.Null(main.CurrentFile); Assert.False(engine.Snapshot.IsPlaying);

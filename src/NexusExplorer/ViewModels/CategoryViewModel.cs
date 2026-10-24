@@ -42,6 +42,7 @@ public partial class CategoryViewModel : ObservableObject
     {
         var states = FlatCategories.ToDictionary(c => c.Id, c => (c.IsExpanded, c.IsSelected));
         var tree = await _categoryService.GetTreeAsync();
+        tree.Insert(0, Models.Category.Favorites());
         foreach (var c in Flatten(tree))
             if (states.TryGetValue(c.Id, out var state)) { c.IsExpanded = state.IsExpanded; c.IsSelected = state.IsSelected; }
         RootCategories = new ObservableCollection<Category>(tree);
@@ -129,6 +130,11 @@ public partial class CategoryViewModel : ObservableObject
             var removedFileIds = await _categoryService.RemoveAsync(category.Id);
             if (_main.CurrentFile is { } current && removedFileIds.Contains(current.Id))
                 await _main.SelectFileAsync(null);
+            else if (_main.CurrentFile is { } kept && await _main.Files.GetByIdAsync(kept.Id) is { } refreshed && refreshed.CategoryId != kept.CategoryId)
+            {
+                _main.CurrentFile = refreshed;
+                await _main.Navigation.OnCurrentFileChangedAsync(await _categoryService.GetByIdAsync(refreshed.CategoryId));
+            }
             await _main.RefreshTreeAsync();
         }
         catch (Exception ex) { await ReportErrorAsync($"移除分类失败: {ex.Message}"); }

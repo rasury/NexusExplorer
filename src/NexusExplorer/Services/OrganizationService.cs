@@ -76,6 +76,7 @@ public class OrganizationService
         Func<string, string, Task<ConflictResolution>>? conflictHandler,
         CancellationToken cancellationToken, IProgress<OrganizeProgress>? progress)
     {
+        if (categoryId == NexusExplorer.Models.Category.FavoritesId) throw new OperationException("收藏没有物理目录，请在原分类中整理。");
         var timing = Stopwatch.StartNew();
         Log.Information("递归整理开始;分类 {CategoryId}", categoryId);
         using var lease = await MutationGate.AcquireAsync(_factory);

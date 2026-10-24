@@ -58,6 +58,22 @@ public partial class FileListViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public async Task ToggleFavoriteAsync(FileItem? file)
+    {
+        if (file is null) return;
+        try { await SetFavoriteAsync(file, !file.IsFavorite); }
+        catch (Exception ex) { await ReportErrorAsync($"收藏操作失败：{ex.Message}"); }
+    }
+    private async Task SetFavoriteAsync(FileItem file, bool favorite)
+    {
+        await _fileService.SetFavoriteAsync(file.Id, favorite);
+        file.IsFavorite = favorite;
+        foreach (var visible in _main.CurrentFiles.Where(f => f.Id == file.Id)) visible.IsFavorite = favorite;
+        if (_main.CurrentFile?.Id == file.Id) _main.CurrentFile.IsFavorite = favorite;
+        if (_main.CurrentCategory?.IsFavorites == true) await _main.RefreshFilesAsync();
+    }
+
+    [RelayCommand]
     public async Task ActivateFileAsync(FileItem? file)
     {
         if (file is null) return;
@@ -203,6 +219,11 @@ public partial class FileListViewModel : ObservableObject
 
     public async Task RecategorizeManyAsync(IReadOnlyList<FileItem> files, Category target)
     {
+        if (target.IsFavorites)
+        {
+            foreach (var file in files) await SetFavoriteAsync(file, true);
+            return; // Collecting must not move ownership or advance playback.
+        }
         var succeeded = new List<int>(); var errors = new List<string>();
         foreach (var f in files)
         {
@@ -219,6 +240,13 @@ public partial class FileListViewModel : ObservableObject
     public async Task DeleteManyAsync(IReadOnlyList<FileItem> files, bool removeOnly)
     {
         if (files.Count == 0) return;
+        if (removeOnly && _main.CurrentCategory?.IsFavorites == true)
+        {
+            foreach (var file in files)
+                try { await SetFavoriteAsync(file, false); }
+                catch (Exception ex) { await ReportErrorAsync($"取消收藏失败：{file.FileName}：{ex.Message}"); }
+            return;
+        }
         if (ShowConfirmDialog is not null && !await ShowConfirmDialog(removeOnly
             ? $"从分类移除 {files.Count} 个文件？"
             : $"删除 {files.Count} 个文件？")) return;

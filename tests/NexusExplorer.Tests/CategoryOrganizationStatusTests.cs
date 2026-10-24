@@ -177,6 +177,9 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
                 DROP TRIGGER OrganizationFileInsert; DROP TRIGGER OrganizationFileUpdate; DROP TRIGGER OrganizationFileDelete;
                 DROP TRIGGER OrganizationCategoryInsert; DROP TRIGGER OrganizationCategoryDelete; DROP TRIGGER OrganizationCategoryUpdate;
                 ALTER TABLE Categories DROP COLUMN IsOrganized;
+                DELETE FROM Categories WHERE Id=-1;
+                DROP INDEX IX_Files_IsFavorite_FileName_Id;
+                ALTER TABLE Files DROP COLUMN IsFavorite;
                 UPDATE Categories SET IsPinned=1, PinnedOrder=91;
                 PRAGMA user_version=2;
                 """);
@@ -185,12 +188,12 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
         await using (var db = _host.DbFactory.CreateDbContext()) await DatabaseInitializer.InitializeAsync(db, path);
         Assert.False(await Organized(a.Id)); Assert.Equal(91, Assert.Single(await _host.Categories.GetPinnedAsync()).PinnedOrder);
         Assert.Equal(file.AbsolutePath, (await _host.Files.GetByIdAsync(file.Id))!.AbsolutePath);
-        var backup = Assert.Single(Directory.GetFiles(_host.RootDir, "test.db.before-v3-*.bak"));
+        var backup = Assert.Single(Directory.GetFiles(_host.RootDir, $"test.db.before-v{DatabaseInitializer.SchemaVersion}-*.bak"));
         using var connection = new SqliteConnection($"Data Source={backup};Mode=ReadOnly;Pooling=False"); connection.Open();
         using var command = connection.CreateCommand(); command.CommandText = "PRAGMA user_version";
         Assert.Equal(2L, command.ExecuteScalar());
         await using (var db = _host.DbFactory.CreateDbContext()) await DatabaseInitializer.InitializeAsync(db, path);
-        Assert.Single(Directory.GetFiles(_host.RootDir, "test.db.before-v3-*.bak"));
+        Assert.Single(Directory.GetFiles(_host.RootDir, $"test.db.before-v{DatabaseInitializer.SchemaVersion}-*.bak"));
         await _host.Organization.OrganizeAsync(a.Id); Assert.True(await Organized(a.Id));
         await _host.Files.RemoveAsync(file.Id); Assert.False(await Organized(a.Id));
     }
@@ -205,7 +208,7 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
         {
             var main = new MainViewModel(_host.Categories, _host.Files, _host.Organization, new FakePlaybackEngine());
             await main.RefreshTreeAsync(); await main.SelectCategoryAsync(await _host.Categories.GetByIdAsync(a.Id));
-            var node = Assert.Single(main.Category.FlatCategories); node.IsExpanded = true;
+            var node = Assert.Single(main.Category.FlatCategories.Where(c => !c.IsFavorites)); node.IsExpanded = true;
             var panel = new CategoryFilePanel();
             var treeTemplate = (HierarchicalDataTemplate)panel.Resources[new DataTemplateKey(typeof(Category))];
             var treeContent = (StackPanel)treeTemplate.LoadContent(); treeContent.DataContext = node;
@@ -235,7 +238,7 @@ public sealed class CategoryOrganizationStatusTests : IDisposable
             AssertColor(0xB8, 0x5C, 0x16);
             Assert.Equal("分类内包含外部文件", Assert.IsType<string>(treeIcon.ToolTip));
             Assert.Equal(a.Name, navContent.Text);
-            Assert.Same(node, Assert.Single(main.Category.FlatCategories)); Assert.True(node.IsExpanded);
+            Assert.Same(node, Assert.Single(main.Category.FlatCategories.Where(c => !c.IsFavorites))); Assert.True(node.IsExpanded);
             Assert.False(main.CurrentCategory!.IsOrganized);
         });
     }

@@ -17,7 +17,7 @@ public sealed class CategoryService
     { _factory = factory; _operations = operations ?? new FileOperationExecutor(factory); }
     private async Task<List<Category>> AllAsync(AppDbContext db)
     {
-        var all = await db.Categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Id).ToListAsync();
+        var all = await db.Categories.Where(c => c.Id != Category.FavoritesId).OrderBy(c => c.SortOrder).ThenBy(c => c.Id).ToListAsync();
         await LocationService.ResolveAsync(db, categories: all); return all;
     }
     public Task<List<Category>> GetTreeAsync() => Task.Run(() => GetTreeAsyncCore());
@@ -33,7 +33,7 @@ public sealed class CategoryService
         foreach (var c in all) { c.Children = children[c.Id].ToList(); c.Parent = c.ParentId is int id ? lookup.GetValueOrDefault(id) : null; }
         return all.Where(c => c.ParentId is null).ToList();
     }
-    public Task<Category?> GetByIdAsync(int id) => Task.Run(() => GetByIdAsyncCore(id));
+    public Task<Category?> GetByIdAsync(int id) => id == Category.FavoritesId ? Task.FromResult<Category?>(Category.Favorites()) : Task.Run(() => GetByIdAsyncCore(id));
     private async Task<Category?> GetByIdAsyncCore(int id)
     { await using var db = await _factory.CreateDbContextAsync(); return (await AllAsync(db)).FirstOrDefault(c => c.Id == id); }
     public Task<List<Category>> GetChildrenAsync(int? parentId) => Task.Run(() => GetChildrenAsyncCore(parentId));
@@ -42,6 +42,7 @@ public sealed class CategoryService
     public Task<string> GetCategoryPathAsync(int id) => Task.Run(() => GetCategoryPathAsyncCore(id));
     private async Task<string> GetCategoryPathAsyncCore(int id)
     {
+        if (id == Category.FavoritesId) return "收藏";
         await using var db = await _factory.CreateDbContextAsync(); var all = await AllAsync(db);
         var names = new List<string>(); var seen = new HashSet<int>(); var current = all.FirstOrDefault(c => c.Id == id);
         while (current is not null)
@@ -54,6 +55,7 @@ public sealed class CategoryService
     public Task<List<Category>> GetSubtreeAsync(int id, bool includeRoot = true) => Task.Run(() => GetSubtreeAsyncCore(id, includeRoot));
     private async Task<List<Category>> GetSubtreeAsyncCore(int id, bool includeRoot = true)
     {
+        RequireOrdinary(id);
         await using var db = await _factory.CreateDbContextAsync(); var all = await AllAsync(db); var ids = SubtreeIds(all, id);
         return all.Where(c => ids.Contains(c.Id) && (includeRoot || c.Id != id)).ToList();
     }
@@ -85,6 +87,7 @@ public sealed class CategoryService
         => Task.Run(() => CreateAsyncCore(name, parentId, confirmedPath));
     private async Task<Category> CreateAsyncCore(string name, int? parentId, string? confirmedPath = null)
     {
+        RequireOrdinary(parentId);
         name = name.Trim(); ValidateName(name); using var lease = await MutationGate.AcquireAsync(_factory);
         await using var db = await _factory.CreateDbContextAsync(); var all = await AllAsync(db);
         var parent = all.FirstOrDefault(c => c.Id == parentId);
@@ -129,6 +132,7 @@ public sealed class CategoryService
     public Task RenameAsync(int id, string newName) => Task.Run(() => RenameAsyncCore(id, newName));
     private async Task RenameAsyncCore(int id, string newName)
     {
+        RequireOrdinary(id);
         newName = newName.Trim(); ValidateName(newName); using var lease = await MutationGate.AcquireAsync(_factory);
         var c = await GetByIdAsync(id) ?? throw new OperationException("分类不存在。"); if (c.Name == newName) return;
         if ((await GetChildrenAsync(c.ParentId)).Any(x => x.Id != id && string.Equals(x.Name, newName, StringComparison.OrdinalIgnoreCase))) throw new OperationException("分类名称已存在");
@@ -144,6 +148,7 @@ public sealed class CategoryService
     public Task MoveAsync(int id, int? targetParentId) => Task.Run(() => MoveAsyncCore(id, targetParentId));
     private async Task MoveAsyncCore(int id, int? targetParentId)
     {
+        RequireOrdinary(id); RequireOrdinary(targetParentId);
         using var lease = await MutationGate.AcquireAsync(_factory); await using var db = await _factory.CreateDbContextAsync(); var all = await AllAsync(db);
         var c = all.FirstOrDefault(c => c.Id == id) ?? throw new OperationException("分类不存在。"); if (c.ParentId == targetParentId) return;
         var ids = SubtreeIds(all, id);
@@ -158,6 +163,7 @@ public sealed class CategoryService
     public Task<List<string>> PreviewRelocateAsync(int id, string newDirectory) => Task.Run(() => PreviewRelocateAsyncCore(id, newDirectory));
     private async Task<List<string>> PreviewRelocateAsyncCore(int id, string newDirectory)
     {
+        RequireOrdinary(id);
         var category = await GetByIdAsync(id) ?? throw new OperationException("分类不存在。");
         await using var db = await _factory.CreateDbContextAsync(); var categories = await AllAsync(db); var files = await db.Files.ToListAsync(); await LocationService.ResolveAsync(db, files: files);
         return categories.Where(c => LocationService.IsWithin(c.PhysicalPath, category.PhysicalPath)).Select(c =>
@@ -168,12 +174,14 @@ public sealed class CategoryService
     public Task RelocateAsync(int id, string newDirectory) => Task.Run(() => RelocateAsyncCore(id, newDirectory));
     private async Task RelocateAsyncCore(int id, string newDirectory)
     {
+        RequireOrdinary(id);
         using var lease = await MutationGate.AcquireAsync(_factory); var c = await GetByIdAsync(id) ?? throw new OperationException("分类不存在。");
         await ChangeLocationAsync(c, newDirectory, true, c.Name, c.ParentId);
     }
     public Task MigrateDirectoryAsync(int id, string targetParentDirectory) => Task.Run(() => MigrateDirectoryAsyncCore(id, targetParentDirectory));
     private async Task MigrateDirectoryAsyncCore(int id, string targetParentDirectory)
     {
+        RequireOrdinary(id);
         using var lease = await MutationGate.AcquireAsync(_factory); var c = await GetByIdAsync(id) ?? throw new OperationException("分类不存在。");
         await ChangeLocationAsync(c, Path.Combine(targetParentDirectory, Path.GetFileName(c.PhysicalPath)), false, c.Name, c.ParentId);
     }
@@ -216,6 +224,7 @@ public sealed class CategoryService
     public Task PinAsync(int id) => Task.Run(() => PinAsyncCore(id));
     private async Task PinAsyncCore(int id)
     {
+        RequireOrdinary(id);
         using var lease = await MutationGate.AcquireAsync(_factory); await using var db = await _factory.CreateDbContextAsync();
         var c = await db.Categories.FirstAsync(c => c.Id == id); if (c.IsPinned) return;
         c.IsPinned = true; c.PinnedOrder = (await db.Categories.MaxAsync(c => (int?)c.PinnedOrder) ?? 0) + 1; await db.SaveChangesAsync();
@@ -250,15 +259,17 @@ public sealed class CategoryService
     public Task ReorderAsync(int id, int index) => Task.Run(() => ReorderAsyncCore(id, index));
     private async Task ReorderAsyncCore(int id, int index)
     {
+        RequireOrdinary(id);
         using var lease = await MutationGate.AcquireAsync(_factory); await using var db = await _factory.CreateDbContextAsync();
         var c = await db.Categories.FirstAsync(c => c.Id == id);
-        var siblings = await db.Categories.Where(x => x.ParentId == c.ParentId).OrderBy(x => x.SortOrder).ThenBy(x => x.Id).ToListAsync();
+        var siblings = await db.Categories.Where(x => x.ParentId == c.ParentId && x.Id != Category.FavoritesId).OrderBy(x => x.SortOrder).ThenBy(x => x.Id).ToListAsync();
         siblings.Remove(c); siblings.Insert(Math.Clamp(index, 0, siblings.Count), c);
         for (var i = 0; i < siblings.Count; i++) { siblings[i].SortOrder = i + 1; siblings[i].UpdatedAt = DateTime.Now; } await db.SaveChangesAsync();
     }
     public Task MoveWithinSiblingsAsync(int id, int offset) => Task.Run(() => MoveWithinSiblingsAsyncCore(id, offset));
     private async Task MoveWithinSiblingsAsyncCore(int id, int offset)
     {
+        RequireOrdinary(id);
         var c = await GetByIdAsync(id) ?? throw new OperationException("分类不存在。"); var siblings = await GetChildrenAsync(c.ParentId);
         await ReorderAsync(id, Math.Clamp(siblings.FindIndex(x => x.Id == id) + offset, 0, siblings.Count - 1));
     }
@@ -275,6 +286,7 @@ public sealed class CategoryService
     public Task<List<int>> RemoveAsync(int id) => Task.Run(() => RemoveAsyncCore(id));
     private async Task<List<int>> RemoveAsyncCore(int id)
     {
+        RequireOrdinary(id);
         using var lease = await MutationGate.AcquireAsync(_factory);
         await using var db = await _factory.CreateDbContextAsync();
         var all = await db.Categories.ToListAsync();
@@ -282,7 +294,8 @@ public sealed class CategoryService
         var ids = SubtreeIds(all, id);
         await using var transaction = await db.Database.BeginTransactionAsync();
         var files = db.Files.Where(f => ids.Contains(f.CategoryId));
-        var removedFileIds = await files.Select(f => f.Id).ToListAsync();
+        var removedFileIds = await files.Where(f => !f.IsFavorite).Select(f => f.Id).ToListAsync();
+        await files.Where(f => f.IsFavorite).ExecuteUpdateAsync(s => s.SetProperty(f => f.CategoryId, Category.FavoritesId));
         await files.ExecuteDeleteAsync();
         // Foreign keys restrict parent deletion; commit all levels together or roll everything back.
         foreach (var layer in all.Where(c => ids.Contains(c.Id)).GroupBy(c => Depth(all, c)).OrderByDescending(g => g.Key))
@@ -296,6 +309,8 @@ public sealed class CategoryService
         return removedFileIds;
     }
     public List<string> LastDeleteWarnings { get; } = new();
+    private static void RequireOrdinary(int? id)
+    { if (id == Category.FavoritesId) throw new OperationException("收藏是固定分类，没有物理目录，不能执行此操作。"); }
     public Task DeleteAsync(int id, IRecycleBinService recycleBin) => Task.Run(() => DeleteAsyncCore(id, recycleBin));
     private async Task DeleteAsyncCore(int id, IRecycleBinService recycleBin)
     {

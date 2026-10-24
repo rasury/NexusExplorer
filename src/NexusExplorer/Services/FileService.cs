@@ -38,9 +38,8 @@ public class FileService
     private async Task<List<FileItem>> GetByCategoryAsyncCore(int categoryId)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var files = await db.Files
-            .AsNoTracking()
-            .Where(f => f.CategoryId == categoryId)
+        var query = db.Files.AsNoTracking();
+        var files = await (categoryId == Category.FavoritesId ? query.Where(f => f.IsFavorite) : query.Where(f => f.CategoryId == categoryId))
             .OrderBy(f => f.FileName).ThenBy(f => f.Id)
             .ToListAsync();
         await LocationService.ResolveAsync(db, files: files);
@@ -68,6 +67,15 @@ public class FileService
     }
 
     // ---------- 添加 ----------
+    public Task SetFavoriteAsync(int fileId, bool favorite) => Task.Run(async () =>
+    {
+        using var lease = await MutationGate.AcquireAsync(_dbFactory);
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var file = await db.Files.FirstOrDefaultAsync(f => f.Id == fileId) ?? throw new OperationException("文件记录已不存在。");
+        if (!favorite && file.CategoryId == Category.FavoritesId) db.Files.Remove(file);
+        else file.IsFavorite = favorite;
+        await db.SaveChangesAsync();
+    });
 
     /// <summary>
     /// 添加文件到分类。只写数据库,不移动物理文件。
@@ -91,7 +99,8 @@ public class FileService
         var now = DateTime.Now;
         if (existing is not null)
         {
-            existing.CategoryId = categoryId;
+            if (categoryId == Category.FavoritesId) existing.IsFavorite = true;
+            else existing.CategoryId = categoryId;
             existing.FileName = Path.GetFileName(normalized);
             existing.UpdatedAt = now;
             await db.SaveChangesAsync();
@@ -102,6 +111,7 @@ public class FileService
         var file = new FileItem
         {
             CategoryId = categoryId,
+            IsFavorite = categoryId == Category.FavoritesId,
             FileName = Path.GetFileName(normalized),
             AbsolutePath = normalized,
             CreatedAt = now,
@@ -195,6 +205,7 @@ public class FileService
     public Task RecategorizeAsync(int fileId, int targetCategoryId) => Task.Run(() => RecategorizeAsyncCore(fileId, targetCategoryId));
     private async Task RecategorizeAsyncCore(int fileId, int targetCategoryId)
     {
+        if (targetCategoryId == Category.FavoritesId) { await SetFavoriteAsync(fileId, true); return; }
         using var lease = await MutationGate.AcquireAsync(_dbFactory);
         await using var db = await _dbFactory.CreateDbContextAsync();
 
@@ -322,7 +333,8 @@ public class FileService
         var file = await db.Files.FirstOrDefaultAsync(f => f.Id == fileId)
             ?? throw new OperationException("文件不存在。");
 
-        db.Files.Remove(file);
+        if (file.IsFavorite && file.CategoryId != Category.FavoritesId) file.CategoryId = Category.FavoritesId;
+        else db.Files.Remove(file);
         await db.SaveChangesAsync();
         Log.Information("文件移除(保留源文件): {Path}", file.AbsolutePath);
     }
