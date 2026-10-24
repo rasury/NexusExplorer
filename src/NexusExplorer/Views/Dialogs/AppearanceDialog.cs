@@ -20,13 +20,16 @@ internal static class AppearanceDialog
         double selectedOpacity = Math.Clamp(current.BackgroundOpacity, 0, 1);
         TextBlock label = null!;
         bool previewing = false;
+        WrapPanel? footer = null;
         async Task Preview()
         {
             if (previewing) return;
             previewing = true;
+            body.IsEnabled = false;
+            if (footer is not null) footer.IsEnabled = false;
             try { await preview(new AppearanceConfig { ThemeMode = ((DialogChoice<UiThemeMode>)theme.SelectedItem).Value, BackgroundImagePath = path, BackgroundOpacity = selectedOpacity }); }
             catch (Exception ex) { label.Text = "图片无法读取：" + ex.Message; }
-            finally { previewing = false; }
+            finally { previewing = false; body.IsEnabled = true; if (footer is not null) footer.IsEnabled = true; }
         }
         label = new TextBlock { Text = path ?? "默认背景", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 12) };
         body.Children.Add(new TextBlock { Text = "背景" }); body.Children.Add(label);
@@ -42,7 +45,7 @@ internal static class AppearanceDialog
         // The slider increases transparency from left to right.
         opacity.IsDirectionReversed = true;
         theme.SelectionChanged += async (_, _) => await Preview();
-        var footer = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; DialogSurface view = null!;
+        footer = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; DialogSurface view = null!;
         footer.Children.Add(DialogSurface.Action("取消", "ButtonText", null, () => view));
         var apply = new Button { Content = "应用", IsDefault = true }; apply.SetResourceReference(FrameworkElement.StyleProperty, "ButtonPrimary");
         apply.Click += (_, _) => view.Complete(new AppearanceConfig { ThemeMode = ((DialogChoice<UiThemeMode>)theme.SelectedItem).Value, BackgroundImagePath = path, BackgroundOpacity = opacity.Value / 100 });

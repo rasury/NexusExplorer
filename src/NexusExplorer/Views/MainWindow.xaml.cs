@@ -212,10 +212,10 @@ public partial class MainWindow : Window
             var before = config.Appearance;
             var result = await AppearanceDialog.ShowAsync(before, async draft =>
             {
-                UiThemeService.Apply(draft.ThemeMode);
+                await ApplyThemeAsync(draft.ThemeMode);
                 await ApplyWallpaperAsync(draft);
             }, ApplyWallpaperOpacity);
-            if (result is null) { UiThemeService.Apply(before.ThemeMode); await ApplyWallpaperAsync(before); return; }
+            if (result is null) { await ApplyThemeAsync(before.ThemeMode); await ApplyWallpaperAsync(before); return; }
             await ApplyWallpaperAsync(result);
             config.Appearance = result; config.Save(AppPaths.SettingsPath);
             UiThemeService.Apply(result.ThemeMode);
@@ -223,6 +223,13 @@ public partial class MainWindow : Window
         catch (Exception ex) { await MessageDialog.ShowAsync(ex.Message, "外观设置", severity: DialogSeverity.Error); }
     }
     private int _wallpaperVersion;
+    private async Task ApplyThemeAsync(UiThemeMode mode)
+    {
+        await ThemeTransition.Completion;
+        var dark = mode == UiThemeMode.Dark || mode == UiThemeMode.System && MaterialDesignThemes.Wpf.Theme.GetSystemTheme() == MaterialDesignThemes.Wpf.BaseTheme.Dark;
+        if (dark == UiThemeService.IsDark) { UiThemeService.Apply(mode); return; }
+        await ThemeTransition.RunAsync(WindowSurface, MaterialDialogService.ThemeSurface, () => UiThemeService.Apply(mode));
+    }
     private bool _wallpaperLoaded;
     private string? _wallpaperPath;
     internal async Task ApplyWallpaperAsync(AppearanceConfig appearance)

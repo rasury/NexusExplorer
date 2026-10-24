@@ -63,9 +63,10 @@ public class AppearancePreviewTests
                 Assert.True(themeRow.Margin.Top > 0);
                 var otherTheme = theme == UiThemeMode.Light ? UiThemeMode.Dark : UiThemeMode.Light;
                 themes.SelectedItem = themes.Items.Cast<DialogChoice<UiThemeMode>>().Single(x => x.Value == otherTheme);
-                await BoundedDialogTests.Until(() => UiThemeService.Mode == otherTheme);
+                Assert.False(themes.IsEnabled);
+                await BoundedDialogTests.Until(() => UiThemeService.Mode == otherTheme && themes.IsEnabled);
                 themes.SelectedItem = themes.Items.Cast<DialogChoice<UiThemeMode>>().Single(x => x.Value == theme);
-                await BoundedDialogTests.Until(() => UiThemeService.Mode == theme);
+                await BoundedDialogTests.Until(() => UiThemeService.Mode == theme && themes.IsEnabled);
                 var backdrop = (Border)glass.Template.FindName("PART_Backdrop", glass);
                 Assert.IsType<VisualBrush>(backdrop.Background);
                 Assert.Same(window.FindName("WallpaperScene"), ((VisualBrush)backdrop.Background).Visual);

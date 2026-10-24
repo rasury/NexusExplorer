@@ -13,6 +13,7 @@ internal static class MaterialDialogService
     private static WeakReference<DialogHost>? _root;
     private static DialogSession? _session;
     private static bool _closing;
+    internal static System.Windows.Controls.Grid? ThemeSurface { get; private set; }
     public static event Action<string>? NoticeRequested;
     public static event Action<Window, bool>? InputWindowStateChanged;
     public static void Notice(string message) => NoticeRequested?.Invoke(message);
@@ -128,6 +129,7 @@ internal static class MaterialDialogService
                         { Color = Color.FromRgb(30, 55, 70), BlurRadius = 28, ShadowDepth = 8, Opacity = .28 };
                     }
                     _session = e.Session;
+                    ThemeSurface = glass.Template.FindName("PART_Clip", glass) as System.Windows.Controls.Grid;
                     view.Complete = result => { if (!e.Session.IsEnded) e.Session.Close(result); };
 
                 }), new DialogClosingEventHandler((_, e) =>
@@ -154,7 +156,7 @@ internal static class MaterialDialogService
             {
                 glass.Loaded -= Enter; PrismMotion.StopAll(glass); PrismMotion.StopAll(slide);
                 glass.CacheMode = null;
-                host.SizeChanged -= Bounds; host.DialogContent = null; _session = null;
+                host.SizeChanged -= Bounds; host.DialogContent = null; _session = null; ThemeSurface = null;
             }
         }
         finally
