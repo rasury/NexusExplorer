@@ -16,6 +16,11 @@ public class ThemeTransitionTests
         var duration = MotionProfiles.Theme.Seconds;
         Assert.Equal(0, segment.Sample(0).Velocity);
         Assert.Equal(0, segment.Sample(duration).Velocity);
+        Assert.Equal(.05, segment.Sample(duration * .2).Value, 8);
+        Assert.Equal(.95, segment.Sample(duration * .8).Value, 8);
+        foreach (var turn in new[] { .2, .8 })
+            Assert.InRange(Math.Abs(segment.Sample(duration * (turn - .000001)).Velocity - segment.Sample(duration * (turn + .000001)).Velocity), 0, .001);
+        Assert.True(segment.Sample(duration * .5).Velocity > 20 * segment.Sample(duration * .1).Velocity);
         Assert.True(segment.Sample(duration * .5).Velocity > segment.Sample(duration * .1).Velocity);
         Assert.True(segment.Sample(duration * .5).Velocity > segment.Sample(duration * .9).Velocity);
         for (var i = 0; i <= 100; i++) Assert.InRange(segment.Sample(duration * i / 100).Value, 0, 1);

@@ -22,6 +22,28 @@ internal sealed record MotionSegment(double From, double To, double Velocity, Mo
             value = To + decay * (x * c + b * s);
             velocity = decay * ((-a * x + w * b) * c + (-a * b - w * x) * s);
         }
+        else if (Profile.Curve == MotionCurve.Emphasized)
+        {
+            // Non-interruptible reveals: sixth-power edges meet the fast middle
+            // with continuous position and velocity at 20% and 80% of time.
+            var u = t / Profile.Seconds;
+            double progress, speed;
+            if (u < .2)
+            {
+                var edge = u / .2;
+                progress = .05 * Math.Pow(edge, 6);
+                speed = 1.5 * Math.Pow(edge, 5);
+            }
+            else if (u > .8)
+            {
+                var edge = (1 - u) / .2;
+                progress = 1 - .05 * Math.Pow(edge, 6);
+                speed = 1.5 * Math.Pow(edge, 5);
+            }
+            else { progress = .05 + 1.5 * (u - .2); speed = 1.5; }
+            value = From + (To - From) * progress;
+            velocity = (To - From) * speed / Profile.Seconds;
+        }
         else
         {
             // Cubic Hermite: preserve incoming velocity and arrive with zero velocity.

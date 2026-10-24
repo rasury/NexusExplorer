@@ -1,6 +1,6 @@
 namespace NexusExplorer.Views;
 
-internal enum MotionCurve { Spring, Smooth }
+internal enum MotionCurve { Spring, Smooth, Emphasized }
 internal sealed record MotionProfile(double Seconds, MotionCurve Curve, double Damping = .72, double Frequency = 18);
 
 // Values describe interaction roles, not particular controls. No per-call easing constants.
@@ -15,8 +15,8 @@ internal static class MotionProfiles
     internal static readonly MotionProfile DialogEnter = new(.22, MotionCurve.Spring, .78, 30);
     internal static readonly MotionProfile DialogFade = new(.16, MotionCurve.Smooth);
     internal static readonly MotionProfile DialogExit = new(.12, MotionCurve.Smooth);
-    // Smooth starts with zero velocity, accelerates, then decelerates to rest.
-    internal static readonly MotionProfile Theme = new(.55, MotionCurve.Smooth);
+    // 20/60/20 percent of time covers 5/90/5 percent of travel.
+    internal static readonly MotionProfile Theme = new(.85, MotionCurve.Emphasized);
     internal const double ThemeFeather = .12;
     internal const double ThemeSnapshotEdge = 720;
     internal const double DialogOffset = 12;
