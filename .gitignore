@@ -1,0 +1,18 @@
+bin/
+obj/
+publish/
+*.user
+.vs/
+/data/
+logs/
+Storage/
+nexus.db*
+
+# 工具/临时文件
+artifacts/
+/native/
+__pycache__/
+*.py[cod]
+
+# 本地文档
+/docs/

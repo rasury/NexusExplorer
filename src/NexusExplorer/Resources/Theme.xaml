@@ -1,0 +1,113 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <!-- M3 semantic roles. Runtime theme changes replace these dynamic brush resources. -->
+    <SolidColorBrush x:Key="BrushPrimaryBg" Color="#FFFBFE"/>
+    <SolidColorBrush x:Key="BrushSecondaryBg" Color="#F7F2FA"/>
+    <SolidColorBrush x:Key="BrushPanelBg" Color="#F3EDF7"/>
+    <SolidColorBrush x:Key="BrushPrimaryText" Color="#1C1B1F"/>
+    <SolidColorBrush x:Key="BrushSecondaryText" Color="#49454F"/>
+    <SolidColorBrush x:Key="BrushDisabledText" Color="#938F99"/>
+    <SolidColorBrush x:Key="BrushDivider" Color="#CAC4D0"/>
+    <SolidColorBrush x:Key="BrushAccentBlue" Color="#6750A4"/>
+    <SolidColorBrush x:Key="BrushAccentBlueLight" Color="#EADDFF"/>
+    <SolidColorBrush x:Key="BrushAccentOrange" Color="#006B60"/>
+    <SolidColorBrush x:Key="BrushAccentOrangeLight" Color="#9EF2E3"/>
+    <SolidColorBrush x:Key="BrushOnPrimary" Color="White"/>
+    <SolidColorBrush x:Key="BrushOnPrimaryContainer" Color="#21005D"/>
+    <SolidColorBrush x:Key="BrushOnSecondaryContainer" Color="#00201C"/>
+    <SolidColorBrush x:Key="BrushStatusPending" Color="#B85C16"/>
+    <SolidColorBrush x:Key="BrushStatusOrganized" Color="#237D4E"/>
+    <SolidColorBrush x:Key="BrushDanger" Color="#B3261E"/>
+    <SolidColorBrush x:Key="BrushPlayerBg" Color="Black"/>
+    <FontFamily x:Key="FontFamilyMain">HYWenHei 85W, Segoe UI, Microsoft YaHei UI</FontFamily>
+    <!-- One glass control surface, shared with the search-scope switch. -->
+    <Style x:Key="PrismButtonBase" TargetType="ButtonBase">
+        <Setter Property="Background" Value="{DynamicResource BrushPrismSurface}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushPrismRim}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Height" Value="40"/><Setter Property="MinWidth" Value="64"/>
+        <Setter Property="Padding" Value="16,0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="12"/>
+        <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ButtonBase">
+            <Border x:Name="Surface" CornerRadius="{TemplateBinding md:ButtonAssist.CornerRadius}" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+                <md:Ripple Focusable="False" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" ClipToBounds="True" Feedback="{DynamicResource BrushPrismSelection}">
+                    <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
+                </md:Ripple>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource BrushAccentBlue}"/></Trigger>
+                <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.8"/></Trigger>
+                <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.45"/></Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate></Setter.Value></Setter>
+    </Style>
+    <Style x:Key="ButtonText" TargetType="Button" BasedOn="{StaticResource PrismButtonBase}"/>
+    <Style x:Key="ButtonPrimary" TargetType="Button" BasedOn="{StaticResource ButtonText}">
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushAccentBlue}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style x:Key="ButtonSecondary" TargetType="Button" BasedOn="{StaticResource ButtonText}"/>
+    <Style x:Key="ButtonGhost" TargetType="Button" BasedOn="{StaticResource ButtonText}"/>
+    <Style TargetType="Button" BasedOn="{StaticResource ButtonText}"/>
+    <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource ButtonText}">
+        <Setter Property="Width" Value="40"/><Setter Property="MinWidth" Value="0"/><Setter Property="Padding" Value="8"/>
+    </Style>
+    <Style x:Key="ClassicIconButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignIconButton}">
+        <Setter Property="Width" Value="40"/><Setter Property="Height" Value="40"/>
+        <Setter Property="md:ButtonAssist.CornerRadius" Value="10"/>
+    </Style>
+    <Style x:Key="PrismToggleButton" TargetType="ToggleButton" BasedOn="{StaticResource PrismButtonBase}">
+        <Setter Property="MinWidth" Value="0"/><Setter Property="Padding" Value="8"/>
+        <Style.Triggers><Trigger Property="IsChecked" Value="True">
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushAccentBlue}"/>
+            <Setter Property="Background" Value="{DynamicResource BrushPrismSelection}"/>
+        </Trigger></Style.Triggers>
+    </Style>
+    <Style x:Key="TextBoxStandard" TargetType="TextBox" BasedOn="{StaticResource MaterialDesignOutlinedTextBox}">
+        <Setter Property="MinHeight" Value="40"/><Setter Property="Padding" Value="12,8"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="md:TextFieldAssist.TextFieldCornerRadius" Value="12"/>
+        <Setter Property="Background" Value="{DynamicResource BrushPrismSurface}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushPrismRim}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+    </Style>
+    <Style TargetType="TextBox" BasedOn="{StaticResource TextBoxStandard}"/>
+    <Style TargetType="ComboBox" BasedOn="{StaticResource MaterialDesignOutlinedComboBox}">
+        <Setter Property="MinHeight" Value="40"/><Setter Property="Padding" Value="12,8"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="md:TextFieldAssist.TextFieldCornerRadius" Value="12"/>
+        <Setter Property="Background" Value="{DynamicResource BrushPrismSurface}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushPrismRim}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+    </Style>
+    <Style TargetType="PasswordBox" BasedOn="{StaticResource MaterialDesignOutlinedPasswordBox}">
+        <Setter Property="md:TextFieldAssist.TextFieldCornerRadius" Value="12"/>
+        <Setter Property="Background" Value="{DynamicResource BrushPrismSurface}"/>
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushPrismRim}"/>
+        <Setter Property="Padding" Value="12,8"/>
+    </Style>
+    <Style x:Key="TextPrimary" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignBodyMediumTextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+    </Style>
+    <Style x:Key="TextSecondary" TargetType="TextBlock" BasedOn="{StaticResource TextPrimary}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushSecondaryText}"/>
+    </Style>
+    <Style x:Key="TextCaption" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignBodySmallTextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushSecondaryText}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+    </Style>
+    <Style x:Key="TextHeader" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignTitleMediumTextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+    </Style>
+    <Style x:Key="DialogTitle" TargetType="TextBlock" BasedOn="{StaticResource MaterialDesignHeadlineSmallTextBlock}">
+        <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontFamilyMain}"/>
+    </Style>
+</ResourceDictionary>

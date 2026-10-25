@@ -1,0 +1,35 @@
+name: Publish release
+on:
+  workflow_dispatch:
+    inputs:
+      resume_draft:
+        description: Resume a draft for this exact commit
+        type: boolean
+        default: false
+permissions:
+  contents: write
+concurrency:
+  group: nexus-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify release selection
+        shell: powershell
+        run: ./tests/Release-Selection.Tests.ps1
+      - name: Build and publish verified assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESUME_DRAFT: ${{ inputs.resume_draft }}
+        run: ./scripts/Publish-Release.ps1 -ResumeDraft:($env:RESUME_DRAFT -eq 'true')

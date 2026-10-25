@@ -1,0 +1,43 @@
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+
+namespace NexusExplorer.Views.Dialogs;
+
+/// <summary>A bounded DialogHost view: scroll title/body together; keep actions outside scrolling.</summary>
+internal sealed class DialogSurface : Grid
+{
+    public Action<object?> Complete { get; set; } = _ => { };
+    internal bool RequiresInputWindow { get; set; }
+    public DialogSurface(string title, UIElement body, FrameworkElement actions, double width = 560)
+    {
+        Width = width; Margin = new Thickness(24);
+        RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var content = new StackPanel();
+        var heading = new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
+        heading.SetResourceReference(StyleProperty, "DialogTitle");
+        content.Children.Add(heading); content.Children.Add(body);
+        Children.Add(new ScrollViewer { Content = content, Padding = new Thickness(8), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        // Every action row uses the same sizing and an 8px inter-button gap.
+        if (actions is Panel actionPanel)
+            foreach (var button in actionPanel.Children.OfType<Button>())
+            {
+                button.Margin = new Thickness(4);
+                button.MinWidth = 80; button.Height = 40;
+                button.VerticalAlignment = VerticalAlignment.Center;
+            }
+        actions.Margin = new Thickness(4, 20, 4, 0); SetRow(actions, 1); Children.Add(actions);
+        PreviewKeyDown += (_, e) => { if (e.Key == Key.Escape) { e.Handled = true; Complete(null); } };
+    }
+    public void Constrain(double width, double height, Thickness hostMargin = default)
+    {
+        MaxWidth = Math.Max(1, width - hostMargin.Left - hostMargin.Right - Margin.Left - Margin.Right);
+        MaxHeight = Math.Max(1, height - hostMargin.Top - hostMargin.Bottom - Margin.Top - Margin.Bottom);
+    }
+    public static Button Action(string text, string style, object? result, Func<DialogSurface> view)
+    {
+        var button = new Button { Content = text, MinWidth = 80, Margin = new Thickness(8, 0, 0, 8) };
+        button.SetResourceReference(StyleProperty, style); button.Click += (_, _) => view().Complete(result); return button;
+    }
+}

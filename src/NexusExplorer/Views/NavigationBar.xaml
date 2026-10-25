@@ -1,0 +1,204 @@
+﻿<UserControl x:Class="NexusExplorer.Views.NavigationBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:models="clr-namespace:NexusExplorer.Models"
+             Background="Transparent"
+             BorderBrush="{DynamicResource BrushDivider}"
+             BorderThickness="0">
+
+    <UserControl.Resources>
+        <DataTemplate x:Key="CategoryNavigationContent" DataType="{x:Type models:Category}">
+            <TextBlock Text="{Binding Name}" FontSize="14" LineHeight="20" TextWrapping="Wrap" VerticalAlignment="Center" />
+        </DataTemplate>
+        <DataTemplate x:Key="NavigationInlineContent" DataType="{x:Type models:Category}">
+            <TextBlock Text="{Binding Name}" FontSize="14" LineHeight="20" TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" VerticalAlignment="Center" />
+        </DataTemplate>
+        <Style x:Key="NavCategoryButton" TargetType="Button" BasedOn="{StaticResource ButtonText}">
+            <Setter Property="md:ButtonAssist.CornerRadius" Value="12"/>
+            <Setter Property="MaxWidth" Value="160"/>
+            <Setter Property="Background" Value="{DynamicResource BrushPrismSelection}"/>
+            <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <Style x:Key="PinnedCategoryButton" TargetType="Button" BasedOn="{StaticResource ButtonGhost}">
+            <Setter Property="md:ButtonAssist.CornerRadius" Value="12"/>
+            <Setter Property="Height" Value="Auto"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,4,8,4"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Style.Triggers><DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter Property="Background" Value="{DynamicResource BrushPrismSelection}"/>
+                <Setter Property="Foreground" Value="{DynamicResource BrushPrimaryText}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource BrushAccentBlue}"/>
+            </DataTrigger></Style.Triggers>
+        </Style>
+        <Style x:Key="ConfirmButton" TargetType="Button" BasedOn="{StaticResource ButtonPrimary}">
+            <Setter Property="md:ButtonAssist.CornerRadius" Value="12"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BrushAccentOrange}"/>
+            <Setter Property="Width" Value="56"/><Setter Property="MinWidth" Value="56"/>
+            <Setter Property="ToolTip" Value="把当前文件归入此分类"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ===== 第一层:当前路径 + 逐层导航 + 绿勾(共用) ===== -->
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
+                <TextBlock Text="当前分类:"
+                           Style="{StaticResource TextCaption}"
+                           FontSize="14" LineHeight="20"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <TextBlock MaxWidth="240" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentPathText}" Text="{Binding CurrentPathText}"
+                           Style="{StaticResource TextPrimary}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+
+            <ScrollViewer x:Name="NavigationScroll" Grid.Column="1"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled" MaxHeight="64"
+                          VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <!-- 面包屑(导航路径) -->
+                    <ItemsControl x:Name="BreadcrumbHost"
+                                  ItemsSource="{Binding Breadcrumb}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type models:Category}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="{Binding}" ContentTemplate="{StaticResource NavigationInlineContent}"
+                                            Style="{StaticResource NavCategoryButton}"
+                                            Click="OnBreadcrumbClick"
+                                            Tag="{Binding}" />
+                                    <TextBlock Text="›"
+                                               Style="{StaticResource TextSecondary}"
+                                               VerticalAlignment="Center"
+                                               Margin="8,0" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Button x:Name="RootBackButton"
+                            Content="⌂ 顶层"
+                            Style="{StaticResource NavCategoryButton}"
+                            Click="OnBackToRoot"
+                            Visibility="Collapsed" />
+
+                    <!-- 当前层子分类 -->
+                    <ItemsControl x:Name="ChildrenHost"
+                                  >
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type models:Category}">
+                                <Button Content="{Binding}" ContentTemplate="{StaticResource NavigationInlineContent}"
+                                        Style="{StaticResource NavCategoryButton}"
+                                        Click="OnCategoryClick"
+                                        Tag="{Binding}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button x:Name="MoreChildrenButton" Style="{StaticResource ButtonGhost}" md:ButtonAssist.CornerRadius="12" Padding="8,4" Height="32" MinHeight="32" MinWidth="0" VerticalAlignment="Center" Click="OnMoreChildren" Content="更多子分类" Margin="8,0,0,0"/>
+            <!-- 绿色打勾(两层共用) -->
+            <Button x:Name="ConfirmButton"
+                    Grid.Column="2"
+                    Style="{StaticResource ConfirmButton}"
+                    VerticalAlignment="Center"
+                    Margin="16,0,0,0"
+                    Click="OnConfirmClick"><md:PackIcon Kind="Check" Width="24" Height="24"/></Button></StackPanel>
+        </Grid>
+
+        <!-- ===== 第二层:快捷分类(钉) ===== -->
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Height="40" VerticalAlignment="Top" Margin="0,0,8,0">
+            <TextBlock
+                       Text="快捷标签:"
+                       Style="{StaticResource TextCaption}"
+                       FontSize="14" LineHeight="20"
+                       VerticalAlignment="Center" />
+            </Border>
+
+            <ScrollViewer x:Name="PinnedScroll" Grid.Column="1" Background="Transparent" AllowDrop="True" DragOver="OnPinnedDragOver" Drop="OnPinnedDrop"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto" MaxHeight="112"
+                          VerticalAlignment="Top">
+                <ItemsControl x:Name="PinnedHost" AllowDrop="True" PreviewMouseLeftButtonDown="OnPinnedMouseDown" PreviewMouseMove="OnPinnedMouseMove" DragOver="OnPinnedDragOver" Drop="OnPinnedDrop"
+                              Background="Transparent" HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding PinnedCategories}"
+                              Visibility="Visible">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Background="Transparent" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:Category}">
+                            <Button MaxWidth="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource AvailableWidthConverter}}"
+                                    Style="{StaticResource PinnedCategoryButton}"
+                                    Click="OnPinnedClick"
+                                    ContextMenuOpening="OnPinnedContextMenuOpening"
+                                    Tag="{Binding}"
+                                    ToolTip="点击选择分类；Ctrl 多选，Shift 区间选择；右键取消钉住所选标签">
+                                <Button.ContentTemplate><StaticResource ResourceKey="CategoryNavigationContent" /></Button.ContentTemplate>
+                                <Button.Content><Binding /></Button.Content>
+                                <Button.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="✖ 取消钉住" Click="OnUnpinCategory" />
+                                    </ContextMenu>
+                                </Button.ContextMenu>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- 空提示 -->
+            <TextBlock x:Name="PinnedEmptyHint"
+                       Grid.Column="1"
+                       Text=""
+                       Style="{StaticResource TextCaption}"
+                       VerticalAlignment="Center"
+                       Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</UserControl>

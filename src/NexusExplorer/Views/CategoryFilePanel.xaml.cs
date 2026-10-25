@@ -1,0 +1,446 @@
+﻿using NexusExplorer.Views.Dialogs;
+using System.IO;
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
+using NexusExplorer.Infrastructure;
+using NexusExplorer.Models;
+using NexusExplorer.Services;
+using NexusExplorer.ViewModels;
+using Serilog;
+
+namespace NexusExplorer.Views;
+
+public partial class CategoryFilePanel : UserControl
+{
+    private const string FilesFormat = "NexusExplorer.FileIds";
+    private const string CategoryFormat = "NexusExplorer.CategoryId";
+    private MainViewModel _main = null!;
+    private readonly FileHoverPreview _filePreview;
+    private CategoryViewModel CategoryVm => _main.Category;
+    private FileListViewModel FileListVm => _main.FileList;
+    public CategoryViewModel? CategoryVmBinding => _main?.Category;
+    public FileListViewModel? FileListVmBinding => _main?.FileList;
+    private Category? _contextMenuCategory;
+    private Point _start;
+    private FileItem? _pressedFile;
+    private Category? _pressedCategory;
+    private bool _potentialDrag;
+    private bool _deferSelection;
+    private bool _restored;
+    private bool _shuttingDown;
+    private UiStateStore _state = new();
+    private CancellationTokenSource? _organizing;
+    private readonly DragWheelScroller _dragWheel = new();
+    private AsyncRelayCommand<Category>? _organizeCommand;
+    public ICommand OrganizeCommand => _organizeCommand ??= new AsyncRelayCommand<Category>(OrganizeAsync, category => category is { IsFavorites: false } && _organizing is null);
+
+    public event Action? PresentationSizeChanged;
+    internal double PreferredHeight
+    {
+        get
+        {
+            int Count(IEnumerable<Category> categories) => categories.Sum(c => 1 + (c.IsExpanded ? Count(c.Children) : 0));
+            var rows = _main is null ? 0 : Count(CategoryVm.RootCategories);
+            return 8 + Math.Max(120, rows * 39 + 16) + Math.Max(120, FileListBox.Items.Count * 72 + 40);
+        }
+    }
+    public CategoryFilePanel()
+    {
+        InitializeComponent(); DataContext = this; _filePreview = new(FileListBox);
+        CategoryTree.AddHandler(TreeViewItem.ExpandedEvent, new RoutedEventHandler((_, _) => Dispatcher.BeginInvoke(() => PresentationSizeChanged?.Invoke())));
+        CategoryTree.AddHandler(TreeViewItem.CollapsedEvent, new RoutedEventHandler((_, _) => Dispatcher.BeginInvoke(() => PresentationSizeChanged?.Invoke())));
+    }
+    public void Initialize(MainViewModel main, IRecycleBinService recycleBin)
+    {
+        _main = main; DataContext = null; DataContext = this; _state = UiStateStore.Load();
+        CategoryVm.RecycleBin = recycleBin; FileListVm.RecycleBin = recycleBin;
+        CategoryVm.ShowInputDialog = (title, value) => Dialogs.InputDialog.ShowAsync(title, "分类名称", value);
+        CategoryVm.ShowConfirmDialog = ConfirmAsync; FileListVm.ShowConfirmDialog = ConfirmAsync;
+        CategoryVm.ShowErrorAsync = ShowErrorAsync; FileListVm.ShowErrorAsync = ShowErrorAsync;
+        FileListVm.ShowInfo = message => MaterialDialogService.Notice(message);
+        FileListVm.ShowImportStatus = message => MaterialDialogService.Notice(message);
+        FileListVm.PickFiles = () =>
+        {
+            var dialog = new OpenFileDialog { Title = "选择文件", Multiselect = true };
+            return Task.FromResult<IReadOnlyList<string>>(dialog.ShowDialog() == true ? dialog.FileNames : Array.Empty<string>());
+        };
+        FileListVm.PickDirectory = () => Task.FromResult(PickDirectory("选择导入文件夹"));
+        FileListVm.PickRelocateFile = name =>
+        {
+            var dialog = new OpenFileDialog { Title = $"重新定位「{name}」" };
+            return Task.FromResult(dialog.ShowDialog() == true ? dialog.FileName : null);
+        };
+        FileListVm.ShowRenameFileDialog = name => InputDialog.ShowAsync("重命名文件", "文件名（含扩展名）", name, selectFileStem: true);
+        main.CategoryTreeChanged += RefreshTree; main.FileListChanged += RefreshFileList;
+        main.CurrentFileChanged += OnCurrentFileChanged;
+        Unloaded += OnUnloaded;
+    }
+    private static Task<bool> ConfirmAsync(string message) => MessageDialog.ConfirmAsync(message);
+    private static async Task ShowErrorAsync(string message) => await MessageDialog.ShowAsync(message, "错误", severity: DialogSeverity.Warning);
+    private static void ShowError(string message) => MaterialDialogService.NotifyError(message);
+    private static string? PickDirectory(string title)
+    { var dialog = new OpenFolderDialog { Title = title }; return dialog.ShowDialog() == true ? dialog.FolderName : null; }
+    private static async Task RunAsync(Func<Task> action)
+    { try { await action(); } catch (Exception ex) { Log.Error(ex, "界面操作失败"); await ShowErrorAsync(ex.Message); } }
+    internal static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
+    {
+        while (node is not null)
+        {
+            if (node is T found) return found;
+            node = node is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(node) ?? LogicalTreeHelper.GetParent(node)
+                : LogicalTreeHelper.GetParent(node);
+        }
+        return null;
+    }
+    private static T? FindChild<T>(DependencyObject node) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+        { var child = VisualTreeHelper.GetChild(node, i); if (child is T found) return found; if (FindChild<T>(child) is { } nested) return nested; }
+        return null;
+    }
+    private void OnListTopIndicatorLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ItemsControl list && FindChild<ScrollViewer>(list) is { } viewer)
+            UpdateTopIndicator(list, viewer);
+    }
+    private void OnListTopIndicatorScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is ItemsControl list && e.OriginalSource is ScrollViewer viewer
+            && ReferenceEquals(viewer, FindChild<ScrollViewer>(list)))
+            UpdateTopIndicator(list, viewer);
+    }
+    private void UpdateTopIndicator(ItemsControl list, ScrollViewer viewer)
+    {
+        // A non-interactive overlay avoids adding a fake row to the virtualized
+        // collections (which would affect selection, navigation and drag/drop).
+        var indicator = ReferenceEquals(list, CategoryTree) ? CategoryTopIndicator : FileTopIndicator;
+        indicator.Visibility = list.HasItems && viewer.VerticalOffset <= 0.001
+            ? Visibility.Visible : Visibility.Hidden;
+    }
+    internal static bool IsControlChrome(DependencyObject? source) => FindAncestor<ScrollBar>(source) is not null || FindAncestor<Thumb>(source) is not null || FindAncestor<ButtonBase>(source) is not null;
+    internal static FileItem? HitFile(DependencyObject? source) => IsControlChrome(source) ? null : FindAncestor<ListBoxItem>(source)?.DataContext as FileItem;
+    internal static Category? HitCategory(DependencyObject? source) => IsControlChrome(source) ? null : FindAncestor<TreeViewItem>(source)?.Header as Category;
+    private void RefreshTree()
+    {
+        var offset = !_restored ? _state.TreeOffset : FindChild<ScrollViewer>(CategoryTree)?.VerticalOffset ?? 0;
+        if (!_restored)
+        {
+            foreach (var c in CategoryVm.FlatCategories) { c.IsExpanded = _state.Expanded.Contains(c.Id); c.IsSelected = c.Id == _state.SelectedCategoryId; }
+            _restored = true;
+        }
+        CategoryTree.ItemsSource = CategoryVm.RootCategories;
+        PresentationSizeChanged?.Invoke();
+        _ = Dispatcher.BeginInvoke(() => FindChild<ScrollViewer>(CategoryTree)?.ScrollToVerticalOffset(offset));
+        _organizeCommand?.NotifyCanExecuteChanged();
+    }
+    private string _fileFilter = "";
+    private bool _globalSearch;
+    private CancellationTokenSource? _search;
+    public void SetFileFilter(string query) => SetFileFilter(query, _globalSearch);
+    public async void SetFileFilter(string query, bool global)
+    {
+        _fileFilter = query.Trim(); _globalSearch = global;
+        _search?.Cancel(); _search?.Dispose(); _search = new();
+        var token = _search.Token;
+        if (_main is null) return;
+        if (global && _fileFilter.Length > 0)
+        {
+            FileCountHeader.Text = "正在搜索…";
+            FileListBox.ItemsSource = Array.Empty<FileItem>();
+            try
+            {
+                await Task.Delay(200, token);
+                var results = await _main.Files.SearchAsync(_fileFilter, token);
+                token.ThrowIfCancellationRequested();
+                foreach (var f in results) f.IsCurrent = f.Id == _main.CurrentFile?.Id;
+                FileListBox.ItemsSource = results;
+                UpdatePresentationCount();
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { if (!token.IsCancellationRequested) { FileCountHeader.Text = "搜索失败"; Log.Error(ex, "全局搜索失败"); } }
+        }
+        else
+        {
+            FileListBox.ItemsSource = FileListVm.Files;
+            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(FileListVm.Files);
+            view.Filter = string.IsNullOrEmpty(_fileFilter) ? null : item => item is FileItem f && f.FileName.Contains(_fileFilter, StringComparison.CurrentCultureIgnoreCase);
+            UpdatePresentationCount();
+        }
+    }
+    private void UpdatePresentationCount()
+    {
+        FileCountHeader.Text = $"{(_globalSearch && _fileFilter.Length > 0 ? "搜索结果" : _main.CurrentCategory?.Name ?? "文件")} · {FileListBox.Items.Count}";
+        PresentationSizeChanged?.Invoke();
+    }
+    private void RefreshFileList()
+    {
+        _filePreview.Cancel();
+        var timing = Stopwatch.StartNew();
+        var ids = FileListBox.SelectedItems.Cast<FileItem>().Select(f => f.Id).ToHashSet();
+        var offset = FindChild<ScrollViewer>(FileListBox)?.VerticalOffset ?? 0;
+        FileListBox.ItemsSource = FileListVm.Files; SetFileFilter(_fileFilter); FileListVm.UpdateHeader();
+        foreach (var f in FileListBox.Items.Cast<FileItem>().Where(f => ids.Contains(f.Id))) FileListBox.SelectedItems.Add(f);
+        _ = Dispatcher.BeginInvoke(() => FindChild<ScrollViewer>(FileListBox)?.ScrollToVerticalOffset(offset));
+        _organizeCommand?.NotifyCanExecuteChanged();
+        var source = FileListBox.ItemsSource;
+        var categoryId = _main.CurrentCategory?.Id;
+        Log.Information("文件列表绑定完成;分类 {CategoryId};数量 {Count};耗时 {ElapsedMs:F1} ms", categoryId, FileListVm.Files.Count, timing.Elapsed.TotalMilliseconds);
+        _ = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, (Action)(() =>
+        {
+            if (ReferenceEquals(FileListBox.ItemsSource, source))
+                Log.Information("文件列表布局检查点;分类 {CategoryId};数量 {Count};绑定后 {ElapsedMs:F1} ms", categoryId, FileListBox.Items.Count, timing.Elapsed.TotalMilliseconds);
+        }));
+    }
+    public async Task RestoreBrowseAsync()
+    {
+        if (_state.BrowsedCategoryId is int id && await _main.Categories.GetByIdAsync(id) is { } category)
+        { await _main.SelectCategoryAsync(category); FindChild<ScrollViewer>(FileListBox)?.ScrollToVerticalOffset(_state.FileOffset); }
+    }
+    public void SaveUiState()
+    {
+        if (_main is null) return;
+        _state.Expanded = CategoryVm.FlatCategories.Where(c => c.IsExpanded).Select(c => c.Id).ToHashSet();
+        _state.SelectedCategoryId = (CategoryTree.SelectedItem as Category)?.Id;
+        _state.BrowsedCategoryId = _main.CurrentCategory?.Id;
+        _state.TreeOffset = FindChild<ScrollViewer>(CategoryTree)?.VerticalOffset ?? 0;
+        _state.FileOffset = FindChild<ScrollViewer>(FileListBox)?.VerticalOffset ?? 0;
+        _state.Save();
+    }
+    public async Task PrepareForCloseAsync()
+    {
+        _filePreview.Cancel();
+        _dragWheel.Dispose();
+        _shuttingDown = true; _organizing?.Cancel(); _search?.Cancel();
+        if (_organizeCommand?.ExecutionTask is { } task) await task;
+        using var lease = await MutationGate.AcquireAsync();
+    }
+    private void OnUnloaded(object sender, RoutedEventArgs e)
+    {
+        _filePreview.Dispose();
+        _dragWheel.Dispose();
+        SaveUiState();
+        _main.CategoryTreeChanged -= RefreshTree; _main.FileListChanged -= RefreshFileList; _main.CurrentFileChanged -= OnCurrentFileChanged;
+        Unloaded -= OnUnloaded;
+    }
+    private void OnCurrentFileChanged(FileItem? file)
+    {
+        // Global results are detached records, separate from the browsed collection.
+        var displayed = FileListBox.Items.Cast<FileItem>().ToList();
+        foreach (var item in displayed) item.IsCurrent = item.Id == file?.Id;
+        if (file is not null && displayed.FirstOrDefault(f => f.Id == file.Id) is { } visible) FileListBox.ScrollIntoView(visible);
+    }
+    private async void OnCategoryDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Left || HitCategory(e.OriginalSource as DependencyObject) is not { } c) return;
+        e.Handled = true; await RunAsync(() => _main.SelectCategoryAsync(c));
+    }
+    private async void OnFileDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (IsControlChrome(e.OriginalSource as DependencyObject)) return;
+        if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject)?.DataContext is not FileItem file) return;
+        Log.Information("文件双击播放;文件 {FileId};名称 {FileName}", file.Id, file.FileName);
+        e.Handled = true; await RunAsync(async () =>
+        {
+            if (_globalSearch && file.CategoryId != _main.CurrentCategory?.Id)
+                await _main.SelectCategoryAsync(await _main.Categories.GetByIdAsync(file.CategoryId));
+            await FileListVm.ActivateFileAsync(file);
+        });
+    }
+    private void OnCategoryTreeContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        _contextMenuCategory = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.Header as Category;
+        OrganizeCategoryMenu.IsEnabled = OrganizeCommand.CanExecute(_contextMenuCategory);
+        if (_contextMenuCategory is null || _contextMenuCategory.IsFavorites) e.Handled = true;
+    }
+    internal Category? GetContextMenuCategory() => _contextMenuCategory;
+    internal void RecordContextMenuTarget(TreeViewItem item) => _contextMenuCategory = item.Header as Category;
+    internal void RecordContextMenuSource(DependencyObject source) => _contextMenuCategory = FindAncestor<TreeViewItem>(source)?.Header as Category;
+    private void OnFileContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        RemoveFileMenu.Header = _main.CurrentCategory?.IsFavorites == true ? "取消收藏" : "从分类移除";
+        if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject)?.DataContext is not FileItem f) { e.Handled = true; return; }
+        if (!FileListBox.SelectedItems.Contains(f)) { FileListBox.SelectedItems.Clear(); FileListBox.SelectedItems.Add(f); }
+        RelocateFileMenu.IsEnabled = RenameFileMenu.IsEnabled = FileListBox.SelectedItems.Count == 1;
+    }
+    private async Task CategoryActionAsync(Func<Category, Task> action)
+    { if (_contextMenuCategory is { } c) await RunAsync(() => action(c)); }
+    private async void OnCreateChild(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.CreateChildAsync);
+    private async void OnAddCategoryFiles(object sender, RoutedEventArgs e) => await CategoryActionAsync(FileListVm.AddFilesToCategoryAsync);
+    private async void OnAddCategoryFolder(object sender, RoutedEventArgs e) => await CategoryActionAsync(FileListVm.AddFolderToCategoryAsync);
+    private void OnOrganizeCategory(object sender, RoutedEventArgs e)
+    { if (OrganizeCommand.CanExecute(_contextMenuCategory)) OrganizeCommand.Execute(_contextMenuCategory); }
+    private async void OnRenameCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.RenameAsync);
+    private async void OnRemoveCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.RemoveAsync);
+    private async void OnDeleteCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.DeleteAsync);
+    private async void OnMoveCategoryUp(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.MoveUpAsync);
+    private async void OnMoveCategoryDown(object sender, RoutedEventArgs e) => await CategoryActionAsync(CategoryVm.MoveDownAsync);
+    private async void OnMoveCategoryToRoot(object sender, RoutedEventArgs e) => await CategoryActionAsync(c => CategoryVm.MoveAsync(c, null));
+    private async void OnPinCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(async c =>
+    { await _main.Categories.PinAsync(c.Id); await _main.Navigation.OnPinsChangedAsync(); });
+    private async void OnRelocateCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(async c =>
+    {
+        var path = PickDirectory("选择分类的新位置"); if (path is null) return;
+        var preview = await _main.Categories.PreviewRelocateAsync(c.Id, path);
+        if (!await Dialogs.LocationPreviewDialog.ConfirmAsync(preview)) return;
+        await _main.Categories.RelocateAsync(c.Id, path); await _main.RefreshTreeAsync();
+    });
+    private async void OnMigrateCategory(object sender, RoutedEventArgs e) => await CategoryActionAsync(async c =>
+    {
+        var parent = PickDirectory("选择迁移目标父目录"); if (parent is null) return;
+        if (!await ConfirmAsync($"迁移完整物理目录：\n{c.PhysicalPath}\n→ {Path.Combine(parent, Path.GetFileName(c.PhysicalPath))}\n包含未登记文件。继续？")) return;
+        await _main.Categories.MigrateDirectoryAsync(c.Id, parent); await _main.RefreshTreeAsync();
+    });
+    private void OnOpenCategoryInExplorer(object sender, RoutedEventArgs e)
+    { if (_contextMenuCategory is { } c && !ExplorerService.OpenDirectory(c.PhysicalPath)) ShowError("目录不存在，请重新定位。"); }
+    private void OnOpenFileInExplorer(object sender, RoutedEventArgs e)
+    { if (FileListBox.SelectedItem is FileItem f && !ExplorerService.RevealFile(f.AbsolutePath)) ShowError("文件不存在，请重新定位。"); }
+    private IReadOnlyList<FileItem> SelectedFiles() => FileListBox.SelectedItems.Cast<FileItem>().ToList();
+    private async void OnRemoveFile(object sender, RoutedEventArgs e) => await RunAsync(() => FileListVm.DeleteManyAsync(SelectedFiles(), true));
+    private async void OnDeleteFile(object sender, RoutedEventArgs e) => await RunAsync(() => FileListVm.DeleteManyAsync(SelectedFiles(), false));
+    private async void OnRelocateFile(object sender, RoutedEventArgs e)
+    { if (FileListBox.SelectedItems.Count == 1 && FileListBox.SelectedItem is FileItem f) await RunAsync(() => FileListVm.RelocateFileAsync(f)); }
+    private async void OnRenameFile(object sender, RoutedEventArgs e)
+    { if (FileListBox.SelectedItems.Count == 1 && FileListBox.SelectedItem is FileItem f) await RunAsync(() => FileListVm.RenameFileAsync(f)); }
+
+    private async Task OrganizeAsync(Category? category)
+    {
+        if (category is null || _organizing is not null) return;
+        _organizing = new(); var statusRefreshed = false;
+        CancelOrganizeButton.Header = "取消整理";
+        CancelOrganizeButton.Visibility = Visibility.Visible; _organizeCommand?.NotifyCanExecuteChanged();
+        try
+        {
+            Dialogs.ConflictDecision? policy = null;
+            var progress = new Progress<OrganizeProgress>(p => CancelOrganizeButton.Header = $"取消整理（{p.Completed}/{p.Total}）");
+            var result = await _main.Organization.OrganizeAsync(category.Id, async (name, target) =>
+            {
+                var decision = policy ?? await Dialogs.ConflictDialog.ShowDecisionAsync(name, target);
+                if (decision.ApplyToAll && decision.Resolution != ConflictResolution.Ask) policy = decision;
+                return decision.Resolution;
+            }, _organizing.Token, progress);
+            await _main.RefreshOrganizationStatesAsync(); statusRefreshed = true;
+            await _main.RefreshFilesAsync();
+
+            if (!_shuttingDown) await Dialogs.OrganizeResultDialog.ShowAsync(category.Name, result);
+        }
+        catch (Exception ex) { Log.Error(ex, "整理失败"); await ShowErrorAsync(ex.Message); }
+        finally
+        {
+            _organizing.Dispose(); _organizing = null; CancelOrganizeButton.Visibility = Visibility.Collapsed; _organizeCommand?.NotifyCanExecuteChanged();
+            if (!statusRefreshed) await _main.RefreshOrganizationStatesAsync();
+        }
+    }
+    private void OnCancelOrganize(object sender, RoutedEventArgs e) => _organizing?.Cancel();
+    private void OnFilesDragOver(object sender, DragEventArgs e)
+    { e.Effects = _main.CurrentCategory is not null && e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; }
+    private void OnFilesDrop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths) return;
+        if (_main.CurrentCategory is { } target) QueueExternalImport(paths, target);
+        else MaterialDialogService.Notice("请先双击打开分类，再拖入文件。");
+    }
+    private void QueueExternalImport(string[] paths, Category target)
+    {
+        if (target.IsFavorites) { MaterialDialogService.Notice("请先导入普通分类，再点击星星收藏。"); return; }
+        // Copy OLE data before returning Drop; never keep Explorer's drag loop in a dialog.
+        var copiedPaths = paths.ToArray();
+        var queued = Stopwatch.StartNew();
+        var importId = Guid.NewGuid().ToString("N")[..8];
+        Log.Information("外部拖入已排队;导入 {ImportId};分类 {CategoryId};数量 {Count}", importId, target.Id, copiedPaths.Length);
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, (Action)(async () =>
+        {
+            Log.Information("外部拖入开始;导入 {ImportId};排队 {ElapsedMs:F1} ms", importId, queued.Elapsed.TotalMilliseconds);
+            MaterialDialogService.Notice($"正在导入到「{target.Name}」…");
+            try { await FileListVm.ImportIntoAsync(copiedPaths, target, importId); }
+            catch (Exception ex) { Log.Error(ex, "外部拖入失败"); MaterialDialogService.Notice($"导入失败：{ex.Message}"); }
+            finally { Log.Information("外部拖入结束;导入 {ImportId};总耗时 {ElapsedMs:F1} ms", importId, queued.Elapsed.TotalMilliseconds); }
+        }));
+    }
+    private Category? DropTarget(DragEventArgs e) => IsControlChrome(e.OriginalSource as DependencyObject) ? null : FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.Header as Category;
+    private void OnTreeDragEnter(object sender, DragEventArgs e) => BeginTreeDragScroll(e.Data);
+    private void BeginTreeDragScroll(IDataObject data)
+    {
+        if (data.GetDataPresent(DataFormats.FileDrop) || data.GetDataPresent(FilesFormat) || data.GetDataPresent(CategoryFormat))
+            if (FindChild<ScrollViewer>(CategoryTree) is { } viewer) _dragWheel.Start(viewer);
+    }
+    private void OnTreeDragLeave(object sender, DragEventArgs e)
+    {
+        // OLE also sends DragLeave on Escape while the pointer is still over the tree.
+        // Moving between child targets is harmless: the next DragEnter/DragOver reattaches.
+        _dragWheel.Dispose();
+    }
+    private void OnTreeDragOver(object sender, DragEventArgs e)
+    {
+        BeginTreeDragScroll(e.Data);
+        if (DropTarget(e)?.IsFavorites == true) { e.Effects = e.Data.GetDataPresent(FilesFormat) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; return; }
+        e.Effects = DropTarget(e) is null ? (CanDropCategoryAtRoot(e.Data, e.OriginalSource as DependencyObject) ? DragDropEffects.Move : DragDropEffects.None) :
+            e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy :
+            e.Data.GetDataPresent(FilesFormat) || e.Data.GetDataPresent(CategoryFormat) ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+    }
+    private async void OnTreeDrop(object sender, DragEventArgs e)
+    {
+        _dragWheel.Dispose();
+        e.Handled = true; var target = DropTarget(e);
+        if (target?.IsFavorites == true && !e.Data.GetDataPresent(FilesFormat)) return;
+        if (target is null && !CanDropCategoryAtRoot(e.Data, e.OriginalSource as DependencyObject)) return;
+        if (target is not null && e.Data.GetData(DataFormats.FileDrop) is string[] externalPaths) { QueueExternalImport(externalPaths, target); return; }
+        await RunAsync(async () =>
+        {
+            if (e.Data.GetData(CategoryFormat) is int id && await _main.Categories.GetByIdAsync(id) is { } c) await CategoryVm.MoveAsync(c, target);
+            else if (target is not null && e.Data.GetData(FilesFormat) is int[] ids)
+            {
+                var files = new List<FileItem>(); foreach (var fileId in ids) if (await _main.Files.GetByIdAsync(fileId) is { } f) files.Add(f);
+                await FileListVm.RecategorizeManyAsync(files, target);
+            }
+        });
+    }
+    internal static bool CanDropCategoryAtRoot(IDataObject data, DependencyObject? source) =>
+        data.GetDataPresent(CategoryFormat) && !IsControlChrome(source) && FindAncestor<TreeViewItem>(source) is null;
+
+    protected override void OnPreviewMouseDown(MouseButtonEventArgs e)
+    {
+        base.OnPreviewMouseDown(e); _potentialDrag = false; _pressedFile = null; _pressedCategory = null; _deferSelection = false;
+        var source = e.OriginalSource as DependencyObject;
+        if (e.ChangedButton != MouseButton.Left || e.ClickCount > 1 || IsControlChrome(source)) return;
+        _pressedFile = HitFile(source);
+        _pressedCategory = HitCategory(source);
+        if (_pressedCategory?.IsFavorites == true) _pressedCategory = null;
+        if (_pressedFile is null && _pressedCategory is null) return;
+        _start = e.GetPosition(this); _potentialDrag = true;
+        if (_pressedFile is not null && Keyboard.Modifiers == ModifierKeys.None && FileListBox.SelectedItems.Contains(_pressedFile))
+        { _deferSelection = true; e.Handled = true; }
+    }
+    protected override void OnPreviewMouseUp(MouseButtonEventArgs e)
+    {
+        base.OnPreviewMouseUp(e);
+        if (_deferSelection && _pressedFile is not null && _potentialDrag)
+        { FileListBox.SelectedItems.Clear(); FileListBox.SelectedItems.Add(_pressedFile); }
+        _potentialDrag = false; _deferSelection = false;
+    }
+    protected override void OnPreviewMouseMove(MouseEventArgs e)
+    {
+        base.OnPreviewMouseMove(e); if (!_potentialDrag || e.LeftButton != MouseButtonState.Pressed) return;
+        var p = e.GetPosition(this);
+        if (Math.Abs(p.X - _start.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(p.Y - _start.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        _potentialDrag = false;
+        try
+        {
+            if (_pressedFile is not null)
+            {
+                if (!FileListBox.SelectedItems.Contains(_pressedFile)) { FileListBox.SelectedItems.Clear(); FileListBox.SelectedItems.Add(_pressedFile); }
+                DragDrop.DoDragDrop(FileListBox, new DataObject(FilesFormat, FileListBox.SelectedItems.Cast<FileItem>().Select(f => f.Id).ToArray()), DragDropEffects.Move);
+            }
+            else if (_pressedCategory is not null) DragDrop.DoDragDrop(CategoryTree, new DataObject(CategoryFormat, _pressedCategory.Id), DragDropEffects.Move);
+        }
+        finally { _dragWheel.Dispose(); _pressedFile = null; _pressedCategory = null; _deferSelection = false; }
+    }
+}
