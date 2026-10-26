@@ -120,9 +120,11 @@ public partial class PlayerPanel : UserControl
     }
     internal void SetFocusPreview(bool focus)
     {
+        if (_focusPreview == focus) return;
         PrismMotion.Stop(this, InspectorExtentProperty, finish: true);
         if (!_inspectorOpen) InspectorBody.Visibility = Visibility.Hidden;
         _focusPreview = focus;
+        SetImmersiveControls(focus);
         InspectorSlot.Visibility = focus ? Visibility.Collapsed : Visibility.Visible;
         PreviewSurface.IsPlain = focus; PreviewSurface.Padding = new Thickness(focus ? 0 : 10);
         PreviewSurface.Margin = focus ? new Thickness(0) : new Thickness(0, 0, 8, 0);
@@ -142,6 +144,7 @@ public partial class PlayerPanel : UserControl
     internal void SetDialogCovered(bool covered)
     {
         _dialogCovered = covered;
+        if (covered) ResetImmersivePointer();
         if (covered) VolumePopup.IsPopupOpen = false;
         UpdateUi();
     }
@@ -150,6 +153,7 @@ public partial class PlayerPanel : UserControl
     public PlayerPanel()
     {
         InitializeComponent();
+        InitializeImmersiveControls();
         _videoClickTimer.Interval = TimeSpan.FromMilliseconds(250);
         _videoClickTimer.Tick += async (_, _) => { _videoClickTimer.Stop(); if (!_dialogCovered && Controls?.CurrentToken == _clickToken && Vm.Kind == MediaKind.Video) await RunAsync(Vm.TogglePlayPauseAsync); };
         _inspectorTimer.Tick += (_, _) => TrackInspectorPointer();
@@ -181,7 +185,7 @@ public partial class PlayerPanel : UserControl
         if (Vm.Engine is IVideoSurfaceGestures gestures) { gestures.VideoDoubleClicked += OnNativeVideoDoubleClick; gestures.VideoEscapePressed += OnNativeEscape; }
         HardwareCheck.IsChecked = Controls?.HardwareDecoding ?? true; VolumeSlider.Value = Vm.Volume; UpdateVolumeUi(Vm.Volume); _initialized = true;
         ProgressSlider.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler((_, _) => _dragging = true), true);
-        AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(OnProgressReleased), true);
+        ControlsBar.AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(OnProgressReleased), true);
         _timer.Tick += Poll; _timer.Start();
         Loaded += OnLoaded; Unloaded += OnUnloaded; UpdateUi();
     }
@@ -193,6 +197,7 @@ public partial class PlayerPanel : UserControl
     { if (!_dialogCovered && Vm.Kind == MediaKind.Video && Controls is not null) { _clickToken = Controls.CurrentToken; _videoClickTimer.Stop(); _videoClickTimer.Start(); } }
     public void Detach()
     {
+        StopImmersiveControls();
         ++_detailSizeVersion;
         VolumePopup.IsPopupOpen = false;
         PrismMotion.Stop(this, InspectorExtentProperty, finish: true);
@@ -255,7 +260,7 @@ public partial class PlayerPanel : UserControl
         else _ = PdfArea.ClearAsync();
         AudioLayer.Visibility = Vm.Kind == MediaKind.Audio ? Visibility.Visible : Visibility.Collapsed;
         AudioTitle.Text = Vm.MediaTitle ?? "";
-        ControlsBar.Visibility = !_focusPreview && (media || document || pdf || Vm.Kind == MediaKind.Image) ? Visibility.Visible : Visibility.Collapsed;
+        ControlsBar.Visibility = media || document || pdf || Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         DocumentButtonsRow.Visibility = document || pdf ? Visibility.Visible : Visibility.Collapsed;
         ProgressRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;
         MediaButtonsRow.Visibility = media ? Visibility.Visible : Visibility.Collapsed;

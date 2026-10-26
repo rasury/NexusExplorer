@@ -79,12 +79,12 @@ public class PrismUiTests
                 }
                 finally { SetCursorPos(savedCursor.X, savedCursor.Y); }
                 await Task.Delay(600); Click(); Click();
-                await BoundedDialogTests.Until(() => ((FrameworkElement)window.FindName("TitleBar")).Visibility == Visibility.Collapsed);
+                await BoundedDialogTests.Until(() => !window.IsFullscreenTransitioning && ((FrameworkElement)window.FindName("TitleBar")).Visibility == Visibility.Collapsed);
                 window.UpdateLayout(); Assert.Equal(handle, video.Handle); Assert.Equal(0, video.CornerRadius);
                 Assert.Equal(window.ActualWidth, video.ActualWidth, 1); Assert.Equal(window.ActualHeight, video.ActualHeight, 1);
                 SendMessage(child, 0x0100, (IntPtr)27, IntPtr.Zero);
                 SendMessage(child, 0x0101, (IntPtr)27, IntPtr.Zero);
-                await BoundedDialogTests.Until(() => ((FrameworkElement)window.FindName("TitleBar")).Visibility == Visibility.Visible);
+                await BoundedDialogTests.Until(() => !window.IsFullscreenTransitioning && ((FrameworkElement)window.FindName("TitleBar")).Visibility == Visibility.Visible);
                 Assert.Equal(16, video.CornerRadius); Assert.Equal(handle, video.Handle);
             }
             finally { await engine.ShutdownAsync(); window.PrepareForVerificationExit(); window.Close(); }
@@ -190,15 +190,17 @@ public class PrismUiTests
                 Assert.True(grid.RowDefinitions[3].ActualHeight >= 120);
                 Save(window, $"prism-small-{theme}.png");
                 window.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, Key.F11) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+                await BoundedDialogTests.Until(() => !window.IsFullscreenTransitioning);
                 window.UpdateLayout();
                 Assert.Equal(Visibility.Collapsed, ((FrameworkElement)window.FindName("TitleBar")).Visibility);
                 Assert.Equal(Visibility.Collapsed, ((FrameworkElement)window.FindName("SearchCard")).Visibility);
                 Assert.Same(first, main.CurrentFile);
-                Assert.Equal(Visibility.Collapsed, controls.Visibility);
+                Assert.Equal(Visibility.Visible, controls.Visibility);
                 Assert.Equal(0, ((MpvVideoHost)player.FindName("VideoView")).CornerRadius);
                 Assert.Equal(window.ActualWidth, preview.ActualWidth, 1);
                 Assert.Equal(window.ActualHeight, preview.ActualHeight, 1);
                 window.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, Key.Escape) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+                await BoundedDialogTests.Until(() => !window.IsFullscreenTransitioning);
                 Assert.Equal(Visibility.Visible, ((FrameworkElement)window.FindName("TitleBar")).Visibility);
             }
             finally { window.PrepareForVerificationExit(); window.Close(); UiThemeService.Apply(UiThemeMode.Light); }

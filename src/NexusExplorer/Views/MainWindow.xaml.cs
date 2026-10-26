@@ -36,8 +36,8 @@ public partial class MainWindow : Window
         LeftPanel.PresentationSizeChanged += ResizeLibrary;
         Workspace.SizeChanged += (_, _) => ResizeLibrary();
         Loaded += async (_, _) => { try { await ApplyWallpaperAsync(AppConfig.LoadOrDefault(AppPaths.SettingsPath).Appearance); } catch (Exception ex) { Serilog.Log.Warning(ex, "自定义背景不可用，使用默认背景"); } };
-        StateChanged += (_, _) => { Dispatcher.BeginInvoke(() => WindowAppearance.UpdateMaximizedInset(this, WindowSurface)); MaximizeIcon.Kind = WindowState == WindowState.Maximized ? PackIconKind.WindowRestore : PackIconKind.WindowMaximize; WindowLayout.Margin = new Thickness(_focusPreview ? 0 : 6); };
-        SizeChanged += (_, _) => WindowAppearance.UpdateMaximizedInset(this, WindowSurface);
+        StateChanged += (_, _) => { Dispatcher.BeginInvoke(UpdateShellInset); MaximizeIcon.Kind = WindowState == WindowState.Maximized ? PackIconKind.WindowRestore : PackIconKind.WindowMaximize; WindowLayout.Margin = new Thickness(_focusPreview ? 0 : 6); };
+        SizeChanged += (_, _) => UpdateShellInset();
         UiThemeService.Changed += OnThemeChanged;
         SourceInitialized += (_, _) => { WindowAppearance.Apply(this); WindowAppearance.UpdateMaximizedInset(this, WindowSurface); };
         Loaded += (_, _) => { WindowAppearance.Apply(this); WindowAppearance.UpdateMaximizedInset(this, WindowSurface); };
@@ -131,6 +131,7 @@ public partial class MainWindow : Window
     private double _libraryHeight;
     private void ResizeLibrary()
     {
+        if (_focusPreview || _fullscreenTransitioning) return;
         var available = Math.Max(360, Workspace.ActualHeight - 64);
         LibrarySlot.MaxHeight = available;
         var height = Math.Clamp(LeftPanel.PreferredHeight + 72, 360, available);
@@ -162,43 +163,6 @@ public partial class MainWindow : Window
             PrismMotion.Animate(slide, TranslateTransform.XProperty, _globalSearch ? -104 : 0, MotionProfiles.Scope);
         HintAssist.SetHint(FileSearch, _globalSearch ? "搜索全部分类文件…" : "搜索当前分类文件…");
         if (!string.IsNullOrWhiteSpace(FileSearch.Text)) LeftPanel.SetFileFilter(FileSearch.Text, _globalSearch);
-    }
-    private bool _focusPreview;
-    private WindowState _beforeFocusState;
-    private Visibility _beforeFocusLibrary;
-    private Rect _beforeFocusBounds;
-    private void ToggleFocusPreview()
-    {
-        PrismMotion.Stop(this, DrawerExtentProperty, finish: true);
-        _focusPreview = !_focusPreview;
-        var center = (Grid)PlayerArea.Parent;
-        if (_focusPreview)
-        {
-            _beforeFocusState = WindowState; _beforeFocusLibrary = LibraryCard.Visibility;
-            _beforeFocusBounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
-            WindowState = WindowState.Normal; WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize;
-            WindowSurface.Margin = new Thickness(0); Topmost = true;
-            WindowAppearance.FillMonitor(this);
-        }
-        else
-        {
-            Topmost = false; WindowStyle = WindowStyle.SingleBorderWindow; ResizeMode = ResizeMode.CanResize;
-            Left = _beforeFocusBounds.Left; Top = _beforeFocusBounds.Top; Width = _beforeFocusBounds.Width; Height = _beforeFocusBounds.Height;
-            WindowState = _beforeFocusState;
-            WindowAppearance.UpdateMaximizedInset(this, WindowSurface);
-        }
-        WindowLayout.Margin = new Thickness(_focusPreview ? 0 : 6);
-        Workspace.Margin = _focusPreview ? new Thickness(0) : new Thickness(20, 8, -6, 16);
-        WallpaperScene.Visibility = _focusPreview ? Visibility.Hidden : Visibility.Visible;
-        TitleBar.Visibility = SearchCard.Visibility = _focusPreview ? Visibility.Collapsed : Visibility.Visible;
-        System.Windows.Shell.WindowChrome.GetWindowChrome(this).CaptionHeight = _focusPreview ? 0 : 64;
-        WindowLayout.RowDefinitions[0].Height = new GridLength(_focusPreview ? 0 : 64);
-        LibraryCard.Visibility = _focusPreview ? Visibility.Collapsed : _beforeFocusLibrary;
-        LibrarySlot.Visibility = _focusPreview ? Visibility.Collapsed : Visibility.Visible;
-        center.RowDefinitions[0].Height = new GridLength(_focusPreview ? 0 : 64);
-        ((FrameworkElement)NavBar.Parent).Visibility = _focusPreview ? Visibility.Collapsed : Visibility.Visible;
-        PlayerArea.SetFocusPreview(_focusPreview);
-        WindowAppearance.SetFullscreenFrame(this, _focusPreview);
     }
     private void OnDialogOpened(object sender, DialogOpenedEventArgs e) => PlayerArea.SetDialogCovered(true);
     private void OnDialogClosed(object sender, DialogClosedEventArgs e) => PlayerArea.SetDialogCovered(false);

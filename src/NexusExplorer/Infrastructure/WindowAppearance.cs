@@ -1,5 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using System.Windows;
+using System.ComponentModel;
 using System.Windows.Interop;
 
 namespace NexusExplorer.Infrastructure;
@@ -26,12 +27,30 @@ internal static class WindowAppearance
             Math.Max(0, rect.Right - info.Work.Right) / dpi.DpiScaleX,
             Math.Max(0, rect.Bottom - info.Work.Bottom) / dpi.DpiScaleY);
     }
-    internal static void FillMonitor(Window window)
+    internal static RectInt GetMonitorBounds(Window window)
     {
         var hwnd = new WindowInteropHelper(window).Handle;
         var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
-        if (GetMonitorInfo(MonitorFromWindow(hwnd, 2), ref info))
-            SetWindowPos(hwnd, IntPtr.Zero, info.Monitor.Left, info.Monitor.Top, info.Monitor.Right - info.Monitor.Left, info.Monitor.Bottom - info.Monitor.Top, 0x24);
+        if (!GetMonitorInfo(MonitorFromWindow(hwnd, 2), ref info)) throw new Win32Exception();
+        return info.Monitor;
+    }
+    internal static void FillMonitor(Window window, RectInt monitor)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (!SetWindowPos(hwnd, IntPtr.Zero, monitor.Left, monitor.Top,
+            monitor.Right - monitor.Left, monitor.Bottom - monitor.Top, 0x24)) throw new Win32Exception();
+    }
+    internal static Placement CapturePlacement(Window window)
+    {
+        var placement = new Placement { Length = Marshal.SizeOf<Placement>() };
+        if (!GetWindowPlacement(new WindowInteropHelper(window).Handle, ref placement)) throw new Win32Exception();
+        return placement;
+    }
+    internal static void RestorePlacement(Window window, Placement placement)
+    {
+        // Preserve WINDOWPLACEMENT workspace coordinates. Never mix these with WPF
+        // DIPs or expose four separate position/size updates while restoring.
+        if (!SetWindowPlacement(new WindowInteropHelper(window).Handle, ref placement)) throw new Win32Exception();
     }
     internal static void SetFullscreenFrame(Window window, bool fullscreen)
     {
@@ -41,10 +60,25 @@ internal static class WindowAppearance
         _ = DwmSetWindowAttribute(hwnd, 33, ref corner, sizeof(int));
         _ = DwmSetWindowAttribute(hwnd, 34, ref border, sizeof(int));
     }
+    internal static void SetTransitionsDisabled(Window window, bool disabled)
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        var value = disabled ? 1 : 0;
+        _ = DwmSetWindowAttribute(hwnd, 3, ref value, sizeof(int));
+    }
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out RectInt rect);
-    [DllImport("user32.dll")] private static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, int flags);
-    [StructLayout(LayoutKind.Sequential)] private struct PointInt { public int X, Y; }
-    [StructLayout(LayoutKind.Sequential)] private struct RectInt { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPos(IntPtr window, IntPtr after, int x, int y, int width, int height, int flags);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool GetWindowPlacement(IntPtr window, ref Placement placement);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool SetWindowPlacement(IntPtr window, ref Placement placement);
+    [StructLayout(LayoutKind.Sequential)] internal struct PointInt { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] internal struct RectInt { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)] internal struct Placement
+    {
+        public int Length, Flags, ShowCommand;
+        public PointInt MinPosition, MaxPosition;
+        public RectInt NormalPosition;
+    }
     [StructLayout(LayoutKind.Sequential)] private struct MinMaxInfo { public PointInt Reserved, MaxSize, MaxPosition, MinTrackSize, MaxTrackSize; }
     [StructLayout(LayoutKind.Sequential)] private struct MonitorInfo { public int Size; public RectInt Monitor, Work; public uint Flags; }
     [DllImport("user32.dll")] private static extern IntPtr MonitorFromWindow(IntPtr window, int flags);
