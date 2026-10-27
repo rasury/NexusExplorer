@@ -13,6 +13,34 @@ internal static class ThemeTransition
     private static Task _active = Task.CompletedTask;
     internal static Task Completion => _active.IsCompleted ? Task.CompletedTask : _active;
 
+    internal static BitmapSource CaptureLocal(FrameworkElement target)
+    {
+        target.Dispatcher.VerifyAccess();
+        var bounds = new Rect(0, 0, target.ActualWidth, target.ActualHeight);
+        var dpi = VisualTreeHelper.GetDpi(target);
+        var scale = Math.Min(dpi.DpiScaleX, MotionProfiles.ThemeSnapshotEdge / Math.Max(bounds.Width, bounds.Height));
+        var width = Math.Max(1, (int)Math.Ceiling(bounds.Width * scale));
+        var height = Math.Max(1, (int)Math.Ceiling(bounds.Height * scale));
+        // Sample local content explicitly. Rendering the arranged target directly
+        // also renders its parent-relative offset (notably maximized insets).
+        var sourceBounds = bounds;
+        sourceBounds.Offset(VisualTreeHelper.GetOffset(target));
+        var brush = new VisualBrush(target)
+        {
+            AutoLayoutContent = false, ViewboxUnits = BrushMappingMode.Absolute,
+            Viewbox = sourceBounds, Stretch = Stretch.Fill
+        };
+        var drawing = new DrawingVisual();
+        using (var context = drawing.RenderOpen()) context.DrawRectangle(brush, null, bounds);
+        // Match the rounded pixel dimensions to the exact DIP extent; do not
+        // introduce an extra transparent edge or a second scale on placement.
+        var bitmap = new RenderTargetBitmap(width, height, 96 * width / bounds.Width,
+            96 * height / bounds.Height, PixelFormats.Pbgra32);
+        bitmap.Render(drawing); bitmap.Freeze();
+        brush.Visual = null;
+        return bitmap;
+    }
+
     internal static Task RunAsync(Grid root, Grid? dialog, Action apply)
     {
         root.Dispatcher.VerifyAccess();
@@ -56,18 +84,18 @@ internal static class ThemeTransition
         internal Layer(Grid target, Grid root)
         {
             _target = target;
-            var dpi = VisualTreeHelper.GetDpi(target);
             // This short-lived old-theme veil need not render glass effects at screen DPI.
             // The revealed live UI always retains full resolution.
-            var scale = Math.Min(dpi.DpiScaleX, MotionProfiles.ThemeSnapshotEdge / Math.Max(target.ActualWidth, target.ActualHeight));
-            var bitmap = new RenderTargetBitmap(Math.Max(1, (int)Math.Ceiling(target.ActualWidth * scale)),
-                Math.Max(1, (int)Math.Ceiling(target.ActualHeight * scale)), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
-            bitmap.Render(target); bitmap.Freeze();
-            var top = (target.PointToScreen(new Point()).Y - root.PointToScreen(new Point()).Y) / VisualTreeHelper.GetDpi(root).DpiScaleY;
-            var feather = root.ActualHeight * MotionProfiles.ThemeFeather;
-            _clear = new GradientStop(Colors.Transparent, (-feather - top) / target.ActualHeight);
-            _opaque = new GradientStop(Colors.Black, -top / target.ActualHeight);
-            _distance = (root.ActualHeight + feather) / target.ActualHeight;
+            var bitmap = CaptureLocal(target);
+            // Align separate main/dialog windows in screen pixels, not a mixture
+            // of their local DIP units (they may be on different-DPI monitors).
+            var top = target.PointToScreen(new Point()).Y - root.PointToScreen(new Point()).Y;
+            var rootHeight = root.ActualHeight * VisualTreeHelper.GetDpi(root).DpiScaleY;
+            var targetHeight = target.ActualHeight * VisualTreeHelper.GetDpi(target).DpiScaleY;
+            var feather = rootHeight * MotionProfiles.ThemeFeather;
+            _clear = new GradientStop(Colors.Transparent, (-feather - top) / targetHeight);
+            _opaque = new GradientStop(Colors.Black, -top / targetHeight);
+            _distance = (rootHeight + feather) / targetHeight;
             _image = new Image { Source = bitmap, IsHitTestVisible = false, Stretch = Stretch.Fill,
                 OpacityMask = new LinearGradientBrush(new GradientStopCollection { _clear, _opaque }, new Point(0, 0), new Point(0, 1)) };
             Panel.SetZIndex(_image, int.MaxValue);
