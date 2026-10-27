@@ -18,7 +18,7 @@ internal sealed class DialogSurface : Grid
         var heading = new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
         heading.SetResourceReference(StyleProperty, "DialogTitle");
         content.Children.Add(heading); content.Children.Add(body);
-        Children.Add(new ScrollViewer { Content = content, Padding = new Thickness(8), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+        Children.Add(new ScrollViewer { Content = content, Focusable = false, Padding = new Thickness(8), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
         // Every action row uses the same sizing and an 8px inter-button gap.
         if (actions is Panel actionPanel)
             foreach (var button in actionPanel.Children.OfType<Button>())

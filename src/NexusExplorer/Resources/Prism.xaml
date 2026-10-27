@@ -103,13 +103,24 @@
    </Grid>
   </ControlTemplate></Setter.Value></Setter>
  </Style>
- <!-- Overlay bars share the content viewport: appearing never changes its width. -->
+ <Style x:Key="PrismHorizontalScrollBar" TargetType="ScrollBar" BasedOn="{StaticResource PrismScrollBar}">
+  <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar">
+   <Grid Background="Transparent">
+    <Track x:Name="PART_Track" Orientation="Horizontal" IsDirectionReversed="False">
+     <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageLeftCommand" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.DecreaseRepeatButton>
+     <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="Thumb"><Border x:Name="Grip" Height="4" CornerRadius="2" Background="{DynamicResource BrushSecondaryText}" Opacity="0.5"/><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Grip" Property="Opacity" Value="1"/><Setter TargetName="Grip" Property="Height" Value="6"/></Trigger><Trigger Property="IsDragging" Value="True"><Setter TargetName="Grip" Property="Opacity" Value="1"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+     <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageRightCommand" Focusable="False"><RepeatButton.Template><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></RepeatButton.Template></RepeatButton></Track.IncreaseRepeatButton>
+    </Track>
+   </Grid>
+  </ControlTemplate></Setter.Value></Setter>
+ </Style>
+ <!-- Overlay bars share the content viewport: appearing never changes its width or height. -->
  <Style x:Key="PrismOverlayScrollViewer" TargetType="ScrollViewer">
   <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollViewer">
    <Grid Background="{TemplateBinding Background}">
     <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Margin="{TemplateBinding Padding}" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" CanContentScroll="{TemplateBinding CanContentScroll}"/>
     <ScrollBar x:Name="PART_VerticalScrollBar" Style="{StaticResource PrismScrollBar}" Orientation="Vertical" HorizontalAlignment="Right" Width="10" Margin="0,12,2,12" Minimum="0" Maximum="{TemplateBinding ScrollableHeight}" ViewportSize="{TemplateBinding ViewportHeight}" Value="{Binding VerticalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
-    <ScrollBar x:Name="PART_HorizontalScrollBar" Orientation="Horizontal" VerticalAlignment="Bottom" Height="10" Margin="12,0,12,2" Minimum="0" Maximum="{TemplateBinding ScrollableWidth}" ViewportSize="{TemplateBinding ViewportWidth}" Value="{Binding HorizontalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}" Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
+    <ScrollBar x:Name="PART_HorizontalScrollBar" Style="{StaticResource PrismHorizontalScrollBar}" Orientation="Horizontal" VerticalAlignment="Bottom" Height="10" Margin="12,0,12,2" Minimum="0" Maximum="{TemplateBinding ScrollableWidth}" ViewportSize="{TemplateBinding ViewportWidth}" Value="{Binding HorizontalOffset, RelativeSource={RelativeSource TemplatedParent}, Mode=OneWay}" Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
    </Grid>
   </ControlTemplate></Setter.Value></Setter>
  </Style>

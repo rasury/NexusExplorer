@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 using MaterialDesignThemes.Wpf;
 namespace NexusExplorer.Views.Dialogs;
@@ -7,6 +8,9 @@ public static class InputDialog
 {
     public static async Task<string?> ShowAsync(string title, string label, string? defaultValue, bool selectFileStem = false)
     {
+        // Let the invoking context menu finish closing/restoring focus before
+        // creating the owned input window. No timer or animation-length guess.
+        await Dispatcher.Yield(DispatcherPriority.ContextIdle);
         var box = new TextBox { Text = defaultValue ?? "", Margin = new Thickness(0, 8, 0, 8) };
         box.SetResourceReference(FrameworkElement.StyleProperty, "TextBoxStandard"); HintAssist.SetHint(box, label);
         var footer = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; DialogSurface view = null!;
@@ -15,9 +19,15 @@ public static class InputDialog
         accept.SetResourceReference(FrameworkElement.StyleProperty, "ButtonPrimary"); accept.Click += (_, _) => view.Complete(box.Text);
         footer.Children.Add(cancel); footer.Children.Add(accept);
         view = new DialogSurface(title, box, footer, 480) { RequiresInputWindow = true };
-        box.Loaded += (_, _) => box.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        box.Loaded += (_, _) => box.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() =>
         {
-            box.Focus();
+            if (!box.IsLoaded || !box.IsVisible) return;
+            var window = Window.GetWindow(box);
+            if (window is null || !window.IsVisible) return;
+            window.Activate();
+            FocusManager.SetFocusedElement(window, box);
+            Keyboard.Focus(box);
+            if (!box.IsKeyboardFocused) return;
             var stemLength = System.IO.Path.GetFileNameWithoutExtension(box.Text).Length;
             if (selectFileStem && stemLength > 0)
                 box.Select(0, stemLength);

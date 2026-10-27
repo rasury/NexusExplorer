@@ -38,7 +38,9 @@ internal static class MaterialDialogService
             DialogHost? host = null;
             if (_root is not null && _root.TryGetTarget(out var root) && root.IsLoaded) host = root;
             var scene = host is null ? null : Window.GetWindow(host)?.FindName("WallpaperScene") as FrameworkElement;
-            var glass = new PrismCard { Content = view };
+            // DialogHost's deferred focus traversal must reach an input/action,
+            // never this decorative container (which has no IME caret anchor).
+            var glass = new PrismCard { Content = view, Focusable = false };
             var slide = new TranslateTransform(0, MotionProfiles.DialogOffset);
             glass.RenderTransform = slide;
             glass.Opacity = .15;

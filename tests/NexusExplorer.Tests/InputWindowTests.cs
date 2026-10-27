@@ -24,18 +24,29 @@ public sealed class InputWindowTests
             owner.Show(); await Dispatcher.Yield(DispatcherPriority.Loaded); MaterialDialogService.Register(host);
             try
             {
-                var result = InputDialog.ShowAsync("新建分类", "分类名称", "中文分类");
+                Task<string?>? result = null;
+                var menu = new ContextMenu { PlacementTarget = host };
+                var rename = new MenuItem { Header = "重命名" };
+                rename.Click += (_, _) => result = InputDialog.ShowAsync("重命名", "分类名称", "中文分类");
+                menu.Items.Add(rename); menu.IsOpen = true;
+                await Dispatcher.Yield(DispatcherPriority.Input);
+                var peer = new System.Windows.Automation.Peers.MenuItemAutomationPeer(rename);
+                ((System.Windows.Automation.Provider.IInvokeProvider)peer.GetPattern(System.Windows.Automation.Peers.PatternInterface.Invoke)).Invoke();
+                await BoundedDialogTests.Until(() => result is not null);
                 Window? shell = null;
                 await BoundedDialogTests.Until(() => (shell = System.Windows.Application.Current.Windows.OfType<Window>().FirstOrDefault(w => ReferenceEquals(w.Owner, owner)))?.Content is DialogHost { IsOpen: true, DialogContent: PrismCard { Content: DialogSurface { IsLoaded: true } } });
                 var surface = (DialogSurface)((PrismCard)((DialogHost)shell!.Content).DialogContent!).Content;
                 var body = (StackPanel)((ScrollViewer)surface.Children[0]).Content;
                 var input = body.Children.OfType<TextBox>().Single();
                 await BoundedDialogTests.Until(() => input.SelectionLength == input.Text.Length);
+                Assert.True(input.IsKeyboardFocused);
+                Assert.True(shell.IsActive);
                 Assert.False(owner.IsEnabled);
                 Assert.Equal(WindowStyle.None, shell.WindowStyle);
                 Assert.Equal(ResizeMode.NoResize, shell.ResizeMode);
                 shell.UpdateLayout();
                 await Task.Delay(350); shell.UpdateLayout();
+                Assert.True(input.IsKeyboardFocused, $"Deferred focus: {System.Windows.Input.Keyboard.FocusedElement?.GetType().Name}; active={shell.IsActive}");
                 Assert.True(input.TranslatePoint(new Point(input.ActualWidth, 0), surface).X <= surface.ActualWidth + .1);
                 var hwnd = new WindowInteropHelper(shell).Handle;
                 Assert.Equal(hwnd, ((HwndSource)PresentationSource.FromVisual(input)).Handle);
@@ -77,7 +88,7 @@ public sealed class InputWindowTests
                 Assert.Equal(hwnd, ((HwndSource)PresentationSource.FromVisual(input)).Handle);
                 actions.Single(b => Equals(b.Content, accept ? "确定" : "取消")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Assert.True(shell.IsVisible);
-                Assert.False(result.IsCompleted);
+                Assert.False(result!.IsCompleted);
                 var glass = (PrismCard)dialogHost.DialogContent!;
                 await Task.Delay(45);
                 Assert.True(shell.IsVisible);

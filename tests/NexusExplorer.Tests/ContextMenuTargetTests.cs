@@ -56,7 +56,7 @@ public class ContextMenuTargetTests
         var pinned = new List<Category>();
         for (var i = 0; i < 12; i++)
         {
-            var c = await host.Categories.CreateAsync("快捷分类" + i, null);
+            var c = await host.Categories.CreateAsync("快捷分类特别长的名称" + i, null);
             await host.Categories.PinAsync(c.Id); pinned.Add(c);
         }
         await WpfTestHost.RunAsync(async () =>
@@ -72,6 +72,9 @@ public class ContextMenuTargetTests
             Assert.True(last.TranslatePoint(new Point(), items).Y > first.TranslatePoint(new Point(), items).Y);
             Assert.True(last.TranslatePoint(new Point(), items).X + last.ActualWidth <= items.ActualWidth + 1);
             Assert.True(bar.ActualHeight < 340);
+            Assert.True(first.ActualWidth <= 110); // 102-DIP button plus 8-DIP gap.
+            var scroll = (ScrollViewer)bar.FindName("PinnedScroll");
+            Assert.Same(bar.FindResource("PrismOverlayScrollViewer"), scroll.Style);
         });
     }
 
