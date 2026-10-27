@@ -18,6 +18,15 @@ if ((Test-Path -LiteralPath $taskDll) -and (Get-NativeHash $taskDll) -eq $taskMa
     return
 }
 $taskCache = Join-Path $taskRoot 'native/mpv/cache'
+$taskSevenZip = $env:MPV_7ZIP
+if (!$taskSevenZip) {
+    $task7zCommand = Get-Command 7z.exe -CommandType Application -ErrorAction SilentlyContinue
+    if ($task7zCommand) { $taskSevenZip = $task7zCommand.Source }
+    elseif ($env:ProgramFiles) { $taskSevenZip = Join-Path $env:ProgramFiles '7-Zip/7z.exe' }
+}
+if (!$taskSevenZip -or !(Test-Path -LiteralPath $taskSevenZip -PathType Leaf)) {
+    throw '还原 mpv 需要 7-Zip。请安装 7-Zip，或通过 MPV_7ZIP 环境变量指定 7z.exe。'
+}
 for ($taskAncestor = $taskCache; $taskAncestor; $taskAncestor = [IO.Path]::GetDirectoryName($taskAncestor)) {
     if ((Test-Path -LiteralPath $taskAncestor) -and ((Get-Item -LiteralPath $taskAncestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'SDK 缓存路径包含联接点，停止还原。' }
 }
@@ -35,9 +44,10 @@ if ((Get-NativeHash $taskArchive) -ne $taskManifest.archiveSha256) { throw 'mpv 
 $taskStaging = Join-Path $taskCache ('restore-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $taskStaging | Out-Null
 try {
-    & tar.exe -xf $taskArchive -C $taskStaging $taskManifest.dll
-    if ($LASTEXITCODE -ne 0) { throw '无法解压 mpv；需要支持 7z 的 Windows tar.exe。' }
+    & $taskSevenZip e "-o$taskStaging" -y -- $taskArchive $taskManifest.dll
+    if ($LASTEXITCODE -ne 0) { throw '7-Zip 解压 mpv 失败。' }
     $taskExtracted = Join-Path $taskStaging $taskManifest.dll
+    if (!(Test-Path -LiteralPath $taskExtracted -PathType Leaf)) { throw 'mpv 压缩包未提取出预期 DLL。' }
     if ((Get-NativeHash $taskExtracted) -ne $taskManifest.dllSha256) { throw 'mpv DLL 哈希不匹配。' }
     New-Item -ItemType Directory -Path $taskNative -Force | Out-Null
     Move-Item -LiteralPath $taskExtracted -Destination $taskDll -Force

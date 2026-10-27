@@ -17,13 +17,23 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+      - name: Verify 7-Zip dependency
+        shell: pwsh
+        run: |
+          $sevenZip = Join-Path $env:ProgramFiles '7-Zip/7z.exe'
+          if (!(Test-Path -LiteralPath $sevenZip -PathType Leaf)) {
+            throw '7-Zip is required to restore mpv. Install it on the runner before publishing.'
+          }
+          & $sevenZip i
+          if ($LASTEXITCODE -ne 0) { throw '7-Zip cannot run.' }
+          "MPV_7ZIP=$sevenZip" >> $env:GITHUB_ENV
       - name: Verify release selection
         shell: powershell
         run: ./tests/Release-Selection.Tests.ps1
