@@ -23,7 +23,7 @@
    <Button Style="{StaticResource PdfButton}" ToolTip="适合宽度" Click="OnFitWidth"><md:PackIcon Kind="ArrowExpandHorizontal" Width="24" Height="24"/></Button>
    <Button Style="{StaticResource PdfButton}" ToolTip="顺时针旋转 90°" Click="OnRotate"><md:PackIcon Kind="RotateRight" Width="24" Height="24"/></Button>
   </WrapPanel>
-  <ScrollViewer x:Name="PageScroll" Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="{DynamicResource BrushSecondaryBg}" SizeChanged="OnViewportChanged" PreviewMouseWheel="OnPageWheel">
+  <ScrollViewer x:Name="PageScroll" Style="{StaticResource PrismOverlayScrollViewer}" Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="{DynamicResource BrushSecondaryBg}" SizeChanged="OnViewportChanged" PreviewMouseWheel="OnPageWheel">
    <Image x:Name="PageImage" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Fill" RenderOptions.BitmapScalingMode="HighQuality"/>
   </ScrollViewer>
   <views:PdfContinuousView x:Name="ContinuousArea" Grid.Row="2" Visibility="Collapsed" PreviewMouseWheel="OnPageWheel" SizeChanged="OnViewportChanged"/>

@@ -10,6 +10,7 @@
     <Border x:Name="WallpaperShade" Background="{DynamicResource BrushWallpaperShade}" Visibility="Collapsed"/>
    </Grid>
   </Grid>
+  <views:WallpaperBlurHost x:Name="WallpaperBlur" Source="{Binding ElementName=WallpaperScene}"/>
   <md:DialogHost x:Name="RootDialog" Identifier="Nexus.Main" CloseOnClickAway="False" DialogContentUniformCornerRadius="24" DialogBackground="{DynamicResource BrushPrismDialog}" OverlayBackground="#20456775" DialogOpened="OnDialogOpened" DialogClosed="OnDialogClosed">
    <Grid x:Name="WindowLayout" Margin="6">
     <Grid.RowDefinitions><RowDefinition Height="64"/><RowDefinition Height="*"/></Grid.RowDefinitions>

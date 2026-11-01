@@ -22,12 +22,12 @@ public partial class PlayerPanel : UserControl
     private bool _focusPreview;
     private readonly DispatcherTimer _videoClickTimer = new();
     private PlaybackToken _clickToken;
-    private readonly DispatcherTimer _inspectorTimer = new() { Interval = MotionProfiles.HoverPoll };
+    private readonly DispatcherTimer _inspectorTimer = new(DispatcherPriority.Input);
     private bool _inspectorOpen;
-    private DateTime _inspectorEntered, _inspectorLeft;
+    private bool? _inspectorPendingOpen;
     private bool IsPointerInsideInspector()
     {
-        if (!InspectorSlot.IsVisible) return false;
+        if (!InspectorSlot.IsVisible || PresentationSource.FromVisual(InspectorSlot) is null) return false;
         GetCursorPos(out var point);
         var p = InspectorSlot.PointFromScreen(new Point(point.X, point.Y));
         // Includes the card padding and the stationary edge handle throughout resizing.
@@ -37,29 +37,52 @@ public partial class PlayerPanel : UserControl
     [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool GetCursorPos(out CursorPoint point);
     private void OnInspectorEnter(object sender, MouseEventArgs e)
     {
-        if (!_inspectorTimer.IsEnabled) { _inspectorEntered = DateTime.UtcNow; _inspectorLeft = default; _inspectorTimer.Start(); }
+        if (InspectorPin.IsChecked == true) return;
+        if (_inspectorOpen) CancelInspectorWait();
+        else BeginInspectorWait(true);
     }
-    private void OnInspectorLeave(object sender, MouseEventArgs e) { /* The stable screen rectangle, not animated hit testing, decides exit. */ }
+    private void OnInspectorLeave(object sender, MouseEventArgs e)
+    {
+        if (InspectorPin.IsChecked == true) return;
+        if (_inspectorOpen) BeginInspectorWait(false);
+        else CancelInspectorWait();
+    }
+    private void BeginInspectorWait(bool open)
+    {
+        if (_inspectorPendingOpen == open) return; // Repeated events must not move the deadline.
+        CancelInspectorWait();
+        _inspectorPendingOpen = open;
+        _inspectorTimer.Interval = open ? MotionProfiles.InspectorEnter : MotionProfiles.InspectorLeave;
+        _inspectorTimer.Start();
+    }
+    private void CancelInspectorWait()
+    {
+        _inspectorTimer.Stop();
+        _inspectorPendingOpen = null;
+    }
     private void TrackInspectorPointer()
     {
-        if (InspectorPin.IsChecked == true) { _inspectorTimer.Stop(); return; }
-        if (IsPointerInsideInspector())
+        _inspectorTimer.Stop();
+        if (_inspectorPendingOpen is not bool open) return;
+        if (InspectorPin.IsChecked == true || _focusPreview || !IsLoaded) { CancelInspectorWait(); return; }
+        var inside = IsPointerInsideInspector();
+        if (!open && inside)
         {
-            _inspectorLeft = default;
-            if (!_inspectorOpen && (DateTime.UtcNow - _inspectorEntered) >= MotionProfiles.InspectorEnter) ShowInspector(true);
+            // Animation or the 8px safe edge can cause MouseLeave without a real exit.
+            // Keep the original deadline; once outside, do not wait another 150ms.
+            _inspectorTimer.Interval = MotionProfiles.HoverPoll;
+            _inspectorTimer.Start();
+            return;
         }
-        else
-        {
-            if (_inspectorLeft == default) _inspectorLeft = DateTime.UtcNow;
-            if ((DateTime.UtcNow - _inspectorLeft) >= MotionProfiles.InspectorLeave)
-            { ShowInspector(false); _inspectorTimer.Stop(); }
-        }
+        _inspectorPendingOpen = null;
+        if (!open || inside) ShowInspector(open);
     }
-    private void OnInspectorOpen(object sender, RoutedEventArgs e) => ShowInspector(true);
+    private void OnInspectorOpen(object sender, RoutedEventArgs e) { CancelInspectorWait(); ShowInspector(true); }
     private void OnInspectorPin(object sender, RoutedEventArgs e)
     {
-        if (InspectorPin.IsChecked == true) { _inspectorTimer.Stop(); ShowInspector(true); }
-        else { _inspectorLeft = default; _inspectorTimer.Start(); }
+        CancelInspectorWait();
+        if (InspectorPin.IsChecked == true) ShowInspector(true);
+        else if (!IsPointerInsideInspector()) BeginInspectorWait(false);
     }
     private static readonly DependencyProperty InspectorExtentProperty = DependencyProperty.Register(
         "InspectorExtent", typeof(double), typeof(PlayerPanel), new PropertyMetadata(24d, (d, e) =>
@@ -121,6 +144,7 @@ public partial class PlayerPanel : UserControl
     internal void SetFocusPreview(bool focus)
     {
         if (_focusPreview == focus) return;
+        CancelInspectorWait();
         PrismMotion.Stop(this, InspectorExtentProperty, finish: true);
         if (!_inspectorOpen) InspectorBody.Visibility = Visibility.Hidden;
         _focusPreview = focus;
@@ -201,7 +225,7 @@ public partial class PlayerPanel : UserControl
         ++_detailSizeVersion;
         VolumePopup.IsPopupOpen = false;
         PrismMotion.Stop(this, InspectorExtentProperty, finish: true);
-        _videoClickTimer.Stop(); _inspectorTimer.Stop(); if (_main is not null) _main.CurrentFileChanged -= UpdateDetails;
+        _videoClickTimer.Stop(); CancelInspectorWait(); if (_main is not null) _main.CurrentFileChanged -= UpdateDetails;
         _timer.Stop(); Lifetime?.AttachSurface(IntPtr.Zero);
         if (_initialized) Vm.ReleaseImagePreview();
         ImageDisplay.Source = null;
@@ -250,7 +274,7 @@ public partial class PlayerPanel : UserControl
         var pdf = Vm.Kind == MediaKind.Pdf;
         // Material dialogs use their own popup HWND above the native video.
         // Keep rendering underneath; _dialogCovered still blocks video clicks.
-        VideoView.Visibility = Vm.Kind == MediaKind.Video ? Visibility.Visible : Visibility.Hidden;
+        VideoView.Visibility = Vm.IsVideoSurfaceRequired ? Visibility.Visible : Visibility.Hidden;
         ImageScroll.Visibility = Vm.Kind == MediaKind.Image ? Visibility.Visible : Visibility.Collapsed;
         DocumentArea.Visibility = document ? Visibility.Visible : Visibility.Collapsed;
         if (document && Vm.MediaPath is not null) DocumentArea.SetFile(Vm.MediaPath, Vm.Kind == MediaKind.Markdown, Vm.PreviewVersion);

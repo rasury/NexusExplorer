@@ -16,6 +16,9 @@ public partial class PlayerViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
     public IPlaybackEngine Engine { get; }
+    // Selection remains Video after Stop so Replay still works; native surface visibility
+    // follows the playback lifetime instead of the selected file's extension.
+    internal bool IsVideoSurfaceRequired { get; private set; }
     private CancellationTokenSource? _opening;
     private long _version;
     internal long PreviewVersion => Interlocked.Read(ref _version);
@@ -67,6 +70,7 @@ public partial class PlayerViewModel : ObservableObject
         if (version != Interlocked.Read(ref _version)) return;
         ImageSource = null; ImageScale = 0; Position = TimeSpan.Zero; Duration = TimeSpan.Zero; IsPlaying = false; PlaybackCompleted = false;
         Kind = file is null ? MediaKind.None : GetMediaKind(file.FileName); MediaTitle = file?.FileName; MediaPath = file?.AbsolutePath;
+        IsVideoSurfaceRequired = Kind == MediaKind.Video;
         StateChanged?.Invoke();
         if (file is null) return;
         try
@@ -184,7 +188,7 @@ public partial class PlayerViewModel : ObservableObject
     {
         PlaybackCompleted = false; ReleaseImagePreview();
         if (ReleaseDocumentPreviewAsync is not null) await ReleaseDocumentPreviewAsync();
-        await Engine.StopAndReleaseAsync(); IsPlaying = false; Position = TimeSpan.Zero; StateChanged?.Invoke();
+        await Engine.StopAndReleaseAsync(); IsVideoSurfaceRequired = false; IsPlaying = false; Position = TimeSpan.Zero; StateChanged?.Invoke();
     }
     private async Task FinishPlaybackAsync(PlaybackSnapshot state)
     {

@@ -24,8 +24,8 @@ internal static class MotionProfiles
     internal const double DialogOffset = 12;
     internal static readonly TimeSpan NoticeHold = TimeSpan.FromMilliseconds(500);
     internal static readonly TimeSpan HoverPoll = TimeSpan.FromMilliseconds(40);
-    internal static readonly TimeSpan InspectorEnter = TimeSpan.FromMilliseconds(200);
-    internal static readonly TimeSpan InspectorLeave = TimeSpan.FromMilliseconds(180);
+    internal static readonly TimeSpan InspectorEnter = TimeSpan.FromMilliseconds(150);
+    internal static readonly TimeSpan InspectorLeave = TimeSpan.FromMilliseconds(150);
     internal const int VolumeLeaveMilliseconds = 250;
     internal const double PressDepth = 1.5;
 }

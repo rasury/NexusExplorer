@@ -8,7 +8,7 @@ namespace NexusExplorer.Views;
 /// <summary>Samples only the wallpaper, never video, text or the card itself.</summary>
 public sealed class PrismCard : ContentControl
 {
-    public static readonly DependencyProperty IsPlainProperty = DependencyProperty.Register(nameof(IsPlain), typeof(bool), typeof(PrismCard), new PropertyMetadata(false));
+    public static readonly DependencyProperty IsPlainProperty = DependencyProperty.Register(nameof(IsPlain), typeof(bool), typeof(PrismCard), new PropertyMetadata(false, (d, _) => ((PrismCard)d).UpdateSample()));
     public bool IsPlain { get => (bool)GetValue(IsPlainProperty); set => SetValue(IsPlainProperty, value); }
     internal FrameworkElement? BackdropScene { get; set; }
     private VisualBrush? _dialogBackdrop;
@@ -19,8 +19,17 @@ public sealed class PrismCard : ContentControl
         // No repeated RenderTargetBitmap allocation while dragging opacity.
         _dialogBackdrop = new VisualBrush(scene) { Stretch = Stretch.UniformToFill };
         if (_backdrop is Border border) border.Background = _dialogBackdrop;
+        UpdateSample();
     }
     private FrameworkElement? _backdrop;
+    private Border? _sharedBackdrop;
+    private WallpaperBlurHost? _blurHost;
+    private readonly MatrixTransform _sharedTransform = new();
+    private void OnRendering(object? sender, EventArgs e)
+    {
+        // RenderTransform changes do not necessarily produce LayoutUpdated.
+        if (IsVisible && _blurHost is not null && !IsPlain) UpdateSample();
+    }
     private Grid? _clip;
     private VisualBrush? _sample;
     private Rect _last;
@@ -52,13 +61,15 @@ public sealed class PrismCard : ContentControl
     public PrismCard()
     {
         SetResourceReference(StyleProperty, "PrismCardStyle");
-        Loaded += (_, _) => { LayoutUpdated += QueueSample; QueueSample(null, EventArgs.Empty); };
-        Unloaded += (_, _) => { LayoutUpdated -= QueueSample; BackdropUpdates.Remove(this); _scene = null; if (_sample is not null) _sample.Visual = null; _sample = null; };
+        Loaded += (_, _) => { LayoutUpdated += QueueSample; CompositionTarget.Rendering += OnRendering; QueueSample(null, EventArgs.Empty); };
+        Unloaded += (_, _) => { LayoutUpdated -= QueueSample; CompositionTarget.Rendering -= OnRendering; BackdropUpdates.Remove(this); _scene = null; if (_blurHost is not null) _blurHost.AvailabilityChanged -= UpdateSample; _blurHost = null; if (_sharedBackdrop is not null) _sharedBackdrop.Background = null; if (_sample is not null) _sample.Visual = null; _sample = null; };
     }
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
         _backdrop = GetTemplateChild("PART_Backdrop") as FrameworkElement;
+        _sharedBackdrop = GetTemplateChild("PART_SharedBackdrop") as Border;
+        if (_sharedBackdrop is not null) _sharedBackdrop.RenderTransform = _sharedTransform;
         if (_backdrop is Border border && _dialogBackdrop is not null) border.Background = _dialogBackdrop;
         _clip = GetTemplateChild("PART_Clip") as Grid;
         _sample = null;
@@ -83,9 +94,33 @@ public sealed class PrismCard : ContentControl
     {
         if (_clip is null || _backdrop is not Border backdrop || ActualWidth <= 0 || ActualHeight <= 0) return;
         UpdateClip();
-        if (IsPlain || _dialogBackdrop is not null) return;
+        if (IsPlain || _dialogBackdrop is not null)
+        {
+            if (_sharedBackdrop is not null) _sharedBackdrop.Visibility = Visibility.Collapsed;
+            backdrop.Visibility = IsPlain ? Visibility.Collapsed : Visibility.Visible;
+            return;
+        }
         _scene ??= BackdropScene ?? Window.GetWindow(this)?.FindName("WallpaperScene") as FrameworkElement;
         if (_scene is null || PresentationSource.FromVisual(_scene) is null || PresentationSource.FromVisual(this) is null) return;
+        if (_blurHost is null && Window.GetWindow(this)?.FindName("WallpaperBlur") is WallpaperBlurHost host)
+        {
+            _blurHost = host;
+            host.AvailabilityChanged += UpdateSample;
+        }
+        if (_sharedBackdrop is not null && _blurHost is not null && !_blurHost.IsResizing && ReferenceEquals(_blurHost.Source, _scene)
+            && ReferenceEquals(PresentationSource.FromVisual(_scene), PresentationSource.FromVisual(this)))
+        {
+            var matrix = WallpaperBlurHost.MapUnitSurface(_scene, _clip, _scene.RenderSize);
+            if (_sharedTransform.Matrix != matrix) _sharedTransform.Matrix = matrix;
+            if (!ReferenceEquals(_sharedBackdrop.Background, _blurHost.SharedBrush)) _sharedBackdrop.Background = _blurHost.SharedBrush;
+            _sharedBackdrop.Visibility = Visibility.Visible;
+            backdrop.Visibility = Visibility.Collapsed;
+            backdrop.Background = null;
+            _sample = null;
+            return;
+        }
+        if (_sharedBackdrop is not null) { _sharedBackdrop.Visibility = Visibility.Collapsed; _sharedBackdrop.Background = null; }
+        backdrop.Visibility = Visibility.Visible;
         // Main-window cards share a visual tree. Avoid two screen-coordinate conversions per sample.
         var origin = TranslatePoint(new Point(-18, -18), _scene);
         var rect = new Rect(origin, new Size(ActualWidth + 36, ActualHeight + 36));

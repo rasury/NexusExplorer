@@ -5,6 +5,13 @@
   ScrollViewer.CanContentScroll="True" ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
   VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
   VirtualizingPanel.CacheLength="0.5" VirtualizingPanel.CacheLengthUnit="Page" ScrollViewer.ScrollChanged="OnScrollChanged">
+  <ListBox.Template><ControlTemplate TargetType="ListBox">
+   <ScrollViewer x:Name="PART_ScrollViewer" Style="{StaticResource PrismOverlayScrollViewer}" Background="{TemplateBinding Background}"
+    Padding="{TemplateBinding Padding}" CanContentScroll="True" Focusable="False"
+    HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}" VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}">
+    <ItemsPresenter/>
+   </ScrollViewer>
+  </ControlTemplate></ListBox.Template>
   <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
   <ListBox.ItemContainerStyle>
    <Style TargetType="ListBoxItem">
