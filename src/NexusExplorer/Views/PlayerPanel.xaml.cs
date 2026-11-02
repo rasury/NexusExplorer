@@ -20,7 +20,9 @@ public partial class PlayerPanel : UserControl
     public event Action? FocusPreviewRequested;
     public event Action? ExitFocusPreviewRequested;
     private bool _focusPreview;
-    private readonly DispatcherTimer _videoClickTimer = new();
+    // Input remains gated by pending Win32 input. Keep this short, one-shot
+    // callback in the foreground range; native commands still run asynchronously.
+    private readonly DispatcherTimer _videoClickTimer = new(DispatcherPriority.Render);
     private PlaybackToken _clickToken;
     private readonly DispatcherTimer _inspectorTimer = new(DispatcherPriority.Input);
     private bool _inspectorOpen;
@@ -179,7 +181,12 @@ public partial class PlayerPanel : UserControl
         InitializeComponent();
         InitializeImmersiveControls();
         _videoClickTimer.Interval = TimeSpan.FromMilliseconds(250);
-        _videoClickTimer.Tick += async (_, _) => { _videoClickTimer.Stop(); if (!_dialogCovered && Controls?.CurrentToken == _clickToken && Vm.Kind == MediaKind.Video) await RunAsync(Vm.TogglePlayPauseAsync); };
+        _videoClickTimer.Tick += async (_, _) =>
+        {
+            _videoClickTimer.Stop();
+            if (!_dialogCovered && Controls?.CurrentToken == _clickToken && Vm.Kind == MediaKind.Video)
+                await RunAsync(Vm.TogglePlayPauseAsync);
+        };
         _inspectorTimer.Tick += (_, _) => TrackInspectorPointer();
         VolumeSlider.AddHandler(Mouse.LostMouseCaptureEvent, new MouseEventHandler(OnVolumeSliderLostCapture), true);
         VolumePopup.Closed += OnVolumePopupClosed;
@@ -218,7 +225,12 @@ public partial class PlayerPanel : UserControl
     private void OnNativeEscape() => ExitFocusPreviewRequested?.Invoke();
     private void OnNativeVideoDoubleClick() { _videoClickTimer.Stop(); if (!_dialogCovered) FocusPreviewRequested?.Invoke(); }
     private void OnNativeVideoClick()
-    { if (!_dialogCovered && Vm.Kind == MediaKind.Video && Controls is not null) { _clickToken = Controls.CurrentToken; _videoClickTimer.Stop(); _videoClickTimer.Start(); } }
+    {
+        if (!_dialogCovered && Vm.Kind == MediaKind.Video && Controls is not null)
+        {
+            _clickToken = Controls.CurrentToken; _videoClickTimer.Stop(); _videoClickTimer.Start();
+        }
+    }
     public void Detach()
     {
         StopImmersiveControls();

@@ -151,7 +151,7 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, IMediaPlaybackControls,
         foreach (var name in new[] { "track-list", "audio-params", "audio-out-params" }) Observe(generation, name, MpvNative.Format.Node);
     }
     private async Task SendAsync(params string[] values)
-        => await SendAsync(null, values);
+        => await SendAsync(null, values).ConfigureAwait(false);
     private async Task SendAsync(Action? accepted, params string[] values)
     {
         if (_pumpFailure is not null) throw new OperationException("播放器事件接收失败。", _pumpFailure);
@@ -164,8 +164,8 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, IMediaPlaybackControls,
                 using var arguments = new MpvNative.Arguments(values);
                 MpvNative.Check(MpvNative.CommandAsync(_handle, id, arguments.Pointer), values[0]);
                 accepted?.Invoke();
-            });
-            await completion.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            }).ConfigureAwait(false);
+            await completion.Task.WaitAsync(TimeSpan.FromSeconds(15)).ConfigureAwait(false);
         }
         catch { _pending.TryRemove(id, out _); throw; }
     }
@@ -252,8 +252,9 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, IMediaPlaybackControls,
     }
     public Task TogglePauseAsync() => ControlAsync(async () =>
     {
-        var paused = await Task.Run(() => MpvNative.GetString(_handle, "pause"));
-        await SendAsync("set", "pause", paused == "yes" ? "no" : "yes");
+        // Keep native control independent of UI dispatcher continuations.
+        var paused = await Task.Run(() => MpvNative.GetString(_handle, "pause")).ConfigureAwait(false);
+        await SendAsync("set", "pause", paused == "yes" ? "no" : "yes").ConfigureAwait(false);
     });
     public Task SetVolumeAsync(int volume)
     {
@@ -291,12 +292,12 @@ public sealed class MpvPlaybackEngine : IPlaybackEngine, IMediaPlaybackControls,
     private async Task ControlAsync(Func<Task> action, bool requireMedia = true)
     {
         var token = CurrentToken;
-        await _commands.WaitAsync();
+        await _commands.WaitAsync().ConfigureAwait(false);
         try
         {
             EnsureUsable();
             if (_handle == IntPtr.Zero || (requireMedia && (token.MediaGeneration == 0 || token != CurrentToken || token.MediaGeneration != Interlocked.Read(ref _generation)))) return;
-            await action();
+            await action().ConfigureAwait(false);
         }
         finally { _commands.Release(); }
     }

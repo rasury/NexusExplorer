@@ -52,7 +52,7 @@ internal sealed class FullscreenCurtain : IDisposable
     {
         // Drain WPF's layout/render work before waiting for this process's queued DWM updates.
         await _window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-        await _window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
+        await _window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Input);
         DwmFlush();
     }
 
