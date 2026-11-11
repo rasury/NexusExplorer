@@ -26,6 +26,7 @@ public partial class MainViewModel : ObservableObject
     public NavigationViewModel Navigation { get; }
     private long _browseVersion;
     private long _activationVersion;
+    internal long ActivationVersion => Interlocked.Read(ref _activationVersion);
 
     public MainViewModel(CategoryService categories, FileService files, OrganizationService organization, IPlaybackEngine media)
     {

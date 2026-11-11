@@ -144,6 +144,92 @@ public class MaterialFeedbackTests
     }
 
     [Fact]
+    public async Task VolumeTrackPressAndDragChangesVolumeBeforeRelease()
+    {
+        using var host = new TestHost();
+        await WpfTestHost.RunAsync(async () =>
+        {
+            var main = new MainViewModel(host.Categories, host.Files, host.Organization, new FakePlaybackEngine());
+            var panel = new PlayerPanel();
+            panel.Initialize(main);
+            main.Player.Kind = MediaKind.Audio;
+            main.Player.ResetZoom();
+            var window = new Window { Content = panel, Width = 600, Height = 480, ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen, Topmost = true };
+            GetCursorPos(out var saved);
+            bool pressed = false;
+            try
+            {
+                window.Show();
+                window.Activate();
+                window.UpdateLayout();
+                var popup = (PopupBox)panel.FindName("VolumePopup");
+                var slider = (Slider)panel.FindName("VolumeSlider");
+                void Move(FrameworkElement target, double y)
+                {
+                    var point = target.PointToScreen(new Point(target.ActualWidth / 2, target.ActualHeight * y));
+                    Assert.True(SetCursorPos((int)point.X, (int)point.Y));
+                }
+                Move(popup, .5);
+                await BoundedDialogTests.Until(() => slider.IsVisible && slider.ActualHeight > 100);
+                var track = (Track)slider.Template.FindName("PART_Track", slider);
+                double ThumbPosition(double volume)
+                {
+                    slider.Value = volume;
+                    slider.UpdateLayout();
+                    return track.Thumb.TranslatePoint(new Point(track.Thumb.ActualWidth / 2, track.Thumb.ActualHeight / 2), slider).Y / slider.ActualHeight;
+                }
+                var low = ThumbPosition(0);
+                var high = ThumbPosition(100);
+                slider.Value = 50;
+                slider.UpdateLayout();
+                void MoveToVolume(int value) => Move(slider, low + (high - low) * value / 100);
+                async Task CheckVolume(int expected)
+                {
+                    await Task.Delay(100);
+                    Assert.InRange(main.Player.Volume, expected - 1, expected + 1);
+                }
+                MoveToVolume(75);
+                await BoundedDialogTests.Until(() => slider.IsMouseOver);
+                GetCursorPos(out var down);
+                Assert.Equal(((HwndSource)PresentationSource.FromVisual(slider)).Handle, WindowFromPoint(down));
+                mouse_event(2, 0, 0, 0, UIntPtr.Zero);
+                pressed = true;
+                await BoundedDialogTests.Until(() => slider.IsMouseCaptured);
+                await CheckVolume(75);
+                MoveToVolume(25);
+                await CheckVolume(25);
+                MoveToVolume(60);
+                await CheckVolume(60);
+                mouse_event(4, 0, 0, 0, UIntPtr.Zero);
+                pressed = false;
+                await BoundedDialogTests.Until(() => System.Windows.Input.Mouse.Captured is null);
+                MoveToVolume(35);
+                await Task.Delay(100);
+                mouse_event(2, 0, 0, 0, UIntPtr.Zero);
+                pressed = true;
+                await CheckVolume(35);
+                mouse_event(4, 0, 0, 0, UIntPtr.Zero);
+                pressed = false;
+            }
+            finally
+            {
+                if (pressed) mouse_event(4, 0, 0, 0, UIntPtr.Zero);
+                SetCursorPos(saved.X, saved.Y);
+                panel.Detach();
+                window.Close();
+            }
+        });
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CursorPoint { public int X, Y; }
+    [DllImport("user32.dll")] private static extern bool GetCursorPos(out CursorPoint point);
+    [DllImport("user32.dll")] private static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] private static extern IntPtr WindowFromPoint(CursorPoint point);
+    [DllImport("user32.dll")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, UIntPtr extra);
+
+    [Fact]
     public async Task VolumeThumbReleaseDoesNotLeavePopupCapturingTheRestOfTheWindow()
     {
         using var host=new TestHost();

@@ -77,7 +77,8 @@
       <md:PopupBox.ToggleContent><md:PackIcon x:Name="VolumeIcon" Kind="VolumeHigh" Width="24" Height="24"/></md:PopupBox.ToggleContent>
       <views:PrismCard x:Name="VolumeGlass" Padding="8,12" Margin="8"><StackPanel Width="40">
        <TextBlock x:Name="VolumeValueText" Text="100" HorizontalAlignment="Center" Style="{StaticResource TextCaption}" Margin="0,0,0,8"/>
-       <Slider x:Name="VolumeSlider" Orientation="Vertical" Height="144" Width="20" HorizontalAlignment="Center" Minimum="0" Maximum="100" Value="100" IsMoveToPointEnabled="True" ValueChanged="OnVolumeChanged" AutomationProperties.Name="音量"/>
+       <!-- The track press handler owns both the initial jump and the following drag. -->
+       <Slider x:Name="VolumeSlider" Orientation="Vertical" Height="144" Width="20" HorizontalAlignment="Center" Minimum="0" Maximum="100" Value="100" IsMoveToPointEnabled="False" ValueChanged="OnVolumeChanged" AutomationProperties.Name="音量"/>
       </StackPanel></views:PrismCard>
      </views:VolumeHoverPopupBox>
      <ToggleButton x:Name="HardwareCheck" Style="{StaticResource HardwareDecodeToggle}" Width="40" Height="40" Checked="OnHardwareChanged" Unchecked="OnHardwareChanged">

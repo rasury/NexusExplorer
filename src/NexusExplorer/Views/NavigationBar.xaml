@@ -49,6 +49,19 @@
             <Setter Property="BorderBrush" Value="{DynamicResource BrushAccentOrange}"/>
             <Setter Property="Width" Value="56"/><Setter Property="MinWidth" Value="56"/>
             <Setter Property="ToolTip" Value="把当前文件归入此分类"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="True">
+                    <Setter Property="Background" Value="#166534"/>
+                    <Setter Property="Foreground" Value="White"/>
+                </Trigger>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsEnabled" Value="True"/>
+                        <Condition Property="IsMouseOver" Value="True"/>
+                    </MultiTrigger.Conditions>
+                    <Setter Property="Background" Value="#16A34A"/>
+                </MultiTrigger>
+            </Style.Triggers>
         </Style>
     </UserControl.Resources>
 

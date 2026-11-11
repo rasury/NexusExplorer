@@ -336,6 +336,23 @@ public sealed class RefactorRegressionTests : IDisposable
     }
 
     [Fact]
+    public async Task DeletingPlayingBatchAdvancesOnceToNextSurvivingQueueItem()
+    {
+        var category = await _host.Categories.CreateAsync("队列", null);
+        foreach (var name in new[] { "A.mp4", "B.mp4", "C.mp4", "D.mp4" })
+            await _host.Files.AddAsync(_host.CreateTestFile(name), category.Id);
+        using var engine = new FakePlaybackEngine { HoldFile = true };
+        var main = new MainViewModel(_host.Categories, _host.Files, _host.Organization, engine);
+        main.FileList.RecycleBin = _host.RecycleBin;
+        await main.SelectCategoryAsync(category);
+        var queue = main.CurrentFiles.ToArray();
+        await main.SelectFileAsync(queue[1]);
+        await main.FileList.DeleteManyAsync(new[] { queue[1], queue[2] }, false);
+        Assert.Equal(queue[3].Id, main.CurrentFile?.Id);
+        Assert.Equal(new[] { queue[1].AbsolutePath, queue[3].AbsolutePath }, engine.Played);
+    }
+
+    [Fact]
     public async Task DeletePlayingFileReleasesRealFileHandleBeforeRecycle()
     {
         var a = await _host.Categories.CreateAsync("A", null);

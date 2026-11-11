@@ -189,14 +189,57 @@ public partial class PlayerPanel : UserControl
         };
         _inspectorTimer.Tick += (_, _) => TrackInspectorPointer();
         VolumeSlider.AddHandler(Mouse.LostMouseCaptureEvent, new MouseEventHandler(OnVolumeSliderLostCapture), true);
+        VolumeSlider.PreviewMouseLeftButtonDown += OnVolumeTrackPressed;
+        VolumeSlider.PreviewMouseMove += OnVolumeTrackMove;
+        VolumeSlider.PreviewMouseLeftButtonUp += OnVolumeTrackReleased;
         VolumePopup.Closed += OnVolumePopupClosed;
         VideoView.SurfaceCreated += hwnd => { if (_main is not null) Lifetime?.AttachSurface(hwnd); };
     }
+    private void OnVolumeTrackPressed(object sender, MouseButtonEventArgs e)
+    {
+        if (CategoryFilePanel.FindAncestor<Thumb>(e.OriginalSource as DependencyObject) is not null) return;
+        if (VolumeSlider.Template.FindName("PART_Track", VolumeSlider) is Track track && VolumeSlider.CaptureMouse())
+        {
+            SetVolumeFromPointer(track, e);
+            e.Handled = true;
+        }
+    }
+
+    private void OnVolumeTrackMove(object sender, MouseEventArgs e)
+    {
+        if (!VolumeSlider.IsMouseCaptured) return;
+        if (e.LeftButton != MouseButtonState.Pressed) { VolumeSlider.ReleaseMouseCapture(); return; }
+        if (VolumeSlider.Template.FindName("PART_Track", VolumeSlider) is Track track)
+            SetVolumeFromPointer(track, e);
+    }
+
+    private void SetVolumeFromPointer(Track track, MouseEventArgs e)
+    {
+        // Map the pointer to the absolute travel of the thumb centre. ValueFromPoint
+        // uses the current value and the last arranged thumb position, which can
+        // describe different frames when mouse capture delivers another move.
+        var thumbHeight = track.Thumb.ActualHeight;
+        var travel = track.ActualHeight - thumbHeight;
+        if (travel <= 0) return;
+        var fraction = Math.Clamp((e.GetPosition(track).Y - thumbHeight / 2) / travel, 0, 1);
+        if (!track.IsDirectionReversed) fraction = 1 - fraction;
+        var volume = VolumeSlider.Minimum + fraction * (VolumeSlider.Maximum - VolumeSlider.Minimum);
+        VolumeSlider.SetCurrentValue(Slider.ValueProperty, Math.Round(volume));
+    }
+
+    private void OnVolumeTrackReleased(object sender, MouseButtonEventArgs e)
+    {
+        if (!VolumeSlider.IsMouseCaptured) return;
+        VolumeSlider.ReleaseMouseCapture();
+        e.Handled = true;
+    }
+
     private void OnVolumeSliderLostCapture(object sender, MouseEventArgs e)
     {
         // PopupBox's StaysOpen handler otherwise recaptures the entire subtree when
         // Thumb releases capture. Hover volume is not a modal input surface.
-        if (e.OriginalSource is Thumb thumb && ReferenceEquals(CategoryFilePanel.FindAncestor<Slider>(thumb), VolumeSlider))
+        if (ReferenceEquals(e.OriginalSource, VolumeSlider) ||
+            e.OriginalSource is Thumb thumb && ReferenceEquals(CategoryFilePanel.FindAncestor<Slider>(thumb), VolumeSlider))
             e.Handled = true;
     }
     private void OnVolumePopupClosed(object sender, RoutedEventArgs e)

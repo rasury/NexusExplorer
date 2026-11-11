@@ -20,7 +20,8 @@ public sealed class VolumeHoverPopupBox : PopupBox
         _leaveTimer = new DispatcherTimer(DispatcherPriority.Input, Dispatcher)
         { Interval = MotionProfiles.HoverPoll };
         _leaveTimer.Tick += (_, _) => ProcessHover(Mouse.GetPosition(this),
-            Mouse.Captured is Thumb thumb && PopupContent is FrameworkElement content && content.IsAncestorOf(thumb),
+            Mouse.Captured is UIElement captured && (captured is Thumb or System.Windows.Controls.Slider)
+                && PopupContent is FrameworkElement content && content.IsAncestorOf(captured),
             Environment.TickCount64);
         Unloaded += (_, _) => SetCurrentValue(IsPopupOpenProperty, false);
     }

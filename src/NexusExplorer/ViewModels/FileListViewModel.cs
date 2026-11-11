@@ -251,19 +251,33 @@ public partial class FileListViewModel : ObservableObject
             ? $"从分类移除 {files.Count} 个文件？"
             : $"删除 {files.Count} 个文件？")) return;
         var failures = new List<string>(); var succeeded = 0;
+        long? advanceAfterDeletion = null;
         foreach (var file in files)
         {
             try
             {
-                if (_main.CurrentFile?.Id == file.Id) await _main.SelectFileAsync(null);
+                long? stopVersion = null;
+                if (_main.CurrentFile?.Id == file.Id)
+                {
+                    var playback = _main.Player.Engine.Snapshot;
+                    var release = _main.SelectFileAsync(null);
+                    if (playback.IsPlaying || playback.IsPaused) stopVersion = _main.ActivationVersion;
+                    await release;
+                }
                 if (removeOnly) await _fileService.RemoveAsync(file.Id);
-                else await _fileService.DeleteAsync(file.Id, RecycleBin);
+                else
+                {
+                    await _fileService.DeleteAsync(file.Id, RecycleBin);
+                    if (stopVersion.HasValue) advanceAfterDeletion = stopVersion;
+                }
                 succeeded++;
             }
             catch (Exception ex) { failures.Add($"{file.FileName}: {ex.Message}"); Serilog.Log.Error(ex, "批量文件操作失败"); }
         }
         await _main.RefreshOrganizationStatesAsync();
         await _main.RefreshFilesAsync();
+        if (advanceAfterDeletion == _main.ActivationVersion)
+            await _main.PlayAdjacentAsync(1, classification: true);
         if (failures.Count > 0) await ReportErrorAsync($"成功 {succeeded}，失败 {failures.Count}\n" + string.Join("\n", failures));
     }
 }
